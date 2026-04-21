@@ -20,7 +20,7 @@ export default function DMRNew() {
         }
       />
 
-      <div className="mb-5 rounded-xl border-2 border-dashed bg-gradient-surface p-6 text-center">
+      <div className="mb-5 rounded-xl border-2 border-dashed border-primary/30 bg-gradient-surface p-6 text-center">
         <Camera className="mx-auto h-10 w-10 text-primary" />
         <h3 className="mt-3 font-display text-base font-semibold">Start with OCR Capture</h3>
         <p className="mt-1 text-sm text-muted-foreground">Auto-extract vendor, invoice, PO, and line items in seconds</p>
@@ -34,42 +34,44 @@ export default function DMRNew() {
           <Section title="Document Information">
             <Grid>
               <Field label="Flow type">
-                <select className="select-base">
+                <select className="h-9 w-full rounded-md border bg-background px-2.5 text-sm outline-none focus:shadow-glow">
                   <option>PO-based</option>
                   <option>Non-PO</option>
                 </select>
               </Field>
-              <Field label="PO Number"><input className="input-base" placeholder="PO-45100012" /></Field>
-              <Field label="Vendor"><input className="input-base" placeholder="Search vendor master…" /></Field>
-              <Field label="Invoice No"><input className="input-base" placeholder="INV/…" /></Field>
-              <Field label="Invoice Date"><input type="date" className="input-base" /></Field>
-              <Field label="Site / Project"><input className="input-base" placeholder="Site BLR-01" /></Field>
+              <Field label="PO Number"><TextInput placeholder="PO-45100012" /></Field>
+              <Field label="Vendor"><TextInput placeholder="Search vendor master…" /></Field>
+              <Field label="Invoice No"><TextInput placeholder="INV/…" /></Field>
+              <Field label="Invoice Date"><TextInput type="date" /></Field>
+              <Field label="Site / Project"><TextInput placeholder="Site BLR-01" /></Field>
             </Grid>
           </Section>
 
           <Section title="Line Items">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="py-2 font-medium">Material</th>
-                  <th className="py-2 font-medium">UOM</th>
-                  <th className="py-2 font-medium text-right">Qty</th>
-                  <th className="py-2 font-medium text-right">Rate</th>
-                  <th className="py-2 font-medium text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[1, 2].map((i) => (
-                  <tr key={i} className="border-b last:border-0">
-                    <td className="py-2 pr-2"><input className="input-base" placeholder="Search material…" /></td>
-                    <td className="py-2 pr-2"><input className="input-base w-20" defaultValue="BAG" /></td>
-                    <td className="py-2 pr-2"><input className="input-base w-24 text-right" /></td>
-                    <td className="py-2 pr-2"><input className="input-base w-28 text-right" /></td>
-                    <td className="py-2 text-right font-mono">—</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <th className="py-2 font-medium">Material</th>
+                    <th className="py-2 font-medium">UOM</th>
+                    <th className="py-2 font-medium text-right">Qty</th>
+                    <th className="py-2 font-medium text-right">Rate</th>
+                    <th className="py-2 font-medium text-right">Amount</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {[1, 2].map((i) => (
+                    <tr key={i} className="border-b last:border-0">
+                      <td className="py-2 pr-2"><TextInput placeholder="Search material…" /></td>
+                      <td className="py-2 pr-2"><TextInput className="w-20" defaultValue="BAG" /></td>
+                      <td className="py-2 pr-2"><TextInput className="w-24 text-right" /></td>
+                      <td className="py-2 pr-2"><TextInput className="w-28 text-right" /></td>
+                      <td className="py-2 text-right font-mono">—</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <Button variant="outline" size="sm" className="mt-3">+ Add line</Button>
           </Section>
         </div>
@@ -92,12 +94,16 @@ export default function DMRNew() {
           </Section>
         </div>
       </div>
-
-      <style>{`
-        .input-base { @apply h-9 w-full rounded-md border bg-background px-2.5 text-sm outline-none focus:shadow-glow; }
-        .select-base { @apply input-base; }
-      `}</style>
     </>
+  );
+}
+
+function TextInput({ className = "", ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      className={`h-9 w-full rounded-md border bg-background px-2.5 text-sm outline-none focus:shadow-glow ${className}`}
+    />
   );
 }
 

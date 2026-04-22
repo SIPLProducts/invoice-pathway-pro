@@ -35,17 +35,16 @@ function coerce(v: string, type: FieldDef["type"]): string | number | boolean {
 export default function DMRNew() {
   const navigate = useNavigate();
   const apis = useSapApis();
-  // Show every configured API that can plausibly create or read records.
+  // Only show gate-shaped APIs (Get_DMR, Create_Gate_Service, ZUI_Gate_Service…)
+  // — hides MB52, ZMRB, SAP_343/344 from the New DMR source dropdown.
   const liveApis = apis.filter(
     (a) =>
-      a.type === "live" ||
-      a.type === "sync" ||
-      (a.requestHeaderFields?.length ?? 0) > 0 ||
-      (a.responseHeaderFields?.length ?? 0) > 0,
+      /gate|dmr/i.test(a.name) ||
+      (a.proxyPath ?? a.listEndpoint ?? "").startsWith("/api/gate"),
   );
 
   const [selectedName, setSelectedName] = useState<string>(
-    liveApis.find((a) => a.name === "ZUI_Gate_Service")?.name ?? liveApis[0]?.name ?? "",
+    liveApis.find((a) => /gate|dmr/i.test(a.name))?.name ?? liveApis[0]?.name ?? "",
   );
 
   const api: SapApi | undefined = useMemo(

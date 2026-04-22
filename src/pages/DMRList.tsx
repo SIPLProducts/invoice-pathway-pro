@@ -7,7 +7,8 @@ import { inr } from "@/lib/format";
 import { Plus, Search, Filter, Download, Eye, FileText, MapPin, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { SapLiveTable } from "@/components/SapLiveTable";
-import { GATE_HEADER_SCHEMA } from "@/lib/sapApiSchemas";
+import { buildSchemaFromApi } from "@/lib/sapApiSchemas";
+import { getSapApi } from "@/lib/sapApisStore";
 
 const tabs = [
   "All",
@@ -102,7 +103,17 @@ export default function DMRPage() {
       </div>
 
       {active === "SAP Gate Entries" ? (
-        <SapLiveTable schema={GATE_HEADER_SCHEMA} />
+        (() => {
+          const api = getSapApi("ZUI_Gate_Service");
+          if (!api) {
+            return (
+              <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
+                ZUI_Gate_Service is not configured. Open SAP Settings to add it.
+              </div>
+            );
+          }
+          return <SapLiveTable schema={buildSchemaFromApi(api)} />;
+        })()
       ) : (
         <>
           {/* Toolbar */}

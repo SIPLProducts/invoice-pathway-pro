@@ -33,6 +33,8 @@ app.use(
       "Authorization",
       "x-proxy-secret",
       "ngrok-skip-browser-warning",
+      "x-sap-jsessionid",
+      "x-sap-vcap-id",
     ],
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   }),

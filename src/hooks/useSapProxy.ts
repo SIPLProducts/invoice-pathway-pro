@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SapApiSchema } from "@/lib/sapApiSchemas";
 import type { SapApi } from "@/lib/sapApisStore";
 import { getPath } from "@/lib/getPath";
+import { getSapSessionHeaders, useSapSession } from "@/lib/sapSession";
 
 export interface SapProxyError {
   message: string;
@@ -37,6 +38,8 @@ export function useSapProxy<T = Record<string, unknown>>(
   const proxyUrl = useMemo(() => resolveProxyUrl(api), [api]);
   const proxyConfigured = Boolean(proxyUrl);
   const secret = api?.middleware?.secret ?? "";
+  const session = useSapSession();
+  const sessionKey = session ? `${session.jsessionid}|${session.vcapId}` : "";
 
   const [rows, setRows] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,6 +59,7 @@ export function useSapProxy<T = Record<string, unknown>>(
         const headers: Record<string, string> = {
           Accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          ...getSapSessionHeaders(),
         };
         if (secret) headers["x-proxy-secret"] = secret;
         const res = await fetch(`${proxyUrl}${schema.proxyPath}`, { headers });
@@ -110,7 +114,7 @@ export function useSapProxy<T = Record<string, unknown>>(
     return () => {
       cancelled = true;
     };
-  }, [proxyUrl, proxyConfigured, secret, schema.proxyPath, schema.rowsPath, tick]);
+  }, [proxyUrl, proxyConfigured, secret, schema.proxyPath, schema.rowsPath, tick, sessionKey]);
 
   return { rows, loading, error, lastFetched, proxyConfigured, proxyUrl, refresh };
 }

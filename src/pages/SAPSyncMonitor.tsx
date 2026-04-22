@@ -99,9 +99,11 @@ export default function SAPSyncMonitor() {
                         <Badge
                           variant="outline"
                           className={
-                            a.tag === "Vpn_tunnel"
+                            a.tag === "VPN Tunnel"
                               ? "border-warning/40 bg-warning/10 text-warning"
-                              : "border-primary/30 bg-primary/10 text-primary"
+                              : a.tag === "Direct"
+                                ? "border-muted-foreground/30 bg-muted text-muted-foreground"
+                                : "border-primary/30 bg-primary/10 text-primary"
                           }
                         >
                           {a.tag}
@@ -112,10 +114,10 @@ export default function SAPSyncMonitor() {
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">{a.description}</p>
                       <code className="mt-2 inline-block rounded bg-muted px-2 py-1 font-mono text-xs">
-                        {a.endpoint}
+                        {a.baseUrl}{a.endpoint}
                       </code>
-                      {a.lastSynced && (
-                        <div className="mt-2 text-xs text-muted-foreground">Last synced: {a.lastSynced}</div>
+                      {a.autoSync.lastSync && (
+                        <div className="mt-2 text-xs text-muted-foreground">Last synced: {a.autoSync.lastSync}</div>
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">

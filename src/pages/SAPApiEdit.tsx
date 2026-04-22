@@ -333,11 +333,13 @@ export default function SAPApiEdit() {
                 />
               </Field>
 
-              <Field label="Proxy Secret / Password" hint="Shared secret sent as x-proxy-secret header.">
+              <Field label="Proxy Secret / Password" hint="Shared secret sent as x-proxy-secret header (optional).">
                 <div className="relative">
                   <Input
                     type={showSecret ? "text" : "password"}
-                    defaultValue="supersecretvalue123456"
+                    value={details.proxySecret}
+                    onChange={(e) => setDetails((d) => ({ ...d, proxySecret: e.target.value }))}
+                    placeholder="Optional"
                     className="pr-10"
                   />
                   <button

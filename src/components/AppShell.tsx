@@ -17,6 +17,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
+import logo from "@/assets/rithwik-logo.png";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,19 +64,20 @@ export function AppShell() {
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-5">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-accent shadow-glow">
-              <ShieldCheck className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <div className="leading-tight">
-              <div className="font-display text-sm font-bold text-sidebar-accent-foreground">DMR & GRN</div>
-              <div className="text-[10px] uppercase tracking-wider text-sidebar-foreground/60">Portal v2.4</div>
-            </div>
-          </div>
-          <button className="lg:hidden text-sidebar-foreground" onClick={() => setOpen(false)}>
+        <div className="flex h-16 items-center justify-between border-b border-sidebar-border bg-white px-5">
+          <img src={logo} alt="Rithwik" className="h-8 w-auto" />
+          <button className="lg:hidden text-foreground" onClick={() => setOpen(false)}>
             <X className="h-5 w-5" />
           </button>
+        </div>
+        <div className="flex items-center gap-2.5 border-b border-sidebar-border px-5 py-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-accent shadow-glow">
+            <ShieldCheck className="h-4 w-4 text-primary-foreground" />
+          </div>
+          <div className="leading-tight">
+            <div className="font-display text-sm font-bold text-sidebar-accent-foreground">DMR & GRN Portal</div>
+            <div className="text-[10px] uppercase tracking-wider text-sidebar-foreground/60">Enterprise · v2.4</div>
+          </div>
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3 scrollbar-thin">

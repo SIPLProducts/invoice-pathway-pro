@@ -127,6 +127,8 @@ function buildRequestConfig(extraCookies, extraHeaders = {}) {
     // When forwarding a real browser session, do NOT send Basic auth alongside it.
     if (!useBearer && !useOauthCc) {
       cfg.auth = null;
+      // Explicitly drop the instance-level Authorization header so SAP only sees the cookie session.
+      cfg.headers.Authorization = undefined;
     }
   }
   return cfg;

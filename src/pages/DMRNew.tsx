@@ -35,17 +35,14 @@ function coerce(v: string, type: FieldDef["type"]): string | number | boolean {
 export default function DMRNew() {
   const navigate = useNavigate();
   const apis = useSapApis();
-  // Only show gate-shaped APIs (Get_DMR, Create_Gate_Service, ZUI_Gate_Service…)
-  // — hides MB52, ZMRB, SAP_343/344 from the New DMR source dropdown.
-  const liveApis = apis.filter(
-    (a) =>
-      /gate|dmr/i.test(a.name) ||
-      (a.proxyPath ?? a.listEndpoint ?? "").startsWith("/api/gate"),
-  );
-
-  const [selectedName, setSelectedName] = useState<string>(
-    liveApis.find((a) => /gate|dmr/i.test(a.name))?.name ?? liveApis[0]?.name ?? "",
-  );
+  // New DMR is always Create_Gate_Service. No dropdown.
+  // Fallback to any gate-shaped API if Create_Gate_Service isn't configured yet.
+  const selectedName = useMemo(() => {
+    const cgs = apis.find((a) => /create[_ ]?gate[_ ]?service/i.test(a.name));
+    if (cgs) return cgs.name;
+    const gate = apis.find((a) => /gate/i.test(a.name));
+    return gate?.name ?? "";
+  }, [apis]);
 
   const api: SapApi | undefined = useMemo(
     () => apis.find((a) => a.name === selectedName),

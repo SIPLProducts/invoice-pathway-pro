@@ -41,6 +41,17 @@ const tabMap: Record<string, string | null> = {
 export default function DMRPage() {
   const [active, setActive] = useState<(typeof tabs)[number]>("All");
   const [q, setQ] = useState("");
+  const apis = useSapApis();
+  // Any API that has at least one configured response column qualifies as a "live" SAP source for this tab
+  const liveApis = apis.filter(
+    (a) =>
+      a.type === "live" ||
+      a.type === "sync" ||
+      (a.responseHeaderFields?.length ?? 0) > 0,
+  );
+  const [selectedApiName, setSelectedApiName] = useState<string>("");
+  const selectedApi =
+    liveApis.find((a) => a.name === selectedApiName) ?? liveApis[0] ?? null;
 
   const filtered = dmrs.filter((d) => {
     const tab = tabMap[active];

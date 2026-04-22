@@ -14,7 +14,10 @@ import {
   Menu,
   X,
   ChevronDown,
+  ChevronRight,
   ShieldCheck,
+  Plug,
+  Activity,
 } from "lucide-react";
 import { useState } from "react";
 import logo from "@/assets/rithwik-logo.png";
@@ -29,12 +32,30 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const nav = [
+type NavChild = { to: string; label: string; icon: typeof LayoutDashboard };
+type NavItem = {
+  to?: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  end?: boolean;
+  badge?: number;
+  children?: NavChild[];
+};
+
+const nav: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/dmr", label: "DMR", icon: FileText },
   { to: "/ocr", label: "OCR Capture", icon: Camera },
   { to: "/grn", label: "GRN", icon: PackageCheck },
   { to: "/tracker", label: "SAP Tracker", icon: Database },
+  {
+    label: "SAP Module",
+    icon: Plug,
+    children: [
+      { to: "/sap/monitor", label: "Sync Monitor", icon: Activity },
+      { to: "/sap/settings", label: "API Settings", icon: Settings },
+    ],
+  },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, badge: 8 },
   { to: "/documents", label: "Documents", icon: FolderOpen },
   { to: "/reports", label: "Reports", icon: BarChart3 },
@@ -44,7 +65,10 @@ const nav = [
 export function AppShell() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
-  const current = nav.find((n) => (n.end ? location.pathname === n.to : location.pathname.startsWith(n.to)));
+  const [sapOpen, setSapOpen] = useState(location.pathname.startsWith("/sap"));
+  const current = nav.find((n) =>
+    n.to ? (n.end ? location.pathname === n.to : location.pathname.startsWith(n.to)) : false,
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -84,30 +108,76 @@ export function AppShell() {
           <div className="px-2 py-2 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
             Workspace
           </div>
-          {nav.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              onClick={() => setOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
-                )
-              }
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              <span className="flex-1">{item.label}</span>
-              {item.badge && (
-                <span className="rounded-full bg-sidebar-primary px-1.5 py-0.5 text-[10px] font-semibold text-sidebar-primary-foreground">
-                  {item.badge}
-                </span>
-              )}
-            </NavLink>
-          ))}
+          {nav.map((item) => {
+            if (item.children) {
+              const groupActive = location.pathname.startsWith("/sap");
+              return (
+                <div key={item.label}>
+                  <button
+                    onClick={() => setSapOpen((s) => !s)}
+                    className={cn(
+                      "group flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      groupActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                    )}
+                  >
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    <span className="flex-1 text-left">{item.label}</span>
+                    <ChevronRight
+                      className={cn("h-3.5 w-3.5 transition-transform", sapOpen && "rotate-90")}
+                    />
+                  </button>
+                  {sapOpen && (
+                    <div className="ml-3 mt-0.5 space-y-0.5 border-l border-sidebar-border pl-2">
+                      {item.children.map((c) => (
+                        <NavLink
+                          key={c.to}
+                          to={c.to}
+                          onClick={() => setOpen(false)}
+                          className={({ isActive }) =>
+                            cn(
+                              "flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                              isActive
+                                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                                : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
+                            )
+                          }
+                        >
+                          <c.icon className="h-3.5 w-3.5 shrink-0" />
+                          {c.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to!}
+                end={item.end}
+                onClick={() => setOpen(false)}
+                className={({ isActive }) =>
+                  cn(
+                    "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                  )
+                }
+              >
+                <item.icon className="h-4 w-4 shrink-0" />
+                <span className="flex-1">{item.label}</span>
+                {item.badge && (
+                  <span className="rounded-full bg-sidebar-primary px-1.5 py-0.5 text-[10px] font-semibold text-sidebar-primary-foreground">
+                    {item.badge}
+                  </span>
+                )}
+              </NavLink>
+            );
+          })}
         </nav>
 
         <div className="border-t border-sidebar-border p-3">

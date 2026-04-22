@@ -15,6 +15,9 @@ import Approvals from "./pages/Approvals";
 import Documents from "./pages/Documents";
 import Reports from "./pages/Reports";
 import Admin from "./pages/Admin";
+import SAPSettings from "./pages/SAPSettings";
+import SAPSyncMonitor from "./pages/SAPSyncMonitor";
+import SAPApiEdit from "./pages/SAPApiEdit";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -39,6 +42,9 @@ const App = () => (
             <Route path="/approvals" element={<Approvals />} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/sap/settings" element={<SAPSettings />} />
+            <Route path="/sap/settings/edit/:id" element={<SAPApiEdit />} />
+            <Route path="/sap/monitor" element={<SAPSyncMonitor />} />
             <Route path="/admin" element={<Admin />} />
           </Route>
           <Route path="*" element={<NotFound />} />

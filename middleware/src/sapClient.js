@@ -115,22 +115,45 @@ let csrfToken = null;
 let csrfFetchedAt = 0;
 const CSRF_TTL_MS = 25 * 60 * 1000;
 
-function ensureJson(res, path) {
+/**
+ * Build per-request axios config that:
+ *  - injects a Cookie header from caller-supplied browser cookies (e.g. JSESSIONID, __VCAP_ID__)
+ *  - when cookies are present, drops Basic auth so SAP uses the browser session instead
+ */
+function buildRequestConfig(extraCookies, extraHeaders = {}) {
+  const cfg = { headers: { ...extraHeaders } };
+  if (extraCookies && String(extraCookies).trim()) {
+    cfg.headers.Cookie = String(extraCookies).trim();
+    // When forwarding a real browser session, do NOT send Basic auth alongside it.
+    if (!useBearer && !useOauthCc) {
+      cfg.auth = null;
+    }
+  }
+  return cfg;
+}
+
+function ensureJson(res, path, hadCookies = false) {
   const authErr = detectAuthHtml(res);
   if (authErr) {
+    if (hadCookies && authErr.code === "sap_auth_redirect") {
+      authErr.code = "sap_session_expired";
+      authErr.message =
+        "SAP browser session expired or invalid. Re-paste fresh JSESSIONID and __VCAP_ID__ from Chrome DevTools.";
+      authErr.hint =
+        "Open the SAP OData URL in Chrome, log in, then DevTools → Application → Cookies → copy JSESSIONID and __VCAP_ID__ into SAP Settings → SAP Browser Session.";
+    }
     console.error(`[sapClient] ${path} -> non-JSON (${authErr.code})`);
     throw authErr;
   }
 }
 
-async function ensureCsrf(force = false) {
+async function ensureCsrf(force = false, extraCookies = "") {
   const stale = Date.now() - csrfFetchedAt > CSRF_TTL_MS;
   if (csrfToken && !force && !stale) return csrfToken;
 
-  const res = await http.get(`/GateHeader?$top=0&sap-client=${SAP_CLIENT}`, {
-    headers: { "x-csrf-token": "fetch" },
-  });
-  ensureJson(res, "CSRF fetch");
+  const cfg = buildRequestConfig(extraCookies, { "x-csrf-token": "fetch" });
+  const res = await http.get(`/GateHeader?$top=0&sap-client=${SAP_CLIENT}`, cfg);
+  ensureJson(res, "CSRF fetch", Boolean(extraCookies));
   if (res.status >= 400) {
     const err = new Error(`CSRF fetch failed (${res.status})`);
     err.sapStatus = res.status;
@@ -148,33 +171,34 @@ function withClient(path) {
   return path + (path.includes("?") ? "&" : "?") + `sap-client=${SAP_CLIENT}`;
 }
 
-async function sapGet(path) {
-  let res = await http.get(withClient(path));
-  // On 401 in oauth_cc mode, force token refresh and retry once
+async function sapGet(path, extraCookies = "") {
+  const cfg = buildRequestConfig(extraCookies);
+  let res = await http.get(withClient(path), cfg);
   if (res.status === 401 && useOauthCc) {
     cachedToken = null;
-    res = await http.get(withClient(path));
+    res = await http.get(withClient(path), cfg);
   }
-  ensureJson(res, `GET ${path}`);
+  ensureJson(res, `GET ${path}`, Boolean(extraCookies));
   if (res.status >= 400) {
     throw fromAxios({ message: `GET ${path} failed`, response: res });
   }
   return res.data;
 }
 
-async function sapWrite(method, path, body, extraHeaders = {}) {
+async function sapWrite(method, path, body, extraHeaders = {}, extraCookies = "") {
   const doRequest = async () => {
-    const token = await ensureCsrf();
+    const token = await ensureCsrf(false, extraCookies);
+    const cfg = buildRequestConfig(extraCookies, {
+      "x-csrf-token": token,
+      "Content-Type": "application/json",
+      "If-Match": "*",
+      ...extraHeaders,
+    });
     return http.request({
       method,
       url: withClient(path),
       data: body,
-      headers: {
-        "x-csrf-token": token,
-        "Content-Type": "application/json",
-        "If-Match": "*",
-        ...extraHeaders,
-      },
+      ...cfg,
     });
   };
 
@@ -190,25 +214,26 @@ async function sapWrite(method, path, body, extraHeaders = {}) {
     csrfToken = null;
     res = await doRequest();
   }
-  ensureJson(res, `${method} ${path}`);
+  ensureJson(res, `${method} ${path}`, Boolean(extraCookies));
   if (res.status >= 400) {
     throw fromAxios({ message: `${method} ${path} failed`, response: res });
   }
   return res.data;
 }
 
-async function sapBatch(multipartBody, boundary) {
+async function sapBatch(multipartBody, boundary, extraCookies = "") {
   const doRequest = async () => {
-    const token = await ensureCsrf();
+    const token = await ensureCsrf(false, extraCookies);
+    const cfg = buildRequestConfig(extraCookies, {
+      "x-csrf-token": token,
+      "Content-Type": `multipart/mixed; boundary=${boundary}`,
+      Accept: "multipart/mixed",
+    });
     return http.request({
       method: "POST",
       url: withClient(`/$batch`),
       data: multipartBody,
-      headers: {
-        "x-csrf-token": token,
-        "Content-Type": `multipart/mixed; boundary=${boundary}`,
-        Accept: "multipart/mixed",
-      },
+      ...cfg,
       transformRequest: [(d) => d],
     });
   };
@@ -222,7 +247,7 @@ async function sapBatch(multipartBody, boundary) {
     csrfToken = null;
     res = await doRequest();
   }
-  ensureJson(res, "$batch");
+  ensureJson(res, "$batch", Boolean(extraCookies));
   if (res.status >= 400) {
     throw fromAxios({ message: `$batch failed`, response: res });
   }
@@ -239,4 +264,25 @@ function getAuthInfo() {
   };
 }
 
-module.exports = { sapGet, sapWrite, sapBatch, ensureCsrf, SAP_CLIENT, getAuthInfo };
+/**
+ * Build the Cookie string the middleware should forward to SAP, from request headers
+ * supplied by the frontend (x-sap-jsessionid, x-sap-vcap-id).
+ */
+function buildCookieFromHeaders(req) {
+  const j = req?.headers?.["x-sap-jsessionid"];
+  const v = req?.headers?.["x-sap-vcap-id"];
+  const parts = [];
+  if (j) parts.push(`JSESSIONID=${j}`);
+  if (v) parts.push(`__VCAP_ID__=${v}`);
+  return parts.join("; ");
+}
+
+module.exports = {
+  sapGet,
+  sapWrite,
+  sapBatch,
+  ensureCsrf,
+  SAP_CLIENT,
+  getAuthInfo,
+  buildCookieFromHeaders,
+};

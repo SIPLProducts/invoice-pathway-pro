@@ -195,8 +195,8 @@ export default function DMRNew() {
           No SAP API selected.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-5">
+        <div className="space-y-5">
+          <div className="space-y-5">
             <Section title={`${api.name} — Header`}>
               <Grid>
                 {headerFields.map((f) => (
@@ -290,23 +290,6 @@ export default function DMRNew() {
             )}
           </div>
 
-          <div className="space-y-4">
-            <Section title="Request Preview">
-              <pre className="max-h-96 overflow-auto rounded-lg bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">
-                {JSON.stringify(
-                  itemFields.length ? { ...header, _Item: items } : header,
-                  null,
-                  2,
-                )}
-              </pre>
-            </Section>
-
-            <Section title="Attachments">
-              <div className="rounded-lg border-2 border-dashed p-6 text-center text-sm text-muted-foreground">
-                Drop files here or <span className="font-medium text-primary">browse</span>
-              </div>
-            </Section>
-          </div>
         </div>
       )}
     </>

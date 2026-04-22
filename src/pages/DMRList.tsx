@@ -8,7 +8,14 @@ import { Plus, Search, Filter, Download, Eye, FileText, MapPin, Calendar } from 
 import { Link } from "react-router-dom";
 import { SapLiveTable } from "@/components/SapLiveTable";
 import { buildSchemaFromApi } from "@/lib/sapApiSchemas";
-import { getSapApi } from "@/lib/sapApisStore";
+import { useSapApis } from "@/lib/sapApisStore";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const tabs = [
   "All",

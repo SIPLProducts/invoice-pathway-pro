@@ -92,12 +92,12 @@ export function SapLiveTable({ api, schema }: Props) {
       )}
 
       {proxyConfigured && error && (
-        <div className="px-4 py-6 text-sm text-destructive">
+        <div className="border-b bg-destructive/5 px-4 py-3 text-sm text-destructive">
           Failed to load: {error}
         </div>
       )}
 
-      {proxyConfigured && !error && (
+      {proxyConfigured && (
         <div className="overflow-x-auto scrollbar-thin">
           <Table>
             <TableHeader>

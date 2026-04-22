@@ -124,7 +124,9 @@ export default function DMRPage() {
                 <Link to="/sap/settings" className="font-semibold text-primary hover:underline">
                   SAP Settings
                 </Link>{" "}
-                to add one (e.g. <code className="font-mono text-xs">Get_DMR</code>).
+                and add a GET API for the gate service (e.g.{" "}
+                <code className="font-mono text-xs">Get_DMR</code> or{" "}
+                <code className="font-mono text-xs">ZUI_Gate_Service</code>).
               </div>
             );
           }

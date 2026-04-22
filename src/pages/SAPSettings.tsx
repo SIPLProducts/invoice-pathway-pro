@@ -27,10 +27,23 @@ import {
   Cloud,
   Monitor,
   Activity,
+  KeyRound,
+  ChevronDown,
+  ChevronRight,
+  Save,
+  Eraser,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSapApis, deleteApi, type SapMethod } from "@/lib/sapApisStore";
 import { AddApiDialog } from "@/components/AddApiDialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  useSapSession,
+  setSapSession,
+  clearSapSession,
+  getSapSessionHeaders,
+} from "@/lib/sapSession";
 
 const methodColor: Record<SapMethod, string> = {
   GET: "bg-success/15 text-success border-success/30",
@@ -50,8 +63,26 @@ export default function SAPSettings() {
   const [tab, setTab] = useState("apis");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const session = useSapSession();
+  const [jsessionInput, setJsessionInput] = useState("");
+  const [vcapInput, setVcapInput] = useState("");
+  const [showCookieHelp, setShowCookieHelp] = useState(false);
 
-  const testSapConnection = async () => {
+  const saveSession = () => {
+    if (!jsessionInput.trim() && !vcapInput.trim()) {
+      toast.error("Paste at least one cookie value before saving.");
+      return;
+    }
+    setSapSession({ jsessionid: jsessionInput, vcapId: vcapInput });
+    setJsessionInput("");
+    setVcapInput("");
+    toast.success("SAP browser session saved. Refresh tables to use it.");
+  };
+
+  const removeSession = () => {
+    clearSapSession();
+    toast.success("SAP browser session cleared.");
+  };
     const base =
       apis.find((a) => a.middleware?.url)?.middleware?.url?.trim().replace(/\/$/, "") ||
       ((import.meta.env.VITE_SAP_PROXY_URL as string | undefined)?.trim().replace(/\/$/, "") ?? "");

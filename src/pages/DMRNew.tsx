@@ -120,6 +120,28 @@ export default function DMRNew() {
     );
   };
 
+  // Auto-derive form fields on initial mount when the default-selected API
+  // has no request fields configured but does have a response schema.
+  useEffect(() => {
+    if (!api) return;
+    if (derivedHeaderFields !== null || derivedItemFields !== null) return;
+    const hasReqHeader = (api.requestHeaderFields ?? []).some((f) => f.showInForm !== false && f.key);
+    const hasReqItem = (api.requestItemFields ?? []).some((f) => f.showInForm !== false && f.key);
+    const hasRespHeader = (api.responseHeaderFields?.length ?? 0) > 0;
+    const hasRespItem = (api.responseItemFields?.length ?? 0) > 0;
+    if (!hasReqHeader && hasRespHeader) {
+      const hf = (api.responseHeaderFields ?? []).map((f) => ({ ...f, showInForm: true }));
+      setDerivedHeaderFields(hf);
+      setHeader(emptyRowFromFields(hf));
+    }
+    if (!hasReqItem && hasRespItem) {
+      const itf = (api.responseItemFields ?? []).map((f) => ({ ...f, showInForm: true }));
+      setDerivedItemFields(itf);
+      setItems([emptyRowFromFields(itf)]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api?.name]);
+
   const { submit, loading, proxyConfigured } = useSapCreate(api ?? null);
 
   const onSubmit = async () => {

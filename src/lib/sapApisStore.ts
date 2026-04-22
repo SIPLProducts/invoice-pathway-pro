@@ -72,6 +72,20 @@ const seed: SapApi[] = [
     type: "sync",
     autoSync: { enabled: true, frequencyMinutes: 5, lastSync: "22/4/2026, 10:52:03 am" },
   },
+  {
+    name: "ZUI_Gate_Service",
+    description:
+      "SAP BTP Public Cloud - Gate Service (RAP). GET GateHeader?$expand=_Item via Node middleware proxy. Configure VITE_SAP_PROXY_URL on the frontend.",
+    baseUrl: "https://fa530628-e5cb-4817-8c70-9991654babd5.abap-web.us10.hana.ondemand.com",
+    endpoint:
+      "/sap/opu/odata4/sap/zui_gate_service/srvd_a2x/sap/zui_gate_service/0001/GateHeader?$expand=_Item&sap-client=100",
+    method: "GET",
+    auth: "Basic",
+    status: "Active",
+    tag: "Direct",
+    type: "live",
+    autoSync: { enabled: false, frequencyMinutes: 5 },
+  },
 ];
 
 function load(): SapApi[] {

@@ -83,6 +83,8 @@ export default function SAPSettings() {
     clearSapSession();
     toast.success("SAP browser session cleared.");
   };
+
+  const testSapConnection = async () => {
     const base =
       apis.find((a) => a.middleware?.url)?.middleware?.url?.trim().replace(/\/$/, "") ||
       ((import.meta.env.VITE_SAP_PROXY_URL as string | undefined)?.trim().replace(/\/$/, "") ?? "");
@@ -93,7 +95,11 @@ export default function SAPSettings() {
     setTesting(true);
     try {
       const res = await fetch(`${base}/api/health/sap`, {
-        headers: { Accept: "application/json", "ngrok-skip-browser-warning": "true" },
+        headers: {
+          Accept: "application/json",
+          "ngrok-skip-browser-warning": "true",
+          ...getSapSessionHeaders(),
+        },
       });
       const data = await res.json().catch(() => null);
       if (res.ok && data?.ok) {

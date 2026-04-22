@@ -6,6 +6,7 @@ const cors = require("cors");
 const morgan = require("morgan");
 
 const gateRoutes = require("./routes/gate");
+const healthRoutes = require("./routes/health");
 const { errorEnvelope } = require("./util/errors");
 
 const PORT = Number(process.env.PORT || 8080);
@@ -52,6 +53,7 @@ app.use(
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "sap-gate-proxy" }));
 
+app.use("/api/health", healthRoutes);
 app.use("/api/gate", gateRoutes);
 
 // 404
@@ -66,7 +68,14 @@ app.use((err, _req, res, _next) => {
   const status = err.sapStatus || 500;
   res
     .status(status)
-    .json(errorEnvelope(err.code || "internal_error", err.message || "Unknown error", err.sapBody));
+    .json(
+      errorEnvelope(
+        err.code || "internal_error",
+        err.message || "Unknown error",
+        err.sapBody,
+        err.hint,
+      ),
+    );
 });
 
 app.listen(PORT, () => {

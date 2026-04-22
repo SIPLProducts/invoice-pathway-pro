@@ -1,6 +1,7 @@
 "use strict";
 
 const axios = require("axios");
+const qs = require("querystring");
 const { CookieJar } = require("tough-cookie");
 const { wrapper } = require("axios-cookiejar-support");
 const { fromAxios, detectAuthHtml } = require("./util/errors");
@@ -11,29 +12,76 @@ const {
   SAP_CLIENT = "100",
   SAP_USER,
   SAP_PASSWORD,
-  SAP_AUTH_MODE = "basic", // "basic" | "bearer"
+  SAP_AUTH_MODE = "basic", // "basic" | "bearer" | "oauth_cc"
   SAP_BEARER_TOKEN,
+  SAP_OAUTH_TOKEN_URL,
+  SAP_OAUTH_CLIENT_ID,
+  SAP_OAUTH_CLIENT_SECRET,
 } = process.env;
 
-const useBearer = String(SAP_AUTH_MODE).toLowerCase() === "bearer";
+const authMode = String(SAP_AUTH_MODE).toLowerCase();
+const useBearer = authMode === "bearer";
+const useOauthCc = authMode === "oauth_cc";
 
 if (!SAP_BASE_URL || !SAP_SERVICE_PATH) {
-  // eslint-disable-next-line no-console
   console.warn("[sapClient] Missing SAP_BASE_URL / SAP_SERVICE_PATH.");
 }
 if (useBearer && !SAP_BEARER_TOKEN) {
-  // eslint-disable-next-line no-console
   console.warn("[sapClient] SAP_AUTH_MODE=bearer but SAP_BEARER_TOKEN is empty.");
-} else if (!useBearer && (!SAP_USER || !SAP_PASSWORD)) {
-  // eslint-disable-next-line no-console
+} else if (useOauthCc && (!SAP_OAUTH_TOKEN_URL || !SAP_OAUTH_CLIENT_ID || !SAP_OAUTH_CLIENT_SECRET)) {
+  console.warn(
+    "[sapClient] SAP_AUTH_MODE=oauth_cc but SAP_OAUTH_TOKEN_URL / SAP_OAUTH_CLIENT_ID / SAP_OAUTH_CLIENT_SECRET missing.",
+  );
+} else if (!useBearer && !useOauthCc && (!SAP_USER || !SAP_PASSWORD)) {
   console.warn("[sapClient] Basic auth selected but SAP_USER / SAP_PASSWORD missing.");
 }
 
+console.log(
+  `[sapClient] mode=${authMode} ${
+    useOauthCc
+      ? `tokenUrl=${SAP_OAUTH_TOKEN_URL} clientId=${SAP_OAUTH_CLIENT_ID}`
+      : useBearer
+        ? "(static bearer token)"
+        : `user=${SAP_USER || "(unset)"}`
+  }`,
+);
+
 const jar = new CookieJar();
 
-const baseHeaders = {
-  Accept: "application/json",
-};
+// --- OAuth client_credentials token cache ---
+let cachedToken = null;
+let cachedTokenExp = 0; // epoch ms
+
+async function fetchOauthToken() {
+  if (!useOauthCc) return null;
+  const now = Date.now();
+  if (cachedToken && now < cachedTokenExp - 60_000) return cachedToken;
+
+  const res = await axios.post(
+    SAP_OAUTH_TOKEN_URL,
+    qs.stringify({ grant_type: "client_credentials" }),
+    {
+      auth: { username: SAP_OAUTH_CLIENT_ID, password: SAP_OAUTH_CLIENT_SECRET },
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      timeout: 20000,
+      validateStatus: () => true,
+    },
+  );
+  if (res.status >= 400 || !res.data?.access_token) {
+    const err = new Error(`OAuth token fetch failed (${res.status}): ${JSON.stringify(res.data).slice(0, 300)}`);
+    err.code = "sap_oauth_token_failed";
+    err.sapStatus = 502;
+    err.hint =
+      "Check SAP_OAUTH_TOKEN_URL, SAP_OAUTH_CLIENT_ID and SAP_OAUTH_CLIENT_SECRET in middleware/.env. They come from the Communication Arrangement (OAuth 2.0) in your SAP tenant.";
+    throw err;
+  }
+  cachedToken = res.data.access_token;
+  const expiresIn = Number(res.data.expires_in || 3600);
+  cachedTokenExp = now + expiresIn * 1000;
+  return cachedToken;
+}
+
+const baseHeaders = { Accept: "application/json" };
 if (useBearer && SAP_BEARER_TOKEN) {
   baseHeaders.Authorization = `Bearer ${SAP_BEARER_TOKEN}`;
 }
@@ -41,27 +89,35 @@ if (useBearer && SAP_BEARER_TOKEN) {
 const http = wrapper(
   axios.create({
     baseURL: `${SAP_BASE_URL}${SAP_SERVICE_PATH}`,
-    ...(useBearer
+    ...(useBearer || useOauthCc
       ? {}
       : { auth: { username: SAP_USER || "", password: SAP_PASSWORD || "" } }),
     timeout: 30000,
     jar,
     withCredentials: true,
-    maxRedirects: 0, // never silently follow login redirects
+    maxRedirects: 0,
     validateStatus: () => true,
     headers: baseHeaders,
   }),
 );
+
+// Inject fresh oauth_cc bearer on every request
+http.interceptors.request.use(async (config) => {
+  if (useOauthCc) {
+    const token = await fetchOauthToken();
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 let csrfToken = null;
 let csrfFetchedAt = 0;
 const CSRF_TTL_MS = 25 * 60 * 1000;
 
 function ensureJson(res, path) {
-  // Detect SAP login HTML even when status is 200
   const authErr = detectAuthHtml(res);
   if (authErr) {
-    // eslint-disable-next-line no-console
     console.error(`[sapClient] ${path} -> non-JSON (${authErr.code})`);
     throw authErr;
   }
@@ -93,7 +149,12 @@ function withClient(path) {
 }
 
 async function sapGet(path) {
-  const res = await http.get(withClient(path));
+  let res = await http.get(withClient(path));
+  // On 401 in oauth_cc mode, force token refresh and retry once
+  if (res.status === 401 && useOauthCc) {
+    cachedToken = null;
+    res = await http.get(withClient(path));
+  }
   ensureJson(res, `GET ${path}`);
   if (res.status >= 400) {
     throw fromAxios({ message: `GET ${path} failed`, response: res });
@@ -118,6 +179,10 @@ async function sapWrite(method, path, body, extraHeaders = {}) {
   };
 
   let res = await doRequest();
+  if (res.status === 401 && useOauthCc) {
+    cachedToken = null;
+    res = await doRequest();
+  }
   if (
     res.status === 403 &&
     /csrf/i.test(res.headers["x-csrf-token"] || res.data?.toString?.() || "")
@@ -149,6 +214,10 @@ async function sapBatch(multipartBody, boundary) {
   };
 
   let res = await doRequest();
+  if (res.status === 401 && useOauthCc) {
+    cachedToken = null;
+    res = await doRequest();
+  }
   if (res.status === 403) {
     csrfToken = null;
     res = await doRequest();
@@ -160,4 +229,14 @@ async function sapBatch(multipartBody, boundary) {
   return res.data;
 }
 
-module.exports = { sapGet, sapWrite, sapBatch, ensureCsrf, SAP_CLIENT };
+function getAuthInfo() {
+  return {
+    authMode,
+    user: useOauthCc || useBearer ? null : SAP_USER || null,
+    tokenUrl: useOauthCc ? SAP_OAUTH_TOKEN_URL : null,
+    clientId: useOauthCc ? SAP_OAUTH_CLIENT_ID : null,
+    hasBearer: useBearer ? Boolean(SAP_BEARER_TOKEN) : null,
+  };
+}
+
+module.exports = { sapGet, sapWrite, sapBatch, ensureCsrf, SAP_CLIENT, getAuthInfo };

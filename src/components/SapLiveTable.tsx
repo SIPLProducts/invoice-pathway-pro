@@ -95,8 +95,24 @@ export function SapLiveTable({ api, schema }: Props) {
 
       {proxyConfigured && error && (
         <div className="border-b bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          <div className="font-semibold">Failed to load from SAP</div>
-          <div className="mt-1 text-xs whitespace-pre-wrap">{error}</div>
+          <div className="flex items-center gap-2 font-semibold">
+            <AlertCircle className="h-4 w-4" />
+            {error.code === "sap_auth_redirect"
+              ? "SAP authentication failed"
+              : "Failed to load from SAP"}
+            {error.code && (
+              <code className="rounded bg-destructive/10 px-1.5 py-0.5 font-mono text-[10px]">
+                {error.code}
+              </code>
+            )}
+          </div>
+          <div className="mt-1 whitespace-pre-wrap text-xs">{error.message}</div>
+          {error.hint && (
+            <div className="mt-2 rounded border border-destructive/30 bg-background/60 px-3 py-2 text-xs text-foreground">
+              <span className="font-semibold">How to fix: </span>
+              {error.hint}
+            </div>
+          )}
         </div>
       )}
 

@@ -1,7 +1,7 @@
 "use strict";
 
-function errorEnvelope(code, message, sapBody) {
-  return { error: { code, message, sapBody: sapBody ?? null } };
+function errorEnvelope(code, message, sapBody, hint) {
+  return { error: { code, message, sapBody: sapBody ?? null, hint: hint ?? null } };
 }
 
 function fromAxios(err) {
@@ -31,18 +31,21 @@ function detectAuthHtml(res) {
   if (!looksHtml) return null;
 
   const isAuthRedirect =
-    /oauth\/authorize|login\/callback|saml|authentication\.|sap-saml|j_security_check/i.test(
+    /oauth\/authorize|login\/callback|saml|authentication\.|sap-saml|j_security_check|fragmentafterlogin|locationafterlogin/i.test(
       bodyStr,
     );
 
   const err = new Error(
     isAuthRedirect
-      ? "SAP redirected to login (OAuth/SAML). The middleware is not authenticated against this SAP tenant. Use a service-user with Basic auth that doesn't require the IDP login flow, or switch SAP_AUTH_MODE to 'bearer' and provide SAP_BEARER_TOKEN."
+      ? "SAP redirected to login (OAuth/SAML/IDP). The middleware is not authenticated against this SAP tenant."
       : "SAP returned HTML instead of JSON. Check SAP_BASE_URL / SAP_SERVICE_PATH and that the user has access to this OData service.",
   );
   err.code = isAuthRedirect ? "sap_auth_redirect" : "sap_non_json_response";
   err.sapStatus = 502;
   err.sapBody = bodyStr.slice(0, 500);
+  err.hint = isAuthRedirect
+    ? "Your SAP_USER appears to be a dialog/IDP user. ABAP Environment (Steampunk) tenants reject Basic auth from regular BTP users. Fix: (1) create a Communication User via Communication Arrangement in SAP and put its credentials in middleware/.env as SAP_USER/SAP_PASSWORD with SAP_AUTH_MODE=basic; OR (2) switch the Communication Arrangement to OAuth 2.0 and set SAP_AUTH_MODE=oauth_cc with SAP_OAUTH_TOKEN_URL/SAP_OAUTH_CLIENT_ID/SAP_OAUTH_CLIENT_SECRET. Then restart `node server.js`."
+    : "Verify SAP_BASE_URL and SAP_SERVICE_PATH in middleware/.env match a valid OData v4 service the user can access.";
   return err;
 }
 

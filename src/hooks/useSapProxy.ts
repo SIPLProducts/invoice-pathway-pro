@@ -3,10 +3,16 @@ import type { SapApiSchema } from "@/lib/sapApiSchemas";
 import type { SapApi } from "@/lib/sapApisStore";
 import { getPath } from "@/lib/getPath";
 
+export interface SapProxyError {
+  message: string;
+  code?: string;
+  hint?: string;
+}
+
 export interface UseSapProxyResult<T = Record<string, unknown>> {
   rows: T[];
   loading: boolean;
-  error: string | null;
+  error: SapProxyError | null;
   lastFetched: Date | null;
   proxyConfigured: boolean;
   proxyUrl: string;
@@ -34,7 +40,7 @@ export function useSapProxy<T = Record<string, unknown>>(
 
   const [rows, setRows] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<SapProxyError | null>(null);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
   const [tick, setTick] = useState(0);
 
@@ -49,41 +55,37 @@ export function useSapProxy<T = Record<string, unknown>>(
       try {
         const headers: Record<string, string> = {
           Accept: "application/json",
-          // Bypass ngrok free-tier browser warning interstitial
           "ngrok-skip-browser-warning": "true",
         };
         if (secret) headers["x-proxy-secret"] = secret;
         const res = await fetch(`${proxyUrl}${schema.proxyPath}`, { headers });
         const text = await res.text();
         const ct = res.headers.get("content-type") ?? "";
-        // HTML from the proxy itself (ngrok warning) vs HTML proxied through from SAP
         if (ct.includes("text/html") || /^\s*<(!doctype|html)/i.test(text)) {
-          if (/oauth\/authorize|login\/callback|saml|authentication\./i.test(text)) {
-            throw new Error(
-              "SAP redirected the middleware to a login page. The proxy is not authenticated against this SAP tenant — use a Basic-auth service user that bypasses the IDP, or set SAP_AUTH_MODE=bearer with a valid SAP_BEARER_TOKEN in middleware/.env, then restart the middleware.",
-            );
-          }
-          throw new Error(
-            "Middleware returned HTML (likely ngrok warning page or wrong URL). Open the middleware URL once in a new tab to clear the warning, or check the URL is correct.",
-          );
+          throw {
+            message:
+              "Middleware returned HTML (likely ngrok warning page or wrong URL). Open the middleware URL once in a new tab to clear the warning, or check the URL is correct.",
+            code: "middleware_html",
+          } as SapProxyError;
         }
         let data: unknown = null;
         try {
           data = text ? JSON.parse(text) : null;
         } catch {
-          throw new Error(`Non-JSON response from middleware (${res.status}): ${text.slice(0, 200)}`);
+          throw {
+            message: `Non-JSON response from middleware (${res.status}): ${text.slice(0, 200)}`,
+            code: "non_json",
+          } as SapProxyError;
         }
         if (!res.ok) {
-          const errObj = data as { error?: { message?: string; code?: string } } | null;
-          const code = errObj?.error?.code;
-          const msg = errObj?.error?.message;
-          if (code === "sap_auth_redirect") {
-            throw new Error(
-              msg ||
-                "SAP redirected to login. The middleware is not authenticated. Fix SAP_AUTH_MODE / credentials in middleware/.env and restart it.",
-            );
-          }
-          throw new Error(msg || code || `HTTP ${res.status}`);
+          const errObj = data as {
+            error?: { message?: string; code?: string; hint?: string };
+          } | null;
+          throw {
+            message: errObj?.error?.message || `HTTP ${res.status}`,
+            code: errObj?.error?.code,
+            hint: errObj?.error?.hint,
+          } as SapProxyError;
         }
         const collection = schema.rowsPath
           ? (getPath(data, schema.rowsPath) as T[])
@@ -93,7 +95,13 @@ export function useSapProxy<T = Record<string, unknown>>(
           setLastFetched(new Date());
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled) {
+          if (e && typeof e === "object" && "message" in (e as object)) {
+            setError(e as SapProxyError);
+          } else {
+            setError({ message: e instanceof Error ? e.message : String(e) });
+          }
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }

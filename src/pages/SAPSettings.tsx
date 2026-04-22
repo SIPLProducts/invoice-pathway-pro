@@ -26,6 +26,7 @@ import {
   Download,
   Cloud,
   Monitor,
+  Activity,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSapApis, deleteApi, type SapMethod } from "@/lib/sapApisStore";
@@ -48,6 +49,40 @@ export default function SAPSettings() {
   const apis = useSapApis();
   const [tab, setTab] = useState("apis");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+
+  const testSapConnection = async () => {
+    const base =
+      apis.find((a) => a.middleware?.url)?.middleware?.url?.trim().replace(/\/$/, "") ||
+      ((import.meta.env.VITE_SAP_PROXY_URL as string | undefined)?.trim().replace(/\/$/, "") ?? "");
+    if (!base) {
+      toast.error("No middleware URL configured. Set it on any API → API Details.");
+      return;
+    }
+    setTesting(true);
+    try {
+      const res = await fetch(`${base}/api/health/sap`, {
+        headers: { Accept: "application/json", "ngrok-skip-browser-warning": "true" },
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.ok) {
+        toast.success(
+          `SAP OK (mode: ${data.authMode}${data.user ? `, user: ${data.user}` : ""}) — rows: ${data.rows}`,
+        );
+      } else {
+        toast.error(
+          `${data?.code || "sap_error"}: ${data?.message || `HTTP ${res.status}`}${
+            data?.hint ? `\n\nFix: ${data.hint}` : ""
+          }`,
+          { duration: 12000 },
+        );
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const scheduledApis = apis.filter((a) => a.autoSync.enabled);
 
@@ -81,9 +116,21 @@ export default function SAPSettings() {
                 <LinkIcon className="h-4 w-4" /> SAP Connectivity Guide
               </TabsTrigger>
             </TabsList>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Download className="h-4 w-4" /> Download PDF
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={testSapConnection}
+                disabled={testing}
+              >
+                <Activity className="h-4 w-4" />
+                {testing ? "Testing…" : "Test SAP connection"}
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="h-4 w-4" /> Download PDF
+              </Button>
+            </div>
           </div>
 
           <TabsContent value="apis" className="mt-5 space-y-5">

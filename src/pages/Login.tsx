@@ -96,8 +96,7 @@ export default function Login() {
       {/* Right form panel */}
       <main className="flex min-h-screen flex-col justify-center px-6 py-10 sm:px-10 lg:px-14">
         <div className="mx-auto w-full max-w-sm">
-          <div className="mb-8 flex items-center justify-between">
-            <img src={logo} alt="Rithwik" className="h-10 w-auto" />
+          <div className="mb-8 flex items-center justify-end">
             <span className="rounded-full border bg-card px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Secure sign-in
             </span>

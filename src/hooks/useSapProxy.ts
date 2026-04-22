@@ -47,13 +47,29 @@ export function useSapProxy<T = Record<string, unknown>>(
       setLoading(true);
       setError(null);
       try {
-        const headers: Record<string, string> = { Accept: "application/json" };
+        const headers: Record<string, string> = {
+          Accept: "application/json",
+          // Bypass ngrok free-tier browser warning interstitial
+          "ngrok-skip-browser-warning": "true",
+        };
         if (secret) headers["x-proxy-secret"] = secret;
         const res = await fetch(`${proxyUrl}${schema.proxyPath}`, { headers });
         const text = await res.text();
-        const data = text ? JSON.parse(text) : null;
+        const ct = res.headers.get("content-type") ?? "";
+        if (ct.includes("text/html")) {
+          throw new Error(
+            "Middleware returned HTML (likely ngrok warning page or wrong URL). Open the middleware URL once in a new tab to clear the warning, or check the URL is correct.",
+          );
+        }
+        let data: unknown = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch {
+          throw new Error(`Non-JSON response from middleware (${res.status}): ${text.slice(0, 120)}`);
+        }
         if (!res.ok) {
-          throw new Error(data?.error?.message || data?.error?.code || `HTTP ${res.status}`);
+          const errObj = data as { error?: { message?: string; code?: string } } | null;
+          throw new Error(errObj?.error?.message || errObj?.error?.code || `HTTP ${res.status}`);
         }
         const collection = schema.rowsPath
           ? (getPath(data, schema.rowsPath) as T[])

@@ -44,13 +44,18 @@ export default function Login() {
         <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-primary-glow/30 blur-3xl" />
         <div className="absolute -bottom-32 -left-20 h-96 w-96 rounded-full bg-accent/30 blur-3xl" />
 
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm ring-1 ring-white/20">
-            <ShieldCheck className="h-6 w-6" />
+        <div className="relative z-10 space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm ring-1 ring-white/20">
+              <ShieldCheck className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="font-display text-lg font-bold tracking-tight">DMR & GRN Portal</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-primary-foreground/70">Enterprise Edition</div>
+            </div>
           </div>
-          <div>
-            <div className="font-display text-lg font-bold tracking-tight">DMR & GRN Portal</div>
-            <div className="text-xs uppercase tracking-[0.2em] text-primary-foreground/70">Enterprise Edition</div>
+          <div className="inline-flex items-center rounded-xl bg-white px-5 py-3 shadow-lg ring-1 ring-white/30">
+            <img src={logo} alt="Rithwik" className="h-12 w-auto" />
           </div>
         </div>
 
@@ -91,8 +96,7 @@ export default function Login() {
       {/* Right form panel */}
       <main className="flex min-h-screen flex-col justify-center px-6 py-10 sm:px-10 lg:px-14">
         <div className="mx-auto w-full max-w-sm">
-          <div className="mb-8 flex items-center justify-between">
-            <img src={logo} alt="Rithwik" className="h-10 w-auto" />
+          <div className="mb-8 flex items-center justify-end">
             <span className="rounded-full border bg-card px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Secure sign-in
             </span>

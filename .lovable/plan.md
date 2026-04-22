@@ -1,126 +1,107 @@
 
 
-## SAP ZUI_GATE_SERVICE — Node Middleware + Configurable DMR Screen
+## Make SAP API Settings Field-Driven & Wire to DMR (List + New DMR Create)
 
-You want three things, all without using Lovable Cloud:
+### Goal
 
-1. A **complete Node.js middleware** (you host it) that proxies the public SAP BTP `ZUI_GATE_SERVICE` OData v4 service (GET / POST / PATCH / $batch / DELETE).
-2. A **configurable field-mapping** layer so the same screen can be reused for other SAP APIs by changing only the mapping config — keys from the SAP response map to table column headers.
-3. A **DMR screen tab** that lists Gate Headers from the GET endpoint, with a **Refresh** button.
+Stop hard-coding column lists / form fields. Each SAP API entry stores its own **Request Fields** and **Response Fields** schemas (header + items). The DMR list **SAP Gate Entries** table renders columns from the Response Fields schema. The **New DMR** screen renders inputs and an items table from the Request Fields schema and POSTs to the configured create endpoint via the Node middleware.
 
 ---
 
-### Part A — Node.js middleware (delivered as separate files at the repo root in a new `middleware/` folder; you run it on your own server / Render / Railway / EC2)
+### 1. Extend the SAP API model (`src/lib/sapApisStore.ts`)
 
-Folder layout:
-
-```text
-middleware/
-  package.json
-  .env.example
-  README.md
-  src/
-    server.js           # Express app + CORS + routes
-    sapClient.js        # axios instance, Basic auth, CSRF token cache, cookie jar
-    routes/
-      gate.js           # GET list, GET one, POST, PATCH header, PATCH item, DELETE, $batch
-    util/
-      batch.js          # builds multipart/mixed $batch body for header+items
-      errors.js         # uniform error envelope
-```
-
-Key behaviors implemented:
-
-- **Auth**: HTTP Basic (`SAP_USER` / `SAP_PASSWORD`) loaded from `.env`. Base URL also from `.env` (`SAP_BASE_URL=https://fa530628-...hana.ondemand.com`, `SAP_SERVICE_PATH=/sap/opu/odata4/sap/zui_gate_service/srvd_a2x/sap/zui_gate_service/0001`, `SAP_CLIENT=100`).
-- **CSRF + cookies**: on first write request, do `HEAD ?$top=0` with `x-csrf-token: fetch`, cache token + `JSESSIONID` cookie in memory (per-process, with TTL); auto-refresh on `403 CSRF token validation failed`.
-- **CORS**: `cors()` restricted to your frontend origin (configurable via `ALLOWED_ORIGINS`).
-- **Routes** (all return clean JSON to the frontend):
-  - `GET  /api/gate/headers`           → proxies `GET GateHeader?$expand=_Item&sap-client=100`
-  - `GET  /api/gate/headers/:gateId`   → single header with items
-  - `POST /api/gate/headers`           → create header + items (single POST with `_Item` array)
-  - `PATCH /api/gate/headers/:gateId`  → update header only
-  - `PATCH /api/gate/items/:gateId/:itemNo` → update one item
-  - `POST /api/gate/batch`             → accepts `{ header: {...patch}, items: [{item_no, ...patch}] }`, builds multipart `$batch` with one changeset, posts to `/$batch?sap-client=100`, parses response and returns clean JSON
-  - `DELETE /api/gate/headers/:gateId` → delete
-  - `GET  /api/health`                 → `{ ok: true }`
-- **Error envelope**: `{ error: { code, message, sapStatus, sapBody } }`.
-- **Logging**: `morgan('tiny')` + redaction of Authorization header.
-- Dependencies: `express`, `axios`, `cors`, `dotenv`, `morgan`, `tough-cookie`, `axios-cookiejar-support`.
-
-The README will include exact `npm install`, `npm start`, sample curl, and a "Deploy to Render" 3-step section. After you deploy it, you give me the public URL (e.g. `https://my-sap-proxy.onrender.com`) and I plug it into the frontend as `VITE_SAP_PROXY_URL`.
-
----
-
-### Part B — Configurable mapping layer (frontend)
-
-A single config drives column headers, field paths, formatters, and which middleware endpoint to hit. Same screen works for any future SAP API by adding another entry.
-
-New file `src/lib/sapApiSchemas.ts`:
+Add per-API config (persisted in localStorage like today, seeded for `ZUI_Gate_Service`):
 
 ```ts
-export type ColumnDef = {
-  header: string;          // shown in table header
-  path: string;            // dot path into row, e.g. "vendor_name" or "_Item.0.material"
-  format?: "date" | "time" | "number" | "text";
+type FieldType = "string" | "number" | "date" | "time" | "boolean";
+
+interface FieldDef {
+  key: string;          // "gate_id"
+  label: string;        // "Gate ID"
+  type: FieldType;
+  required?: boolean;
+  defaultValue?: string;
+  showInTable?: boolean;       // (response) include as column
+  showInForm?: boolean;        // (request)  include as input
   align?: "left" | "right";
   width?: string;
-};
+}
 
-export type SapApiSchema = {
-  id: string;                          // "zui_gate_service"
-  label: string;                       // "SAP Gate Entries"
-  proxyPath: string;                   // "/api/gate/headers"
-  rowsPath: string;                    // "value"  (OData collection key)
-  rowKey: string;                      // "gate_id"
-  columns: ColumnDef[];
-  childKey?: string;                   // "_Item" for expand rows
-  childColumns?: ColumnDef[];
-};
+interface SapApi {
+  // ...existing
+  rowsPath?: string;            // OData "value"
+  rowKey?: string;              // "gate_id"
+  childKey?: string;            // "_Item"
+  requestHeaderFields: FieldDef[];
+  requestItemFields: FieldDef[];
+  responseHeaderFields: FieldDef[];
+  responseItemFields: FieldDef[];
+  scheduler: {
+    enabled: boolean;
+    frequency: "manual" | "5m" | "15m" | "1h" | "1d";
+    retryCount: number;
+    retryDelayMs: number;
+    plants: string[];
+  };
+  credentials: { user: string; password: string; sapClient: string };
+  advanced: { active: boolean; logging: boolean; maxRecords: number; timeoutMs: number; customHeaders: string };
+  createEndpoint?: string;      // e.g. ".../GateHeader?sap-client=100"
+  listEndpoint?: string;        // e.g. ".../GateHeader?$expand=_Item&sap-client=100"
+}
 ```
 
-Seed schema for **GateHeader** with these mapped columns (one per requested SAP key):
-
-`gate_id, plant, gate_date, gate_time, vendor, vendor_name, vehicle_no, vehicle_type, driver_name, driver_mobile, transport_type, purpose, document_type, reference_doc, gross_weight, tare_weight, net_weight, entry_type, gate_status, remarks` — and child `_Item` columns: `item_no, material, material_desc, quantity, unit, batch, storage_location, po_number, po_item, weight, remarks`.
-
-Edit `src/lib/sapApisStore.ts`: add a new entry `ZUI_Gate_Service` (type `live`, tag `Direct`, baseUrl = your proxy URL, endpoint = `/api/gate/headers`) so it also shows up in the existing SAP Settings list.
+Seed `ZUI_Gate_Service` with the exact 21 header keys and 14 item keys from the GET/CREATE payloads you pasted.
 
 ---
 
-### Part C — DMR screen integration
+### 2. Replace the placeholder tabs in `src/pages/SAPApiEdit.tsx`
 
-Edit `src/pages/DMRList.tsx`:
+Each placeholder becomes a real editor that reads/writes the new fields on the API record:
 
-- Add a new tab **"SAP Gate Entries"** alongside the existing Draft/Submitted/… tabs.
-- When active, render a new component `<SapLiveTable schemaId="zui_gate_service" />` instead of the local DMR table.
+- **Request Fields tab** — two sub-sections: *Header Fields* and *Item Fields*. Editable rows: `Key`, `Label`, `Type`, `Required`, `Show in form`, `Default`. Buttons: **+ Add Field**, **Delete**, **Reset to SAP defaults** (loads the seed list).
+- **Response Fields tab** — same UI, with sub-sections *Header Columns* and *Item Columns*; columns: `Key`, `Label`, `Type`, `Show in table`, `Align`, `Width`.
+- **Scheduler tab** — matches your screenshot: Enable toggle, Sync Frequency select, Retry Count, Retry Delay (ms), Sync Plants list (checkbox per plant), Sync Schedule Preview.
+- **Credentials tab** — matches your screenshot: SAP Username, SAP Password (eye toggle), SAP Client.
+- **Settings tab** — matches your screenshot: Active, Enable Logging, Max Records per Sync, Timeout (ms), Custom Headers (JSON), Configuration Summary.
+- "Save API Details" persists the whole `SapApi` (all five tabs at once).
 
-New files:
-
-- `src/hooks/useSapProxy.ts` — generic fetcher: `useSapProxy(schema)` returns `{ rows, loading, error, refresh, lastFetched }`. Reads `VITE_SAP_PROXY_URL` from env, calls `${VITE_SAP_PROXY_URL}${schema.proxyPath}`, extracts `rowsPath`.
-- `src/components/SapLiveTable.tsx` — generic table:
-  - Header row built from `schema.columns[].header`.
-  - Body rows rendered via `lodash.get(row, col.path)` + format helper.
-  - Expandable row showing `_Item` child table when `schema.childKey` is set.
-  - Top-right toolbar: **Refresh** button (lucide `RefreshCw`, spins while loading), "Last updated HH:mm:ss" text, and a small status pill (Live / Error).
-  - Empty + error + loading skeleton states.
-- `src/lib/getPath.ts` — tiny dot-path getter (no lodash dependency needed).
-
-Frontend env:
-
-- Add `VITE_SAP_PROXY_URL` documentation to README. Until you deploy the middleware, the table shows a friendly "Middleware not configured — set `VITE_SAP_PROXY_URL`" empty state with a copy-curl button.
+A small helper `parseODataSample(jsonText)` lets the user paste a sample response and auto-generate Response Fields (one per top-level key + one per `_Item[0]` key).
 
 ---
 
-### Technical details (for reference)
+### 3. Drive `SapLiveTable` from the API record (DMR list "SAP Gate Entries")
 
-- OData v4 collection responses always have `value: [...]`; `rowsPath: "value"` handles that. Single-entity GETs use `rowsPath: ""` (returns object).
-- `$expand=_Item` is preserved in the proxy route; the middleware appends `sap-client=100` once (your sample URL has it twice — that's harmless but the proxy normalizes it).
-- For PATCH of header+items together, the middleware builds the exact `multipart/mixed; boundary=batch_boundary` body shown in your doc, including `If-Match: *` and `Content-ID` per change, and parses the multipart response back into `{ header, items }`.
-- Mapping is pure config — to add a new SAP API later (e.g. MB52), drop another `SapApiSchema` entry and one new proxy route; no UI code changes.
-- No Lovable Cloud / Supabase used anywhere. All secrets live in your Node `.env`.
+`src/components/SapLiveTable.tsx` and `src/lib/sapApiSchemas.ts`:
+
+- Replace the static `GATE_HEADER_SCHEMA` import with a builder `buildSchemaFromApi(api: SapApi): SapApiSchema` that converts `responseHeaderFields` + `responseItemFields` (where `showInTable !== false`) into columns.
+- `DMRList.tsx` looks up the API by name (`getSapApi("ZUI_Gate_Service")`), builds the schema, passes it to `<SapLiveTable />`.
+- Refresh button continues to call the middleware `GET /api/gate/headers`. Now any change to Response Fields immediately changes the table columns — no code edit.
+
+---
+
+### 4. Drive **New DMR** from the API record (`src/pages/DMRNew.tsx`)
+
+Add a "Source API" indicator at the top (defaults to `ZUI_Gate_Service`, switchable via dropdown of all `live`/`sync` APIs).
+
+Render dynamically:
+- **Header section** — one input per `requestHeaderFields[i]` where `showInForm !== false`. Type maps to control: `date` → date input, `number` → numeric input, `time` → time input, `boolean` → switch, else text. `required: true` shows asterisk + validates.
+- **Line Items table** — columns from `requestItemFields`. **+ Add line** / row delete. Default 1 empty row.
+- **Submit** button calls `POST ${VITE_SAP_PROXY_URL}/api/gate/headers` with body `{ ...header, _Item: [...items] }`. **Save Draft** stores locally (existing `dmrs` seed pattern stays for offline/draft view).
+- After successful POST, toast the returned `gate_id` and navigate back to `/dmr` (the list refreshes from SAP).
+
+The hard-coded "Document Information" + "Line Items" sections in `DMRNew.tsx` are replaced by these generic renderers. Tax Summary + Attachments panels stay as-is.
+
+---
+
+### 5. Middleware — already supports this
+
+`middleware/src/routes/gate.js` already exposes `POST /api/gate/headers` proxying SAP's create endpoint and `GET /api/gate/headers` for the list. No middleware change required for this iteration. The endpoint paths inside `sapClient.js` come from `SAP_SERVICE_PATH` in the middleware `.env`, so users can keep configuration in one place.
+
+---
 
 ### Files
 
-- New (middleware repo, separate folder, you deploy): `middleware/package.json`, `middleware/.env.example`, `middleware/README.md`, `middleware/src/server.js`, `middleware/src/sapClient.js`, `middleware/src/routes/gate.js`, `middleware/src/util/batch.js`, `middleware/src/util/errors.js`
-- New (frontend): `src/lib/sapApiSchemas.ts`, `src/lib/getPath.ts`, `src/hooks/useSapProxy.ts`, `src/components/SapLiveTable.tsx`
-- Edit (frontend): `src/pages/DMRList.tsx` (add tab + render), `src/lib/sapApisStore.ts` (register `ZUI_Gate_Service`), `README.md` (env var docs)
+- Edit: `src/lib/sapApisStore.ts` (extend `SapApi`, seed Gate fields), `src/pages/SAPApiEdit.tsx` (real Request/Response/Scheduler/Credentials/Settings tabs + paste-sample helper), `src/lib/sapApiSchemas.ts` (`buildSchemaFromApi` helper), `src/pages/DMRList.tsx` (build schema from API record), `src/components/SapLiveTable.tsx` (accept dynamic schema; unchanged props), `src/pages/DMRNew.tsx` (dynamic header form + items table + POST to middleware)
+- New: `src/components/api-edit/FieldsEditor.tsx` (reusable add/edit/delete table for FieldDef rows used by both Request and Response tabs), `src/hooks/useSapCreate.ts` (POST helper hitting `${VITE_SAP_PROXY_URL}/api/gate/headers`)
+- No changes to `middleware/*` for this step
 

@@ -6,8 +6,19 @@ import { dmrs } from "@/lib/seed";
 import { inr } from "@/lib/format";
 import { Plus, Search, Filter, Download, Eye, FileText, MapPin, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
+import { SapLiveTable } from "@/components/SapLiveTable";
+import { GATE_HEADER_SCHEMA } from "@/lib/sapApiSchemas";
 
-const tabs = ["All", "Draft", "Submitted", "Validated", "Approved", "GRN Posted", "Rejected"] as const;
+const tabs = [
+  "All",
+  "Draft",
+  "Submitted",
+  "Validated",
+  "Approved",
+  "GRN Posted",
+  "Rejected",
+  "SAP Gate Entries",
+] as const;
 const tabMap: Record<string, string | null> = {
   All: null,
   Draft: "draft",
@@ -16,6 +27,7 @@ const tabMap: Record<string, string | null> = {
   Approved: "approved",
   "GRN Posted": "grn_posted",
   Rejected: "rejected",
+  "SAP Gate Entries": "__sap_gate__",
 };
 
 export default function DMRPage() {

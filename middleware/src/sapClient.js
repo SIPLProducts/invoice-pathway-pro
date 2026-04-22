@@ -3,7 +3,7 @@
 const axios = require("axios");
 const { CookieJar } = require("tough-cookie");
 const { wrapper } = require("axios-cookiejar-support");
-const { fromAxios } = require("./util/errors");
+const { fromAxios, detectAuthHtml } = require("./util/errors");
 
 const {
   SAP_BASE_URL,
@@ -11,34 +11,61 @@ const {
   SAP_CLIENT = "100",
   SAP_USER,
   SAP_PASSWORD,
+  SAP_AUTH_MODE = "basic", // "basic" | "bearer"
+  SAP_BEARER_TOKEN,
 } = process.env;
 
-if (!SAP_BASE_URL || !SAP_SERVICE_PATH || !SAP_USER || !SAP_PASSWORD) {
+const useBearer = String(SAP_AUTH_MODE).toLowerCase() === "bearer";
+
+if (!SAP_BASE_URL || !SAP_SERVICE_PATH) {
   // eslint-disable-next-line no-console
-  console.warn(
-    "[sapClient] Missing one of SAP_BASE_URL / SAP_SERVICE_PATH / SAP_USER / SAP_PASSWORD. Requests will fail until set.",
-  );
+  console.warn("[sapClient] Missing SAP_BASE_URL / SAP_SERVICE_PATH.");
+}
+if (useBearer && !SAP_BEARER_TOKEN) {
+  // eslint-disable-next-line no-console
+  console.warn("[sapClient] SAP_AUTH_MODE=bearer but SAP_BEARER_TOKEN is empty.");
+} else if (!useBearer && (!SAP_USER || !SAP_PASSWORD)) {
+  // eslint-disable-next-line no-console
+  console.warn("[sapClient] Basic auth selected but SAP_USER / SAP_PASSWORD missing.");
 }
 
 const jar = new CookieJar();
 
+const baseHeaders = {
+  Accept: "application/json",
+};
+if (useBearer && SAP_BEARER_TOKEN) {
+  baseHeaders.Authorization = `Bearer ${SAP_BEARER_TOKEN}`;
+}
+
 const http = wrapper(
   axios.create({
     baseURL: `${SAP_BASE_URL}${SAP_SERVICE_PATH}`,
-    auth: { username: SAP_USER || "", password: SAP_PASSWORD || "" },
+    ...(useBearer
+      ? {}
+      : { auth: { username: SAP_USER || "", password: SAP_PASSWORD || "" } }),
     timeout: 30000,
     jar,
     withCredentials: true,
-    validateStatus: () => true, // we'll inspect manually
-    headers: {
-      Accept: "application/json",
-    },
+    maxRedirects: 0, // never silently follow login redirects
+    validateStatus: () => true,
+    headers: baseHeaders,
   }),
 );
 
 let csrfToken = null;
 let csrfFetchedAt = 0;
-const CSRF_TTL_MS = 25 * 60 * 1000; // 25 min
+const CSRF_TTL_MS = 25 * 60 * 1000;
+
+function ensureJson(res, path) {
+  // Detect SAP login HTML even when status is 200
+  const authErr = detectAuthHtml(res);
+  if (authErr) {
+    // eslint-disable-next-line no-console
+    console.error(`[sapClient] ${path} -> non-JSON (${authErr.code})`);
+    throw authErr;
+  }
+}
 
 async function ensureCsrf(force = false) {
   const stale = Date.now() - csrfFetchedAt > CSRF_TTL_MS;
@@ -47,6 +74,7 @@ async function ensureCsrf(force = false) {
   const res = await http.get(`/GateHeader?$top=0&sap-client=${SAP_CLIENT}`, {
     headers: { "x-csrf-token": "fetch" },
   });
+  ensureJson(res, "CSRF fetch");
   if (res.status >= 400) {
     const err = new Error(`CSRF fetch failed (${res.status})`);
     err.sapStatus = res.status;
@@ -66,6 +94,7 @@ function withClient(path) {
 
 async function sapGet(path) {
   const res = await http.get(withClient(path));
+  ensureJson(res, `GET ${path}`);
   if (res.status >= 400) {
     throw fromAxios({ message: `GET ${path} failed`, response: res });
   }
@@ -89,10 +118,14 @@ async function sapWrite(method, path, body, extraHeaders = {}) {
   };
 
   let res = await doRequest();
-  if (res.status === 403 && /csrf/i.test(res.headers["x-csrf-token"] || res.data?.toString?.() || "")) {
+  if (
+    res.status === 403 &&
+    /csrf/i.test(res.headers["x-csrf-token"] || res.data?.toString?.() || "")
+  ) {
     csrfToken = null;
     res = await doRequest();
   }
+  ensureJson(res, `${method} ${path}`);
   if (res.status >= 400) {
     throw fromAxios({ message: `${method} ${path} failed`, response: res });
   }
@@ -111,7 +144,7 @@ async function sapBatch(multipartBody, boundary) {
         "Content-Type": `multipart/mixed; boundary=${boundary}`,
         Accept: "multipart/mixed",
       },
-      transformRequest: [(d) => d], // keep raw string
+      transformRequest: [(d) => d],
     });
   };
 
@@ -120,6 +153,7 @@ async function sapBatch(multipartBody, boundary) {
     csrfToken = null;
     res = await doRequest();
   }
+  ensureJson(res, "$batch");
   if (res.status >= 400) {
     throw fromAxios({ message: `$batch failed`, response: res });
   }

@@ -1,4 +1,9 @@
-import type { FieldDef, SapApi } from "@/lib/sapApisStore";
+import {
+  DEFAULT_GATE_RESPONSE_HEADER,
+  DEFAULT_GATE_RESPONSE_ITEM,
+  type FieldDef,
+  type SapApi,
+} from "@/lib/sapApisStore";
 
 export type ColumnFormat = "text" | "date" | "time" | "number";
 
@@ -35,28 +40,40 @@ function fieldToColumn(f: FieldDef): ColumnDef {
 
 /**
  * Build a SapApiSchema for SapLiveTable from a configured SapApi record.
- * Falls back to safe defaults if the API has no schema yet.
+ * For gate-shaped APIs (Get_DMR, Create_Gate_Service, ZUI_Gate_Service…)
+ * fall back to standard gate fields so the table renders even when the
+ * user hasn't configured response fields yet.
  */
 export function buildSchemaFromApi(api: SapApi): SapApiSchema {
-  const headerCols = (api.responseHeaderFields ?? [])
-    .filter((f) => f.showInTable !== false && f.key)
-    .map(fieldToColumn);
-  const itemCols = (api.responseItemFields ?? [])
-    .filter((f) => f.showInTable !== false && f.key)
-    .map(fieldToColumn);
-
-  // Detect "gate-shaped" APIs (Get_DMR, Create_Gate_Service, ZUI_Gate_Service, etc.)
-  // and apply sensible defaults so user-created APIs render correctly without
-  // forcing them to fill in obscure fields like rowsPath / rowKey / childKey.
   const proxyPath = api.proxyPath ?? api.listEndpoint ?? "/api/gate/headers";
   const isGateShaped =
     proxyPath.startsWith("/api/gate") || /gate|dmr/i.test(api.name);
+
+  const headerSource =
+    (api.responseHeaderFields ?? []).length > 0
+      ? api.responseHeaderFields ?? []
+      : isGateShaped
+        ? DEFAULT_GATE_RESPONSE_HEADER
+        : [];
+  const itemSource =
+    (api.responseItemFields ?? []).length > 0
+      ? api.responseItemFields ?? []
+      : isGateShaped
+        ? DEFAULT_GATE_RESPONSE_ITEM
+        : [];
+
+  const headerCols = headerSource
+    .filter((f) => f.showInTable !== false && f.key)
+    .map(fieldToColumn);
+  const itemCols = itemSource
+    .filter((f) => f.showInTable !== false && f.key)
+    .map(fieldToColumn);
 
   return {
     id: api.name,
     label: api.name,
     proxyPath,
-    rowsPath: api.rowsPath ?? (isGateShaped ? "value" : "value"),
+    rowsPath: api.rowsPath ?? "value",
     rowKey: api.rowKey ?? (isGateShaped ? "gate_id" : headerCols[0]?.path ?? "id"),
     columns: headerCols,
     childKey: api.childKey ?? (isGateShaped ? "_Item" : undefined),

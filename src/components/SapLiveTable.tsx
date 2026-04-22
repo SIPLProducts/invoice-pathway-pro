@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -8,11 +8,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useSapProxy } from "@/hooks/useSapProxy";
 import type { ColumnDef, SapApiSchema } from "@/lib/sapApiSchemas";
 import type { SapApi } from "@/lib/sapApisStore";
 import { getPath } from "@/lib/getPath";
-import { ChevronDown, ChevronRight, RefreshCw, AlertCircle, Wifi, WifiOff } from "lucide-react";
+import { RefreshCw, AlertCircle, Wifi, WifiOff, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -26,7 +33,6 @@ function formatCell(value: unknown, col: ColumnDef): string {
     case "number":
       return typeof value === "number" ? value.toLocaleString() : String(value);
     case "date":
-      return String(value);
     case "time":
       return String(value);
     default:
@@ -36,16 +42,13 @@ function formatCell(value: unknown, col: ColumnDef): string {
 
 export function SapLiveTable({ api, schema }: Props) {
   const { rows, loading, error, lastFetched, proxyConfigured, refresh } = useSapProxy(api, schema);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const toggleRow = (key: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
+  const [openRow, setOpenRow] = useState<{
+    key: string;
+    items: Record<string, unknown>[];
+  } | null>(null);
+
+  const hasChildren = Boolean(schema.childKey && schema.childColumns?.length);
 
   return (
     <div className="rounded-xl border bg-card shadow-card">
@@ -82,7 +85,6 @@ export function SapLiveTable({ api, schema }: Props) {
         </div>
       </div>
 
-      {/* States */}
       {!proxyConfigured && (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
           Set the <strong>Node.js Middleware URL</strong> on{" "}
@@ -93,7 +95,8 @@ export function SapLiveTable({ api, schema }: Props) {
 
       {proxyConfigured && error && (
         <div className="border-b bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          Failed to load: {error}
+          <div className="font-semibold">Failed to load from SAP</div>
+          <div className="mt-1 text-xs whitespace-pre-wrap">{error}</div>
         </div>
       )}
 
@@ -102,7 +105,6 @@ export function SapLiveTable({ api, schema }: Props) {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40">
-                {schema.childKey && <TableHead className="w-8" />}
                 {schema.columns.map((c) => (
                   <TableHead
                     key={c.path}
@@ -114,23 +116,28 @@ export function SapLiveTable({ api, schema }: Props) {
                     {c.header}
                   </TableHead>
                 ))}
+                {hasChildren && (
+                  <TableHead className="whitespace-nowrap text-xs uppercase tracking-wider">
+                    Items
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && rows.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={schema.columns.length + (schema.childKey ? 1 : 0)}
+                    colSpan={schema.columns.length + (hasChildren ? 1 : 0)}
                     className="py-8 text-center text-sm text-muted-foreground"
                   >
                     Loading…
                   </TableCell>
                 </TableRow>
               )}
-              {!loading && rows.length === 0 && (
+              {!loading && rows.length === 0 && !error && (
                 <TableRow>
                   <TableCell
-                    colSpan={schema.columns.length + (schema.childKey ? 1 : 0)}
+                    colSpan={schema.columns.length + (hasChildren ? 1 : 0)}
                     className="py-8 text-center text-sm text-muted-foreground"
                   >
                     No records returned by SAP.
@@ -139,102 +146,93 @@ export function SapLiveTable({ api, schema }: Props) {
               )}
               {rows.map((row, idx) => {
                 const key = String(getPath(row, schema.rowKey) ?? idx);
-                const isOpen = expanded.has(key);
-                const children =
-                  schema.childKey && schema.childColumns
-                    ? ((getPath(row, schema.childKey) as Record<string, unknown>[]) ?? [])
-                    : [];
+                const children = hasChildren
+                  ? ((getPath(row, schema.childKey!) as Record<string, unknown>[]) ?? [])
+                  : [];
                 return (
-                  <Fragment key={key}>
-                    <TableRow className="hover:bg-muted/30">
-                      {schema.childKey && (
-                        <TableCell className="w-8 p-2">
-                          <button
-                            onClick={() => toggleRow(key)}
-                            className="rounded p-1 hover:bg-muted"
-                            aria-label={isOpen ? "Collapse" : "Expand"}
-                          >
-                            {isOpen ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </button>
-                        </TableCell>
-                      )}
-                      {schema.columns.map((c) => (
-                        <TableCell
-                          key={c.path}
-                          className={cn(
-                            "whitespace-nowrap text-sm",
-                            c.align === "right" && "text-right font-mono",
-                          )}
+                  <TableRow key={key} className="hover:bg-muted/30">
+                    {schema.columns.map((c) => (
+                      <TableCell
+                        key={c.path}
+                        className={cn(
+                          "whitespace-nowrap text-sm",
+                          c.align === "right" && "text-right font-mono",
+                        )}
+                      >
+                        {formatCell(getPath(row, c.path), c)}
+                      </TableCell>
+                    ))}
+                    {hasChildren && (
+                      <TableCell className="whitespace-nowrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1.5 text-xs"
+                          disabled={children.length === 0}
+                          onClick={() => setOpenRow({ key, items: children })}
                         >
-                          {formatCell(getPath(row, c.path), c)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                    {isOpen && schema.childColumns && (
-                      <TableRow className="bg-muted/20">
-                        <TableCell
-                          colSpan={schema.columns.length + 1}
-                          className="p-0"
-                        >
-                          <div className="px-4 py-3">
-                            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                              Items ({children.length})
-                            </div>
-                            {children.length === 0 ? (
-                              <div className="text-xs text-muted-foreground">No items.</div>
-                            ) : (
-                              <div className="overflow-x-auto rounded border bg-background">
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow className="bg-muted/40">
-                                      {schema.childColumns.map((c) => (
-                                        <TableHead
-                                          key={c.path}
-                                          className={cn(
-                                            "whitespace-nowrap text-[10px] uppercase",
-                                            c.align === "right" && "text-right",
-                                          )}
-                                        >
-                                          {c.header}
-                                        </TableHead>
-                                      ))}
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {children.map((child, i) => (
-                                      <TableRow key={i}>
-                                        {schema.childColumns!.map((c) => (
-                                          <TableCell
-                                            key={c.path}
-                                            className={cn(
-                                              "whitespace-nowrap text-xs",
-                                              c.align === "right" && "text-right font-mono",
-                                            )}
-                                          >
-                                            {formatCell(getPath(child, c.path), c)}
-                                          </TableCell>
-                                        ))}
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                          <Package className="h-3 w-3" />
+                          {children.length} item{children.length === 1 ? "" : "s"}
+                        </Button>
+                      </TableCell>
                     )}
-                  </Fragment>
+                  </TableRow>
                 );
               })}
             </TableBody>
           </Table>
         </div>
       )}
+
+      {/* Items popup */}
+      <Dialog open={!!openRow} onOpenChange={(o) => !o && setOpenRow(null)}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Line items — {openRow?.key}</DialogTitle>
+            <DialogDescription>
+              {openRow?.items.length ?? 0} item(s) for this gate entry.
+            </DialogDescription>
+          </DialogHeader>
+          {schema.childColumns && openRow && (
+            <div className="overflow-x-auto rounded border bg-background">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40">
+                    {schema.childColumns.map((c) => (
+                      <TableHead
+                        key={c.path}
+                        className={cn(
+                          "whitespace-nowrap text-[10px] uppercase",
+                          c.align === "right" && "text-right",
+                        )}
+                      >
+                        {c.header}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {openRow.items.map((child, i) => (
+                    <TableRow key={i}>
+                      {schema.childColumns!.map((c) => (
+                        <TableCell
+                          key={c.path}
+                          className={cn(
+                            "whitespace-nowrap text-xs",
+                            c.align === "right" && "text-right font-mono",
+                          )}
+                        >
+                          {formatCell(getPath(child, c.path), c)}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

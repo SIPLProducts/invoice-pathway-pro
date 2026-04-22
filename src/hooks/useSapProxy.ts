@@ -56,7 +56,13 @@ export function useSapProxy<T = Record<string, unknown>>(
         const res = await fetch(`${proxyUrl}${schema.proxyPath}`, { headers });
         const text = await res.text();
         const ct = res.headers.get("content-type") ?? "";
-        if (ct.includes("text/html")) {
+        // HTML from the proxy itself (ngrok warning) vs HTML proxied through from SAP
+        if (ct.includes("text/html") || /^\s*<(!doctype|html)/i.test(text)) {
+          if (/oauth\/authorize|login\/callback|saml|authentication\./i.test(text)) {
+            throw new Error(
+              "SAP redirected the middleware to a login page. The proxy is not authenticated against this SAP tenant — use a Basic-auth service user that bypasses the IDP, or set SAP_AUTH_MODE=bearer with a valid SAP_BEARER_TOKEN in middleware/.env, then restart the middleware.",
+            );
+          }
           throw new Error(
             "Middleware returned HTML (likely ngrok warning page or wrong URL). Open the middleware URL once in a new tab to clear the warning, or check the URL is correct.",
           );
@@ -65,11 +71,19 @@ export function useSapProxy<T = Record<string, unknown>>(
         try {
           data = text ? JSON.parse(text) : null;
         } catch {
-          throw new Error(`Non-JSON response from middleware (${res.status}): ${text.slice(0, 120)}`);
+          throw new Error(`Non-JSON response from middleware (${res.status}): ${text.slice(0, 200)}`);
         }
         if (!res.ok) {
           const errObj = data as { error?: { message?: string; code?: string } } | null;
-          throw new Error(errObj?.error?.message || errObj?.error?.code || `HTTP ${res.status}`);
+          const code = errObj?.error?.code;
+          const msg = errObj?.error?.message;
+          if (code === "sap_auth_redirect") {
+            throw new Error(
+              msg ||
+                "SAP redirected to login. The middleware is not authenticated. Fix SAP_AUTH_MODE / credentials in middleware/.env and restart it.",
+            );
+          }
+          throw new Error(msg || code || `HTTP ${res.status}`);
         }
         const collection = schema.rowsPath
           ? (getPath(data, schema.rowsPath) as T[])

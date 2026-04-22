@@ -124,7 +124,9 @@ export default function DMRNew() {
 
     if (!proxyConfigured) {
       toast.error(
-        "VITE_SAP_PROXY_URL is not set. Configure your Node middleware URL to enable Submit.",
+        "Middleware URL not set. Open SAP Settings → " +
+          (api.name || "API") +
+          " → API Details and set the Node.js Middleware URL.",
       );
       return;
     }

@@ -16,59 +16,7 @@ import {
   TestTube2,
 } from "lucide-react";
 import { toast } from "sonner";
-
-interface SyncApi {
-  name: string;
-  description: string;
-  endpoint: string;
-  method: "GET" | "POST" | "PUT" | "DELETE";
-  status: "Active" | "Inactive";
-  tag: "Proxy" | "Vpn_tunnel";
-  type: "action" | "live" | "sync";
-  lastSynced?: string;
-}
-
-const apis: SyncApi[] = [
-  {
-    name: "SAP_343_Blocked_To_Unrestricted",
-    description: "343 Movement - Moves blocked stock quantity to unrestricted stock in SAP.",
-    endpoint: "http://10.10.6.115:8000/mrb/mb52/mat_stocks?sap-client=234",
-    method: "PUT",
-    status: "Active",
-    tag: "Proxy",
-    type: "action",
-  },
-  {
-    name: "SAP_344_Unrestricted_To_Blocked",
-    description: "344 Movement - Moves unrestricted stock quantity to blocked stock in SAP.",
-    endpoint: "http://10.10.6.115:8000/mrb/mb52/mat_stocks?sap-client=234",
-    method: "GET",
-    status: "Active",
-    tag: "Proxy",
-    type: "action",
-  },
-  {
-    name: "MB52_Stock_Report",
-    description:
-      "MB52 - Material Stock Report. Returns stock quantities (unrestricted, blocked, QI, transfer) by plant, storage location, material and batch.",
-    endpoint: "http://10.10.6.115:8000/mrb/mb52/mat_stocks?sap-client=234",
-    method: "POST",
-    status: "Active",
-    tag: "Proxy",
-    type: "live",
-  },
-  {
-    name: "ZMRB_Inward_Inspection",
-    description:
-      "ZMRB01/ZMRB04 - Inward Inspection Report. Fetches inspection lots with vendor, PO, batch and quantity details. Use ART=01 for ZMRB01, ART=04 for ZMRB04.",
-    endpoint: "http://10.10.6.115:8000/mrb/inward/report?sap-client=234",
-    method: "POST",
-    status: "Active",
-    tag: "Vpn_tunnel",
-    type: "sync",
-    lastSynced: "22/4/2026, 10:52:03 am",
-  },
-];
+import { useSapApis } from "@/lib/sapApisStore";
 
 const methodColor: Record<string, string> = {
   GET: "bg-success/15 text-success border-success/30",
@@ -94,6 +42,8 @@ const previewRows = [
 
 export default function SAPSyncMonitor() {
   const [tab, setTab] = useState("connections");
+  const apis = useSapApis();
+  const activeCount = apis.filter((a) => a.status === "Active").length;
 
   return (
     <>
@@ -109,7 +59,7 @@ export default function SAPSyncMonitor() {
 
       {/* KPI cards */}
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Kpi icon={Plug} label="Active APIs" value="4" tone="primary" />
+        <Kpi icon={Plug} label="Active APIs" value={String(activeCount)} tone="primary" />
         <Kpi icon={CheckCircle2} label="Successful Syncs" value="50/50" tone="success" />
         <Kpi icon={XCircle} label="Failed Syncs" value="0" tone="destructive" />
         <Kpi icon={Download} label="Records Synced" value="4,847" tone="accent" />
@@ -149,9 +99,11 @@ export default function SAPSyncMonitor() {
                         <Badge
                           variant="outline"
                           className={
-                            a.tag === "Vpn_tunnel"
+                            a.tag === "VPN Tunnel"
                               ? "border-warning/40 bg-warning/10 text-warning"
-                              : "border-primary/30 bg-primary/10 text-primary"
+                              : a.tag === "Direct"
+                                ? "border-muted-foreground/30 bg-muted text-muted-foreground"
+                                : "border-primary/30 bg-primary/10 text-primary"
                           }
                         >
                           {a.tag}
@@ -162,10 +114,10 @@ export default function SAPSyncMonitor() {
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">{a.description}</p>
                       <code className="mt-2 inline-block rounded bg-muted px-2 py-1 font-mono text-xs">
-                        {a.endpoint}
+                        {a.baseUrl}{a.endpoint}
                       </code>
-                      {a.lastSynced && (
-                        <div className="mt-2 text-xs text-muted-foreground">Last synced: {a.lastSynced}</div>
+                      {a.autoSync.lastSync && (
+                        <div className="mt-2 text-xs text-muted-foreground">Last synced: {a.autoSync.lastSync}</div>
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">

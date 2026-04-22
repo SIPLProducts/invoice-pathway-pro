@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
+import { getSapApi, updateApi, addApi, type SapApi, type SapMethod, type SapAuth, type SapTag } from "@/lib/sapApisStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +32,7 @@ export default function SAPApiEdit() {
   const [showSecret, setShowSecret] = useState(false);
   const [tab, setTab] = useState("details");
 
+  const existing = !isNew ? getSapApi(decodeURIComponent(id ?? "")) : undefined;
   const initial = isNew
     ? {
         name: "",
@@ -47,12 +49,12 @@ export default function SAPApiEdit() {
         middlewareUrl: "http://10.10.4.178:3202",
       }
     : {
-        name: decodeURIComponent(id ?? ""),
-        description: "343 Movement - Moves blocked stock quantity to unrestricted stock in SAP.",
-        baseUrl: "http://10.10.6.115:8000",
-        endpoint: "/mrb/mb52/mat_stocks?sap-client=234",
-        method: "PUT",
-        auth: "Basic Auth",
+        name: existing?.name ?? decodeURIComponent(id ?? ""),
+        description: existing?.description ?? "",
+        baseUrl: existing?.baseUrl ?? "http://10.10.6.115:8000",
+        endpoint: existing?.endpoint ?? "",
+        method: (existing?.method ?? "PUT") as string,
+        auth: existing?.auth === "Basic" ? "Basic Auth" : existing?.auth ?? "Basic Auth",
         sapClient: "234",
         timeout: "30000",
         connectionMode: "Via Proxy Server",
@@ -240,6 +242,33 @@ export default function SAPApiEdit() {
         <Button
           className="gap-2"
           onClick={() => {
+            if (!form.name.trim() || !form.endpoint.trim()) {
+              toast.error("Name and Endpoint Path are required");
+              return;
+            }
+            const normalizedAuth: SapAuth =
+              form.auth === "Basic Auth" ? "Basic" : (form.auth as SapAuth);
+            const payload: SapApi = {
+              name: form.name.trim(),
+              description: form.description,
+              baseUrl: form.baseUrl,
+              endpoint: form.endpoint,
+              method: form.method as SapMethod,
+              auth: normalizedAuth,
+              status: existing?.status ?? "Active",
+              tag: (existing?.tag ?? (form.connectionMode === "VPN Tunnel" ? "VPN Tunnel" : "Proxy")) as SapTag,
+              type: existing?.type ?? "sync",
+              autoSync: existing?.autoSync ?? { enabled: false, frequencyMinutes: 5 },
+            };
+            if (isNew) {
+              if (getSapApi(payload.name)) {
+                toast.error(`An API named "${payload.name}" already exists`);
+                return;
+              }
+              addApi(payload);
+            } else {
+              updateApi(decodeURIComponent(id ?? ""), payload);
+            }
             toast.success("API details saved");
             navigate("/sap/settings");
           }}

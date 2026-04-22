@@ -38,6 +38,15 @@ router.post("/headers", async (req, res, next) => {
     const data = await sapWrite("POST", `/GateHeader`, req.body, {}, cookies);
     res.status(201).json(data);
   } catch (e) {
+    if (e?.code === "sap_error" && e?.sapBody?.error) {
+      console.error(
+        "[gate] POST /headers SAP error:",
+        e.sapBody.error.code,
+        e.sapBody.error.message,
+        "details=",
+        JSON.stringify(e.sapBody.error.details || [], null, 2),
+      );
+    }
     next(e);
   }
 });

@@ -9,20 +9,39 @@ export interface SapSession {
 const STORAGE_KEY = "sap.session.cookies.v1";
 const listeners = new Set<() => void>();
 
+let cachedRaw: string | null = null;
+let cachedSession: SapSession | null = null;
+
+function readSession(): SapSession | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw === cachedRaw) return cachedSession;
+    cachedRaw = raw;
+    if (!raw) {
+      cachedSession = null;
+      return null;
+    }
+    const parsed = JSON.parse(raw) as SapSession;
+    if (!parsed?.jsessionid && !parsed?.vcapId) {
+      cachedSession = null;
+      return null;
+    }
+    cachedSession = parsed;
+    return parsed;
+  } catch {
+    cachedSession = null;
+    return null;
+  }
+}
+
 function emit() {
+  // Invalidate cache so subscribers get fresh value
+  cachedRaw = null;
   listeners.forEach((l) => l());
 }
 
 export function getSapSession(): SapSession | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as SapSession;
-    if (!parsed?.jsessionid && !parsed?.vcapId) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
+  return readSession();
 }
 
 export function setSapSession(session: { jsessionid: string; vcapId: string }) {

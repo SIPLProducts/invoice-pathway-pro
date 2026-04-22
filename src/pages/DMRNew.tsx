@@ -229,7 +229,17 @@ export default function DMRNew() {
                 ))}
                 {headerFields.length === 0 && (
                   <div className="col-span-full rounded-lg border-2 border-dashed p-4 text-center text-xs text-muted-foreground">
-                    No request header fields configured. Open SAP Settings → {api.name} → Request Fields.
+                    <div>No request header fields configured for <strong>{api.name}</strong>.</div>
+                    <div className="mt-2 flex flex-wrap justify-center gap-2">
+                      <Button size="sm" variant="outline" onClick={autoGenerateFromResponse}>
+                        Auto-generate from response schema
+                      </Button>
+                      <Button size="sm" variant="ghost" asChild>
+                        <Link to={`/sap/settings/${encodeURIComponent(api.name)}`}>
+                          Open SAP Settings →
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
                 )}
               </Grid>

@@ -31,6 +31,7 @@ export function useSapCreate(api: SapApi | null | undefined, proxyPathOverride?:
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         Accept: "application/json",
+        "ngrok-skip-browser-warning": "true",
       };
       if (secret) headers["x-proxy-secret"] = secret;
       const res = await fetch(`${proxyUrl}${proxyPath}`, {

@@ -94,59 +94,52 @@ export function SapLiveTable({ api, schema }: Props) {
         </div>
       )}
 
-      {proxyConfigured && error && (() => {
-        const sapErr = (error as { sapBody?: { error?: { code?: string; details?: { message?: string }[] } } }).sapBody?.error;
-        const xmlDetail =
-          sapErr?.code === "CX_SXML_PARSE_ERROR" && Array.isArray(sapErr.details)
-            ? sapErr.details.map((d) => d?.message).filter(Boolean).join(" • ")
-            : null;
-        return (
-          <div
-            className={cn(
-              "border-b px-4 py-3 text-sm",
-              error.code === "sap_session_expired" || error.code === "sap_auth_redirect"
-                ? "bg-warning/10 text-warning-foreground"
-                : "bg-destructive/5 text-destructive",
+      {proxyConfigured && error && (
+        <div
+          className={cn(
+            "border-b px-4 py-3 text-sm",
+            error.code === "sap_session_expired" || error.code === "sap_auth_redirect"
+              ? "bg-warning/10 text-warning-foreground"
+              : "bg-destructive/5 text-destructive",
+          )}
+        >
+          <div className="flex items-center gap-2 font-semibold">
+            {error.code === "sap_session_expired" || error.code === "sap_auth_redirect" ? (
+              <KeyRound className="h-4 w-4 text-warning" />
+            ) : (
+              <AlertCircle className="h-4 w-4" />
             )}
-          >
-            <div className="flex items-center gap-2 font-semibold">
-              {error.code === "sap_session_expired" || error.code === "sap_auth_redirect" ? (
-                <KeyRound className="h-4 w-4 text-warning" />
-              ) : (
-                <AlertCircle className="h-4 w-4" />
-              )}
-              {error.code === "sap_session_expired"
-                ? "SAP browser session expired"
-                : error.code === "sap_auth_redirect"
-                  ? "SAP authentication required"
-                  : "Failed to load from SAP"}
-              {error.code && (
-                <code className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[10px]">
-                  {error.code}
-                </code>
-              )}
-            </div>
-            <div className="mt-1 whitespace-pre-wrap text-xs">{xmlDetail || error.message}</div>
-            {error.hint && (
-              <div className="mt-2 rounded border border-border bg-background/60 px-3 py-2 text-xs text-foreground">
-                <span className="font-semibold">How to fix: </span>
-                {error.hint}
-              </div>
-            )}
-            {(error.code === "sap_session_expired" || error.code === "sap_auth_redirect") && (
-              <div className="mt-2">
-                <Link
-                  to="/sap/settings"
-                  className="inline-flex items-center gap-1.5 rounded-md border border-warning/40 bg-warning/15 px-2.5 py-1 text-xs font-semibold text-warning hover:bg-warning/25"
-                >
-                  <KeyRound className="h-3 w-3" />
-                  Open SAP Settings → SAP Browser Session
-                </Link>
-              </div>
+            {error.code === "sap_session_expired"
+              ? "SAP browser session expired"
+              : error.code === "sap_auth_redirect"
+                ? "SAP authentication required"
+                : "Failed to load from SAP"}
+            {error.code && (
+              <code className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[10px]">
+                {error.code}
+              </code>
             )}
           </div>
-        );
-      })()}
+          <div className="mt-1 whitespace-pre-wrap text-xs">{error.message}</div>
+          {error.hint && (
+            <div className="mt-2 rounded border border-border bg-background/60 px-3 py-2 text-xs text-foreground">
+              <span className="font-semibold">How to fix: </span>
+              {error.hint}
+            </div>
+          )}
+          {(error.code === "sap_session_expired" || error.code === "sap_auth_redirect") && (
+            <div className="mt-2">
+              <Link
+                to="/sap/settings"
+                className="inline-flex items-center gap-1.5 rounded-md border border-warning/40 bg-warning/15 px-2.5 py-1 text-xs font-semibold text-warning hover:bg-warning/25"
+              >
+                <KeyRound className="h-3 w-3" />
+                Open SAP Settings → SAP Browser Session
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
 
       {proxyConfigured && (
         <div className="overflow-x-auto scrollbar-thin">

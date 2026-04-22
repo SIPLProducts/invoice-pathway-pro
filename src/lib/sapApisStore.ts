@@ -93,29 +93,29 @@ export interface SapApi {
   middleware?: MiddlewareConfig;
 }
 
-const STORAGE_KEY = "dmr.sapApis.v3";
+const STORAGE_KEY = "dmr.sapApis.v2";
 
 const GATE_HEADER_REQUEST: FieldDef[] = [
   { key: "gate_id", label: "Gate ID", type: "string", required: true, showInForm: true },
   { key: "plant", label: "Plant", type: "string", required: true, showInForm: true, defaultValue: "3801" },
   { key: "gate_date", label: "Gate Date", type: "date", required: true, showInForm: true },
-  { key: "gate_time", label: "Gate Time", type: "time", required: true, showInForm: true },
-  { key: "vendor", label: "Vendor Code", type: "string", required: true, showInForm: true },
+  { key: "gate_time", label: "Gate Time", type: "time", showInForm: true },
+  { key: "vendor", label: "Vendor Code", type: "string", showInForm: true },
   { key: "vendor_name", label: "Vendor Name", type: "string", showInForm: true },
-  { key: "vehicle_no", label: "Vehicle No", type: "string", required: true, showInForm: true },
+  { key: "vehicle_no", label: "Vehicle No", type: "string", showInForm: true },
   { key: "vehicle_type", label: "Vehicle Type", type: "string", showInForm: true },
   { key: "driver_name", label: "Driver Name", type: "string", showInForm: true },
   { key: "driver_mobile", label: "Driver Mobile", type: "string", showInForm: true },
   { key: "license_no", label: "License No", type: "string", showInForm: true },
-  { key: "transport_type", label: "Transport Type", type: "string", required: true, showInForm: true, defaultValue: "INBOUND" },
-  { key: "purpose", label: "Purpose", type: "string", required: true, showInForm: true },
-  { key: "document_type", label: "Document Type", type: "string", required: true, showInForm: true, defaultValue: "PO" },
+  { key: "transport_type", label: "Transport Type", type: "string", showInForm: true, defaultValue: "INBOUND" },
+  { key: "purpose", label: "Purpose", type: "string", showInForm: true },
+  { key: "document_type", label: "Document Type", type: "string", showInForm: true, defaultValue: "PO" },
   { key: "reference_doc", label: "Reference Doc", type: "string", showInForm: true },
   { key: "gross_weight", label: "Gross Weight", type: "number", showInForm: true },
   { key: "tare_weight", label: "Tare Weight", type: "number", showInForm: true },
   { key: "net_weight", label: "Net Weight", type: "number", showInForm: true },
-  { key: "entry_type", label: "Entry Type", type: "string", required: true, showInForm: true, defaultValue: "IN" },
-  { key: "gate_status", label: "Gate Status", type: "string", required: true, showInForm: true, defaultValue: "OPEN" },
+  { key: "entry_type", label: "Entry Type", type: "string", showInForm: true, defaultValue: "IN" },
+  { key: "gate_status", label: "Gate Status", type: "string", showInForm: true, defaultValue: "OPEN" },
   { key: "remarks", label: "Remarks", type: "string", showInForm: true },
 ];
 
@@ -123,8 +123,8 @@ const GATE_ITEM_REQUEST: FieldDef[] = [
   { key: "item_no", label: "Item No", type: "string", required: true, showInForm: true },
   { key: "material", label: "Material", type: "string", required: true, showInForm: true },
   { key: "material_desc", label: "Material Desc", type: "string", showInForm: true },
-  { key: "quantity", label: "Quantity", type: "number", required: true, showInForm: true, align: "right" },
-  { key: "unit", label: "Unit", type: "string", required: true, showInForm: true, defaultValue: "KG" },
+  { key: "quantity", label: "Quantity", type: "number", showInForm: true, align: "right" },
+  { key: "unit", label: "Unit", type: "string", showInForm: true, defaultValue: "KG" },
   { key: "batch", label: "Batch", type: "string", showInForm: true },
   { key: "storage_location", label: "Storage Loc", type: "string", showInForm: true },
   { key: "po_number", label: "PO Number", type: "string", showInForm: true },

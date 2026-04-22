@@ -16,59 +16,7 @@ import {
   TestTube2,
 } from "lucide-react";
 import { toast } from "sonner";
-
-interface SyncApi {
-  name: string;
-  description: string;
-  endpoint: string;
-  method: "GET" | "POST" | "PUT" | "DELETE";
-  status: "Active" | "Inactive";
-  tag: "Proxy" | "Vpn_tunnel";
-  type: "action" | "live" | "sync";
-  lastSynced?: string;
-}
-
-const apis: SyncApi[] = [
-  {
-    name: "SAP_343_Blocked_To_Unrestricted",
-    description: "343 Movement - Moves blocked stock quantity to unrestricted stock in SAP.",
-    endpoint: "http://10.10.6.115:8000/mrb/mb52/mat_stocks?sap-client=234",
-    method: "PUT",
-    status: "Active",
-    tag: "Proxy",
-    type: "action",
-  },
-  {
-    name: "SAP_344_Unrestricted_To_Blocked",
-    description: "344 Movement - Moves unrestricted stock quantity to blocked stock in SAP.",
-    endpoint: "http://10.10.6.115:8000/mrb/mb52/mat_stocks?sap-client=234",
-    method: "GET",
-    status: "Active",
-    tag: "Proxy",
-    type: "action",
-  },
-  {
-    name: "MB52_Stock_Report",
-    description:
-      "MB52 - Material Stock Report. Returns stock quantities (unrestricted, blocked, QI, transfer) by plant, storage location, material and batch.",
-    endpoint: "http://10.10.6.115:8000/mrb/mb52/mat_stocks?sap-client=234",
-    method: "POST",
-    status: "Active",
-    tag: "Proxy",
-    type: "live",
-  },
-  {
-    name: "ZMRB_Inward_Inspection",
-    description:
-      "ZMRB01/ZMRB04 - Inward Inspection Report. Fetches inspection lots with vendor, PO, batch and quantity details. Use ART=01 for ZMRB01, ART=04 for ZMRB04.",
-    endpoint: "http://10.10.6.115:8000/mrb/inward/report?sap-client=234",
-    method: "POST",
-    status: "Active",
-    tag: "Vpn_tunnel",
-    type: "sync",
-    lastSynced: "22/4/2026, 10:52:03 am",
-  },
-];
+import { useSapApis } from "@/lib/sapApisStore";
 
 const methodColor: Record<string, string> = {
   GET: "bg-success/15 text-success border-success/30",

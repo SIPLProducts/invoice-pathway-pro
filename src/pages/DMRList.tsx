@@ -9,13 +9,8 @@ import { Link } from "react-router-dom";
 import { SapLiveTable } from "@/components/SapLiveTable";
 import { buildSchemaFromApi } from "@/lib/sapApiSchemas";
 import { useSapApis } from "@/lib/sapApisStore";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+
 
 const tabs = [
   "All",

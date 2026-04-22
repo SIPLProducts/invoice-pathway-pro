@@ -35,8 +35,13 @@ function coerce(v: string, type: FieldDef["type"]): string | number | boolean {
 export default function DMRNew() {
   const navigate = useNavigate();
   const apis = useSapApis();
+  // Show every configured API that can plausibly create or read records.
   const liveApis = apis.filter(
-    (a) => (a.requestHeaderFields?.length ?? 0) > 0 || a.name === "ZUI_Gate_Service",
+    (a) =>
+      a.type === "live" ||
+      a.type === "sync" ||
+      (a.requestHeaderFields?.length ?? 0) > 0 ||
+      (a.responseHeaderFields?.length ?? 0) > 0,
   );
 
   const [selectedName, setSelectedName] = useState<string>(
@@ -48,8 +53,20 @@ export default function DMRNew() {
     [apis, selectedName],
   );
 
-  const headerFields = (api?.requestHeaderFields ?? []).filter((f) => f.showInForm !== false && f.key);
-  const itemFields = (api?.requestItemFields ?? []).filter((f) => f.showInForm !== false && f.key);
+  // If request fields are missing, allow user to derive them from response fields (in-memory only).
+  const [derivedHeaderFields, setDerivedHeaderFields] = useState<FieldDef[] | null>(null);
+  const [derivedItemFields, setDerivedItemFields] = useState<FieldDef[] | null>(null);
+
+  const headerFields = (
+    derivedHeaderFields ??
+    api?.requestHeaderFields ??
+    []
+  ).filter((f) => f.showInForm !== false && f.key);
+  const itemFields = (
+    derivedItemFields ??
+    api?.requestItemFields ??
+    []
+  ).filter((f) => f.showInForm !== false && f.key);
 
   const [header, setHeader] = useState<Row>(() => emptyRowFromFields(headerFields));
   const [items, setItems] = useState<Row[]>(() =>
@@ -59,6 +76,8 @@ export default function DMRNew() {
   // Reset state when switching API
   const handleSelectApi = (name: string) => {
     setSelectedName(name);
+    setDerivedHeaderFields(null);
+    setDerivedItemFields(null);
     const next = apis.find((a) => a.name === name);
     const hf = (next?.requestHeaderFields ?? []).filter((f) => f.showInForm !== false && f.key);
     const itf = (next?.requestItemFields ?? []).filter((f) => f.showInForm !== false && f.key);
@@ -66,8 +85,30 @@ export default function DMRNew() {
     setItems(itf.length ? [emptyRowFromFields(itf)] : []);
   };
 
-  const proxyPath = api?.createEndpoint ?? api?.proxyPath ?? "/api/gate/headers";
-  const { submit, loading, proxyConfigured } = useSapCreate(proxyPath);
+  const autoGenerateFromResponse = () => {
+    if (!api) return;
+    const hf: FieldDef[] = (api.responseHeaderFields ?? []).map((f) => ({
+      ...f,
+      showInForm: true,
+    }));
+    const itf: FieldDef[] = (api.responseItemFields ?? []).map((f) => ({
+      ...f,
+      showInForm: true,
+    }));
+    if (!hf.length && !itf.length) {
+      toast.error("No response fields configured either. Open SAP Settings to add them.");
+      return;
+    }
+    setDerivedHeaderFields(hf);
+    setDerivedItemFields(itf);
+    setHeader(emptyRowFromFields(hf));
+    setItems(itf.length ? [emptyRowFromFields(itf)] : []);
+    toast.success(
+      `Generated ${hf.length} header + ${itf.length} item field(s) from response schema`,
+    );
+  };
+
+  const { submit, loading, proxyConfigured } = useSapCreate(api ?? null);
 
   const onSubmit = async () => {
     if (!api) return;

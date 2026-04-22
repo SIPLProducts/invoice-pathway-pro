@@ -42,16 +42,10 @@ export default function DMRPage() {
   const [active, setActive] = useState<(typeof tabs)[number]>("All");
   const [q, setQ] = useState("");
   const apis = useSapApis();
-  // Only show gate-shaped APIs in the DMR Gate Entries tab
-  // (hides MB52_Stock_Report, ZMRB_Inward_Inspection, SAP_343/344, etc.)
-  const liveApis = apis.filter(
-    (a) =>
-      /gate|dmr/i.test(a.name) ||
-      (a.proxyPath ?? a.listEndpoint ?? "").startsWith("/api/gate"),
-  );
-  const [selectedApiName, setSelectedApiName] = useState<string>("");
-  const selectedApi =
-    liveApis.find((a) => a.name === selectedApiName) ?? liveApis[0] ?? null;
+  // SAP Gate Entries tab shows ONLY the Get_DMR list API.
+  // Create_Gate_Service is a write API and lives on the New DMR page.
+  const liveApis = apis.filter((a) => /get[_ ]?dmr/i.test(a.name));
+  const selectedApi = liveApis[0] ?? null;
 
   const filtered = dmrs.filter((d) => {
     const tab = tabMap[active];

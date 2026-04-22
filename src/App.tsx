@@ -15,6 +15,7 @@ import Approvals from "./pages/Approvals";
 import Documents from "./pages/Documents";
 import Reports from "./pages/Reports";
 import Admin from "./pages/Admin";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          <Route path="/login" element={<Login />} />
           <Route element={<AppShell />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/dmr" element={<DMRList />} />

@@ -179,33 +179,6 @@ export default function DMRNew() {
         }
       />
 
-      <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 shadow-card">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Source API
-          </span>
-          <Select value={selectedName} onValueChange={handleSelectApi}>
-            <SelectTrigger className="h-9 w-72">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {liveApis.map((a) => (
-                <SelectItem key={a.name} value={a.name}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="ml-auto text-[11px] text-muted-foreground">
-          Fields and validation come from{" "}
-          <Link to="/sap/settings" className="font-semibold text-primary hover:underline">
-            SAP Settings → {selectedName} → Request Fields
-          </Link>
-          .
-        </div>
-      </div>
-
       <div className="mb-5 rounded-xl border-2 border-dashed border-primary/30 bg-gradient-surface p-6 text-center">
         <Camera className="mx-auto h-10 w-10 text-primary" />
         <h3 className="mt-3 font-display text-base font-semibold">Start with OCR Capture</h3>

@@ -6,13 +6,8 @@ import { ArrowLeft, Camera, Save, Send, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useSapApis, type FieldDef, type SapApi } from "@/lib/sapApisStore";
 import { useSapCreate } from "@/hooks/useSapCreate";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+
 
 type Row = Record<string, string | number | boolean>;
 
@@ -35,17 +30,14 @@ function coerce(v: string, type: FieldDef["type"]): string | number | boolean {
 export default function DMRNew() {
   const navigate = useNavigate();
   const apis = useSapApis();
-  // Only show gate-shaped APIs (Get_DMR, Create_Gate_Service, ZUI_Gate_Service…)
-  // — hides MB52, ZMRB, SAP_343/344 from the New DMR source dropdown.
-  const liveApis = apis.filter(
-    (a) =>
-      /gate|dmr/i.test(a.name) ||
-      (a.proxyPath ?? a.listEndpoint ?? "").startsWith("/api/gate"),
-  );
-
-  const [selectedName, setSelectedName] = useState<string>(
-    liveApis.find((a) => /gate|dmr/i.test(a.name))?.name ?? liveApis[0]?.name ?? "",
-  );
+  // New DMR is always Create_Gate_Service. No dropdown.
+  // Fallback to any gate-shaped API if Create_Gate_Service isn't configured yet.
+  const selectedName = useMemo(() => {
+    const cgs = apis.find((a) => /create[_ ]?gate[_ ]?service/i.test(a.name));
+    if (cgs) return cgs.name;
+    const gate = apis.find((a) => /gate/i.test(a.name));
+    return gate?.name ?? "";
+  }, [apis]);
 
   const api: SapApi | undefined = useMemo(
     () => apis.find((a) => a.name === selectedName),
@@ -72,30 +64,7 @@ export default function DMRNew() {
     itemFields.length ? [emptyRowFromFields(itemFields)] : [],
   );
 
-  // Reset state when switching API. If the chosen API has no request fields
-  // configured but does have response fields (e.g. user only filled Response Fields
-  // for Get_DMR / Create_Gate_Service), auto-derive the form from the response schema
-  // so the header form + line-item table appear immediately.
-  const handleSelectApi = (name: string) => {
-    setSelectedName(name);
-    const next = apis.find((a) => a.name === name);
-    let hf = (next?.requestHeaderFields ?? []).filter((f) => f.showInForm !== false && f.key);
-    let itf = (next?.requestItemFields ?? []).filter((f) => f.showInForm !== false && f.key);
-    if (hf.length === 0 && (next?.responseHeaderFields?.length ?? 0) > 0) {
-      hf = (next?.responseHeaderFields ?? []).map((f) => ({ ...f, showInForm: true }));
-      setDerivedHeaderFields(hf);
-    } else {
-      setDerivedHeaderFields(null);
-    }
-    if (itf.length === 0 && (next?.responseItemFields?.length ?? 0) > 0) {
-      itf = (next?.responseItemFields ?? []).map((f) => ({ ...f, showInForm: true }));
-      setDerivedItemFields(itf);
-    } else {
-      setDerivedItemFields(null);
-    }
-    setHeader(emptyRowFromFields(hf));
-    setItems(itf.length ? [emptyRowFromFields(itf)] : []);
-  };
+  // (Source API is fixed to Create_Gate_Service — no selector / handler needed.)
 
   const autoGenerateFromResponse = () => {
     if (!api) return;
@@ -205,33 +174,6 @@ export default function DMRNew() {
         }
       />
 
-      <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4 shadow-card">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Source API
-          </span>
-          <Select value={selectedName} onValueChange={handleSelectApi}>
-            <SelectTrigger className="h-9 w-72">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {liveApis.map((a) => (
-                <SelectItem key={a.name} value={a.name}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="ml-auto text-[11px] text-muted-foreground">
-          Fields and validation come from{" "}
-          <Link to="/sap/settings" className="font-semibold text-primary hover:underline">
-            SAP Settings → {selectedName} → Request Fields
-          </Link>
-          .
-        </div>
-      </div>
-
       <div className="mb-5 rounded-xl border-2 border-dashed border-primary/30 bg-gradient-surface p-6 text-center">
         <Camera className="mx-auto h-10 w-10 text-primary" />
         <h3 className="mt-3 font-display text-base font-semibold">Start with OCR Capture</h3>
@@ -248,8 +190,8 @@ export default function DMRNew() {
           No SAP API selected.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-5">
+        <div className="space-y-5">
+          <div className="space-y-5">
             <Section title={`${api.name} — Header`}>
               <Grid>
                 {headerFields.map((f) => (
@@ -343,23 +285,6 @@ export default function DMRNew() {
             )}
           </div>
 
-          <div className="space-y-4">
-            <Section title="Request Preview">
-              <pre className="max-h-96 overflow-auto rounded-lg bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">
-                {JSON.stringify(
-                  itemFields.length ? { ...header, _Item: items } : header,
-                  null,
-                  2,
-                )}
-              </pre>
-            </Section>
-
-            <Section title="Attachments">
-              <div className="rounded-lg border-2 border-dashed p-6 text-center text-sm text-muted-foreground">
-                Drop files here or <span className="font-medium text-primary">browse</span>
-              </div>
-            </Section>
-          </div>
         </div>
       )}
     </>

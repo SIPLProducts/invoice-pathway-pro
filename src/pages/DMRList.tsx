@@ -9,13 +9,8 @@ import { Link } from "react-router-dom";
 import { SapLiveTable } from "@/components/SapLiveTable";
 import { buildSchemaFromApi } from "@/lib/sapApiSchemas";
 import { useSapApis } from "@/lib/sapApisStore";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+
 
 const tabs = [
   "All",
@@ -42,16 +37,10 @@ export default function DMRPage() {
   const [active, setActive] = useState<(typeof tabs)[number]>("All");
   const [q, setQ] = useState("");
   const apis = useSapApis();
-  // Only show gate-shaped APIs in the DMR Gate Entries tab
-  // (hides MB52_Stock_Report, ZMRB_Inward_Inspection, SAP_343/344, etc.)
-  const liveApis = apis.filter(
-    (a) =>
-      /gate|dmr/i.test(a.name) ||
-      (a.proxyPath ?? a.listEndpoint ?? "").startsWith("/api/gate"),
-  );
-  const [selectedApiName, setSelectedApiName] = useState<string>("");
-  const selectedApi =
-    liveApis.find((a) => a.name === selectedApiName) ?? liveApis[0] ?? null;
+  // SAP Gate Entries tab shows ONLY the Get_DMR list API.
+  // Create_Gate_Service is a write API and lives on the New DMR page.
+  const liveApis = apis.filter((a) => /get[_ ]?dmr/i.test(a.name));
+  const selectedApi = liveApis[0] ?? null;
 
   const filtered = dmrs.filter((d) => {
     const tab = tabMap[active];
@@ -135,34 +124,6 @@ export default function DMRPage() {
           }
           return (
             <div className="space-y-3">
-              {liveApis.length >= 1 && (
-                <div className="flex items-center gap-2 rounded-xl border bg-card p-3 shadow-card">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Source API
-                  </span>
-                  <Select
-                    value={selectedApi.name}
-                    onValueChange={setSelectedApiName}
-                  >
-                    <SelectTrigger className="h-9 w-72">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {liveApis.map((a) => (
-                        <SelectItem key={a.name} value={a.name}>
-                          {a.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Link
-                    to={`/sap/settings/${encodeURIComponent(selectedApi.name)}`}
-                    className="ml-auto text-[11px] font-semibold text-primary hover:underline"
-                  >
-                    Edit fields →
-                  </Link>
-                </div>
-              )}
               <SapLiveTable api={selectedApi} schema={buildSchemaFromApi(selectedApi)} />
             </div>
           );

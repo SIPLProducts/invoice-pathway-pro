@@ -83,10 +83,19 @@ export function useSapProxy<T = Record<string, unknown>>(
         }
         if (!res.ok) {
           const errObj = data as {
-            error?: { message?: string; code?: string; hint?: string };
+            error?: {
+              message?: string;
+              code?: string;
+              hint?: string;
+              details?: Array<{ message?: string; target?: string }>;
+            };
           } | null;
+          const detail =
+            Array.isArray(errObj?.error?.details) && errObj?.error?.details?.[0]?.message
+              ? errObj!.error!.details![0]!.message
+              : null;
           throw {
-            message: errObj?.error?.message || `HTTP ${res.status}`,
+            message: detail || errObj?.error?.message || `HTTP ${res.status}`,
             code: errObj?.error?.code,
             hint: errObj?.error?.hint,
           } as SapProxyError;

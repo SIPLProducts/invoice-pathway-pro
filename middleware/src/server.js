@@ -26,8 +26,22 @@ app.use(
       return cb(new Error(`Origin ${origin} not allowed`));
     },
     credentials: false,
+    allowedHeaders: [
+      "Content-Type",
+      "Accept",
+      "Authorization",
+      "x-proxy-secret",
+      "ngrok-skip-browser-warning",
+    ],
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   }),
 );
+
+// Always echo the ngrok-skip header so even error responses sail through ngrok cleanly
+app.use((_req, res, next) => {
+  res.setHeader("ngrok-skip-browser-warning", "true");
+  next();
+});
 
 app.use(express.json({ limit: "2mb" }));
 app.use(

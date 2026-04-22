@@ -3,10 +3,16 @@ import type { SapApiSchema } from "@/lib/sapApiSchemas";
 import type { SapApi } from "@/lib/sapApisStore";
 import { getPath } from "@/lib/getPath";
 
+export interface SapProxyError {
+  message: string;
+  code?: string;
+  hint?: string;
+}
+
 export interface UseSapProxyResult<T = Record<string, unknown>> {
   rows: T[];
   loading: boolean;
-  error: string | null;
+  error: SapProxyError | null;
   lastFetched: Date | null;
   proxyConfigured: boolean;
   proxyUrl: string;

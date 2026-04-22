@@ -38,6 +38,15 @@ router.post("/headers", async (req, res, next) => {
     const data = await sapWrite("POST", `/GateHeader`, req.body, {}, cookies);
     res.status(201).json(data);
   } catch (e) {
+    // Log SAP detail messages so we can see exactly which field SAP rejected.
+    const sapErr = e?.sapBody?.error;
+    if (sapErr?.code === "CX_SXML_PARSE_ERROR" || Array.isArray(sapErr?.details)) {
+      console.error("[gate POST] SAP error:", sapErr.code, "-", sapErr.message);
+      if (Array.isArray(sapErr.details)) {
+        console.error("[gate POST] SAP details:", JSON.stringify(sapErr.details, null, 2));
+      }
+      console.error("[gate POST] Sent payload:", JSON.stringify(req.body, null, 2));
+    }
     next(e);
   }
 });

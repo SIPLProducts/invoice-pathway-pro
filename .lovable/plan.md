@@ -1,64 +1,126 @@
 
-## Connect SAP Public Cloud → Frontend via Lovable Cloud Edge Function (the "middleware")
 
-You asked: *"I want to connect the public cloud SAP URL through the middleware to the frontend. How can we achieve this?"*
+## SAP ZUI_GATE_SERVICE — Node Middleware + Configurable DMR Screen
 
-Here's the concrete plan. In Lovable, the "middleware" for a public cloud SAP endpoint is a **Lovable Cloud edge function** (Deno serverless). It solves three problems the browser can't solve on its own:
+You want three things, all without using Lovable Cloud:
 
-1. **CORS** — SAP BTP does not send `Access-Control-Allow-Origin`, so the browser blocks direct calls.
-2. **Credential safety** — your SAP username/password must never live in frontend code.
-3. **Auth handshake** — Basic Auth + `sap-client` + CSRF cookies are easier to manage server-side.
+1. A **complete Node.js middleware** (you host it) that proxies the public SAP BTP `ZUI_GATE_SERVICE` OData v4 service (GET / POST / PATCH / $batch / DELETE).
+2. A **configurable field-mapping** layer so the same screen can be reused for other SAP APIs by changing only the mapping config — keys from the SAP response map to table column headers.
+3. A **DMR screen tab** that lists Gate Headers from the GET endpoint, with a **Refresh** button.
 
-### Architecture
+---
+
+### Part A — Node.js middleware (delivered as separate files at the repo root in a new `middleware/` folder; you run it on your own server / Render / Railway / EC2)
+
+Folder layout:
 
 ```text
- Browser (React)                Lovable Cloud Edge Function           SAP BTP Public Cloud
- ────────────────              ──────────────────────────────         ────────────────────────
-  DMR screen                    sap-gate-header                        /sap/opu/odata4/.../GateHeader
-   │  supabase.functions        │  - reads SAP_USER / SAP_PASS         │  ?sap-client=100
-   │   .invoke('sap-gate-       │    from secret store                 │
-   │    header')        ───►    │  - adds Basic Auth header     ───►   │
-   │                            │  - forwards sap-client param          │
-   │  JSON rows         ◄───    │  - returns JSON + CORS headers ◄───  │  OData JSON response
+middleware/
+  package.json
+  .env.example
+  README.md
+  src/
+    server.js           # Express app + CORS + routes
+    sapClient.js        # axios instance, Basic auth, CSRF token cache, cookie jar
+    routes/
+      gate.js           # GET list, GET one, POST, PATCH header, PATCH item, DELETE, $batch
+    util/
+      batch.js          # builds multipart/mixed $batch body for header+items
+      errors.js         # uniform error envelope
 ```
 
-No on-prem Node middleware needed. The edge function IS the middleware for this public cloud endpoint.
+Key behaviors implemented:
 
-### What we'll build
+- **Auth**: HTTP Basic (`SAP_USER` / `SAP_PASSWORD`) loaded from `.env`. Base URL also from `.env` (`SAP_BASE_URL=https://fa530628-...hana.ondemand.com`, `SAP_SERVICE_PATH=/sap/opu/odata4/sap/zui_gate_service/srvd_a2x/sap/zui_gate_service/0001`, `SAP_CLIENT=100`).
+- **CSRF + cookies**: on first write request, do `HEAD ?$top=0` with `x-csrf-token: fetch`, cache token + `JSESSIONID` cookie in memory (per-process, with TTL); auto-refresh on `403 CSRF token validation failed`.
+- **CORS**: `cors()` restricted to your frontend origin (configurable via `ALLOWED_ORIGINS`).
+- **Routes** (all return clean JSON to the frontend):
+  - `GET  /api/gate/headers`           → proxies `GET GateHeader?$expand=_Item&sap-client=100`
+  - `GET  /api/gate/headers/:gateId`   → single header with items
+  - `POST /api/gate/headers`           → create header + items (single POST with `_Item` array)
+  - `PATCH /api/gate/headers/:gateId`  → update header only
+  - `PATCH /api/gate/items/:gateId/:itemNo` → update one item
+  - `POST /api/gate/batch`             → accepts `{ header: {...patch}, items: [{item_no, ...patch}] }`, builds multipart `$batch` with one changeset, posts to `/$batch?sap-client=100`, parses response and returns clean JSON
+  - `DELETE /api/gate/headers/:gateId` → delete
+  - `GET  /api/health`                 → `{ ok: true }`
+- **Error envelope**: `{ error: { code, message, sapStatus, sapBody } }`.
+- **Logging**: `morgan('tiny')` + redaction of Authorization header.
+- Dependencies: `express`, `axios`, `cors`, `dotenv`, `morgan`, `tough-cookie`, `axios-cookiejar-support`.
 
-1. **Enable Lovable Cloud** on the project (one-click; needed to host the edge function and the secret store).
-2. **Store SAP credentials as secrets** — `SAP_BTP_USER`, `SAP_BTP_PASSWORD`, `SAP_BTP_BASE_URL`. You'll be asked once, values go into the encrypted secret store, never into git.
-3. **Edge function `sap-gate-header`** (`supabase/functions/sap-gate-header/index.ts`):
-   - Accepts optional query params (e.g. `$top`, `$filter`, `sap-client`).
-   - Calls `${SAP_BTP_BASE_URL}/sap/opu/odata4/sap/zui_gate_service/srvd_a2x/sap/zui_gate_service/0001/GateHeader?sap-client=100`.
-   - Sends `Authorization: Basic base64(user:pass)` and `Accept: application/json`.
-   - Returns the OData `value` array as JSON with full CORS headers.
-   - Maps SAP errors (401/403/404/5xx) to clean messages so the UI can show a useful banner.
-4. **Frontend hook `useSapGateHeader()`** using TanStack Query:
-   - Calls `supabase.functions.invoke('sap-gate-header')`.
-   - Handles loading / error / empty states.
-   - 60s stale time, manual refetch.
-5. **DMR screen integration** — a new "SAP Gate Entries" tab in `src/pages/DMRList.tsx` showing the live SAP rows in a table (Gate No, Vehicle, Vendor, Material, Qty, Posting Date, Status) with a Refresh button and last-updated timestamp.
-6. **Wire it into SAP API Settings** — register a `GateHeader` entry in `sapApisStore.ts` so it shows up in the Configurations table and is editable from the existing UI (URL/sap-client are read from the registry; auth stays server-side).
+The README will include exact `npm install`, `npm start`, sample curl, and a "Deploy to Render" 3-step section. After you deploy it, you give me the public URL (e.g. `https://my-sap-proxy.onrender.com`) and I plug it into the frontend as `VITE_SAP_PROXY_URL`.
 
-### What you'll do (only once)
+---
 
-- Approve enabling Lovable Cloud.
-- Paste your SAP BTP **username**, **password**, and **base URL** (`https://fa530628-...hana.ondemand.com`) into the secret prompt that appears.
+### Part B — Configurable mapping layer (frontend)
 
-That's it. After that the DMR screen will show live `GateHeader` data, and the credentials stay encrypted server-side.
+A single config drives column headers, field paths, formatters, and which middleware endpoint to hit. Same screen works for any future SAP API by adding another entry.
 
-### Technical notes
+New file `src/lib/sapApiSchemas.ts`:
 
-- Edge function uses `corsHeaders` on every response (including errors), handles `OPTIONS` preflight.
-- Input validated with Zod (`$top`, `$skip`, `$filter`, `sapClient`).
-- Timeouts: 20s fetch with `AbortController`; returns 504 on timeout.
-- Logs request id + status code (no credentials, no PII).
-- `verify_jwt` left at default; we can tighten to require an authenticated user later.
-- Future on-prem APIs (`10.10.6.115`) still require the Node middleware — only this public BTP endpoint can skip it.
+```ts
+export type ColumnDef = {
+  header: string;          // shown in table header
+  path: string;            // dot path into row, e.g. "vendor_name" or "_Item.0.material"
+  format?: "date" | "time" | "number" | "text";
+  align?: "left" | "right";
+  width?: string;
+};
+
+export type SapApiSchema = {
+  id: string;                          // "zui_gate_service"
+  label: string;                       // "SAP Gate Entries"
+  proxyPath: string;                   // "/api/gate/headers"
+  rowsPath: string;                    // "value"  (OData collection key)
+  rowKey: string;                      // "gate_id"
+  columns: ColumnDef[];
+  childKey?: string;                   // "_Item" for expand rows
+  childColumns?: ColumnDef[];
+};
+```
+
+Seed schema for **GateHeader** with these mapped columns (one per requested SAP key):
+
+`gate_id, plant, gate_date, gate_time, vendor, vendor_name, vehicle_no, vehicle_type, driver_name, driver_mobile, transport_type, purpose, document_type, reference_doc, gross_weight, tare_weight, net_weight, entry_type, gate_status, remarks` — and child `_Item` columns: `item_no, material, material_desc, quantity, unit, batch, storage_location, po_number, po_item, weight, remarks`.
+
+Edit `src/lib/sapApisStore.ts`: add a new entry `ZUI_Gate_Service` (type `live`, tag `Direct`, baseUrl = your proxy URL, endpoint = `/api/gate/headers`) so it also shows up in the existing SAP Settings list.
+
+---
+
+### Part C — DMR screen integration
+
+Edit `src/pages/DMRList.tsx`:
+
+- Add a new tab **"SAP Gate Entries"** alongside the existing Draft/Submitted/… tabs.
+- When active, render a new component `<SapLiveTable schemaId="zui_gate_service" />` instead of the local DMR table.
+
+New files:
+
+- `src/hooks/useSapProxy.ts` — generic fetcher: `useSapProxy(schema)` returns `{ rows, loading, error, refresh, lastFetched }`. Reads `VITE_SAP_PROXY_URL` from env, calls `${VITE_SAP_PROXY_URL}${schema.proxyPath}`, extracts `rowsPath`.
+- `src/components/SapLiveTable.tsx` — generic table:
+  - Header row built from `schema.columns[].header`.
+  - Body rows rendered via `lodash.get(row, col.path)` + format helper.
+  - Expandable row showing `_Item` child table when `schema.childKey` is set.
+  - Top-right toolbar: **Refresh** button (lucide `RefreshCw`, spins while loading), "Last updated HH:mm:ss" text, and a small status pill (Live / Error).
+  - Empty + error + loading skeleton states.
+- `src/lib/getPath.ts` — tiny dot-path getter (no lodash dependency needed).
+
+Frontend env:
+
+- Add `VITE_SAP_PROXY_URL` documentation to README. Until you deploy the middleware, the table shows a friendly "Middleware not configured — set `VITE_SAP_PROXY_URL`" empty state with a copy-curl button.
+
+---
+
+### Technical details (for reference)
+
+- OData v4 collection responses always have `value: [...]`; `rowsPath: "value"` handles that. Single-entity GETs use `rowsPath: ""` (returns object).
+- `$expand=_Item` is preserved in the proxy route; the middleware appends `sap-client=100` once (your sample URL has it twice — that's harmless but the proxy normalizes it).
+- For PATCH of header+items together, the middleware builds the exact `multipart/mixed; boundary=batch_boundary` body shown in your doc, including `If-Match: *` and `Content-ID` per change, and parses the multipart response back into `{ header, items }`.
+- Mapping is pure config — to add a new SAP API later (e.g. MB52), drop another `SapApiSchema` entry and one new proxy route; no UI code changes.
+- No Lovable Cloud / Supabase used anywhere. All secrets live in your Node `.env`.
 
 ### Files
 
-- New: `supabase/functions/sap-gate-header/index.ts`, `src/hooks/useSapGateHeader.ts`, `src/components/SapGateHeaderTable.tsx`
-- Edit: `src/pages/DMRList.tsx` (add tab), `src/lib/sapApisStore.ts` (register GateHeader entry)
-- Secrets added: `SAP_BTP_USER`, `SAP_BTP_PASSWORD`, `SAP_BTP_BASE_URL`
+- New (middleware repo, separate folder, you deploy): `middleware/package.json`, `middleware/.env.example`, `middleware/README.md`, `middleware/src/server.js`, `middleware/src/sapClient.js`, `middleware/src/routes/gate.js`, `middleware/src/util/batch.js`, `middleware/src/util/errors.js`
+- New (frontend): `src/lib/sapApiSchemas.ts`, `src/lib/getPath.ts`, `src/hooks/useSapProxy.ts`, `src/components/SapLiveTable.tsx`
+- Edit (frontend): `src/pages/DMRList.tsx` (add tab + render), `src/lib/sapApisStore.ts` (register `ZUI_Gate_Service`), `README.md` (env var docs)
+

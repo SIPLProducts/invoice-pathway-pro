@@ -10,11 +10,13 @@ import {
 } from "@/components/ui/table";
 import { useSapProxy } from "@/hooks/useSapProxy";
 import type { ColumnDef, SapApiSchema } from "@/lib/sapApiSchemas";
+import type { SapApi } from "@/lib/sapApisStore";
 import { getPath } from "@/lib/getPath";
 import { ChevronDown, ChevronRight, RefreshCw, AlertCircle, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
+  api: SapApi;
   schema: SapApiSchema;
 }
 
@@ -32,8 +34,8 @@ function formatCell(value: unknown, col: ColumnDef): string {
   }
 }
 
-export function SapLiveTable({ schema }: Props) {
-  const { rows, loading, error, lastFetched, proxyConfigured, refresh } = useSapProxy(schema);
+export function SapLiveTable({ api, schema }: Props) {
+  const { rows, loading, error, lastFetched, proxyConfigured, refresh } = useSapProxy(api, schema);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggleRow = (key: string) => {
@@ -83,8 +85,9 @@ export function SapLiveTable({ schema }: Props) {
       {/* States */}
       {!proxyConfigured && (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-          Set <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">VITE_SAP_PROXY_URL</code>{" "}
-          to your deployed Node middleware URL (see <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">middleware/README.md</code>).
+          Set the <strong>Node.js Middleware URL</strong> on{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">SAP Settings → {api.name} → API Details</code>{" "}
+          (or define <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">VITE_SAP_PROXY_URL</code>).
         </div>
       )}
 

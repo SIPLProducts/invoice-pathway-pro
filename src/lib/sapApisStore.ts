@@ -46,6 +46,16 @@ export interface AdvancedConfig {
   customHeaders: string;
 }
 
+export interface MiddlewareConfig {
+  /** Base URL of the Node middleware (e.g. https://abcd.ngrok-free.app or http://10.10.4.178:3202). No trailing slash needed. */
+  url: string;
+  port?: string;
+  /** Optional shared secret sent as x-proxy-secret header. */
+  secret?: string;
+  connectionMode?: "Direct" | "Via Proxy Server" | "VPN Tunnel";
+  deploymentMode?: string;
+}
+
 export interface SapApi {
   name: string;
   description: string;
@@ -78,6 +88,9 @@ export interface SapApi {
 
   /** Optional middleware path the proxy exposes. e.g. "/api/gate/headers" */
   proxyPath?: string;
+
+  /** Per-API middleware connection (overrides VITE_SAP_PROXY_URL when set). */
+  middleware?: MiddlewareConfig;
 }
 
 const STORAGE_KEY = "dmr.sapApis.v2";
@@ -258,6 +271,13 @@ const seed: SapApi[] = [
     listEndpoint: "/api/gate/headers",
     createEndpoint: "/api/gate/headers",
     proxyPath: "/api/gate/headers",
+    middleware: {
+      url: "",
+      port: "3202",
+      secret: "",
+      connectionMode: "Via Proxy Server",
+      deploymentMode: "Self-Hosted (Client Server)",
+    },
   },
 ];
 

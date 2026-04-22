@@ -100,12 +100,13 @@ export default function SAPApiEdit() {
 
   const [api, setApi] = useState<SapApi>(initialApi);
   const [details, setDetails] = useState({
-    sapClient: api.credentials?.sapClient ?? "234",
+    sapClient: api.credentials?.sapClient ?? "100",
     timeout: String(api.advanced?.timeoutMs ?? 30000),
-    connectionMode: "Via Proxy Server",
-    deploymentMode: "Self-Hosted (Client Server)",
-    middlewarePort: "3202",
-    middlewareUrl: "http://10.10.4.178:3202",
+    connectionMode: api.middleware?.connectionMode ?? "Via Proxy Server",
+    deploymentMode: api.middleware?.deploymentMode ?? "Self-Hosted (Client Server)",
+    middlewarePort: api.middleware?.port ?? "3202",
+    middlewareUrl: api.middleware?.url ?? "",
+    proxySecret: api.middleware?.secret ?? "",
   });
 
   const setApiField = <K extends keyof SapApi>(k: K, v: SapApi[K]) =>
@@ -282,7 +283,12 @@ export default function SAPApiEdit() {
               <Field label="Connection Mode" hint="Route through a proxy server for on-premise SAP.">
                 <Select
                   value={details.connectionMode}
-                  onValueChange={(v) => setDetails((d) => ({ ...d, connectionMode: v }))}
+                  onValueChange={(v) =>
+                    setDetails((d) => ({
+                      ...d,
+                      connectionMode: v as "Direct" | "Via Proxy Server" | "VPN Tunnel",
+                    }))
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -327,11 +333,13 @@ export default function SAPApiEdit() {
                 />
               </Field>
 
-              <Field label="Proxy Secret / Password" hint="Shared secret sent as x-proxy-secret header.">
+              <Field label="Proxy Secret / Password" hint="Shared secret sent as x-proxy-secret header (optional).">
                 <div className="relative">
                   <Input
                     type={showSecret ? "text" : "password"}
-                    defaultValue="supersecretvalue123456"
+                    value={details.proxySecret}
+                    onChange={(e) => setDetails((d) => ({ ...d, proxySecret: e.target.value }))}
+                    placeholder="Optional"
                     className="pr-10"
                   />
                   <button
@@ -720,9 +728,20 @@ export default function SAPApiEdit() {
             const payload: SapApi = {
               ...api,
               tag: (api.tag ?? (details.connectionMode === "VPN Tunnel" ? "VPN Tunnel" : "Proxy")) as SapTag,
+              credentials: {
+                ...(api.credentials ?? defaultCreds()),
+                sapClient: details.sapClient || api.credentials?.sapClient || "100",
+              },
               advanced: {
                 ...(api.advanced ?? defaultAdvanced()),
                 timeoutMs: Number(details.timeout) || api.advanced?.timeoutMs || 30000,
+              },
+              middleware: {
+                url: details.middlewareUrl.trim().replace(/\/$/, ""),
+                port: details.middlewarePort,
+                secret: details.proxySecret,
+                connectionMode: details.connectionMode,
+                deploymentMode: details.deploymentMode,
               },
             };
             if (isNew) {

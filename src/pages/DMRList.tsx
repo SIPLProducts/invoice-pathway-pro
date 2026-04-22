@@ -8,7 +8,14 @@ import { Plus, Search, Filter, Download, Eye, FileText, MapPin, Calendar } from 
 import { Link } from "react-router-dom";
 import { SapLiveTable } from "@/components/SapLiveTable";
 import { buildSchemaFromApi } from "@/lib/sapApiSchemas";
-import { getSapApi } from "@/lib/sapApisStore";
+import { useSapApis } from "@/lib/sapApisStore";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const tabs = [
   "All",
@@ -34,6 +41,17 @@ const tabMap: Record<string, string | null> = {
 export default function DMRPage() {
   const [active, setActive] = useState<(typeof tabs)[number]>("All");
   const [q, setQ] = useState("");
+  const apis = useSapApis();
+  // Any API that has at least one configured response column qualifies as a "live" SAP source for this tab
+  const liveApis = apis.filter(
+    (a) =>
+      a.type === "live" ||
+      a.type === "sync" ||
+      (a.responseHeaderFields?.length ?? 0) > 0,
+  );
+  const [selectedApiName, setSelectedApiName] = useState<string>("");
+  const selectedApi =
+    liveApis.find((a) => a.name === selectedApiName) ?? liveApis[0] ?? null;
 
   const filtered = dmrs.filter((d) => {
     const tab = tabMap[active];
@@ -104,15 +122,50 @@ export default function DMRPage() {
 
       {active === "SAP Gate Entries" ? (
         (() => {
-          const api = getSapApi("ZUI_Gate_Service");
-          if (!api) {
+          if (!selectedApi) {
             return (
               <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
-                ZUI_Gate_Service is not configured. Open SAP Settings to add it.
+                No live SAP API configured yet. Open{" "}
+                <Link to="/sap/settings" className="font-semibold text-primary hover:underline">
+                  SAP Settings
+                </Link>{" "}
+                to add one (e.g. <code className="font-mono text-xs">Get_DMR</code>).
               </div>
             );
           }
-          return <SapLiveTable schema={buildSchemaFromApi(api)} />;
+          return (
+            <div className="space-y-3">
+              {liveApis.length > 1 && (
+                <div className="flex items-center gap-2 rounded-xl border bg-card p-3 shadow-card">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Source API
+                  </span>
+                  <Select
+                    value={selectedApi.name}
+                    onValueChange={setSelectedApiName}
+                  >
+                    <SelectTrigger className="h-9 w-72">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {liveApis.map((a) => (
+                        <SelectItem key={a.name} value={a.name}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Link
+                    to={`/sap/settings/${encodeURIComponent(selectedApi.name)}`}
+                    className="ml-auto text-[11px] font-semibold text-primary hover:underline"
+                  >
+                    Edit fields →
+                  </Link>
+                </div>
+              )}
+              <SapLiveTable api={selectedApi} schema={buildSchemaFromApi(selectedApi)} />
+            </div>
+          );
         })()
       ) : (
         <>

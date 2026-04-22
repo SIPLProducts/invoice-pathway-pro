@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SapApiSchema } from "@/lib/sapApiSchemas";
+import type { SapApi } from "@/lib/sapApisStore";
 import { getPath } from "@/lib/getPath";
 
 export interface UseSapProxyResult<T = Record<string, unknown>> {
@@ -8,14 +9,28 @@ export interface UseSapProxyResult<T = Record<string, unknown>> {
   error: string | null;
   lastFetched: Date | null;
   proxyConfigured: boolean;
+  proxyUrl: string;
   refresh: () => void;
 }
 
+/**
+ * Resolves the middleware base URL for a given API.
+ * Priority: api.middleware.url -> VITE_SAP_PROXY_URL env -> "".
+ */
+export function resolveProxyUrl(api?: SapApi | null): string {
+  const fromApi = api?.middleware?.url?.trim().replace(/\/$/, "") ?? "";
+  if (fromApi) return fromApi;
+  const fromEnv = (import.meta.env.VITE_SAP_PROXY_URL as string | undefined)?.trim().replace(/\/$/, "") ?? "";
+  return fromEnv;
+}
+
 export function useSapProxy<T = Record<string, unknown>>(
+  api: SapApi | null | undefined,
   schema: SapApiSchema,
 ): UseSapProxyResult<T> {
-  const proxyUrl = (import.meta.env.VITE_SAP_PROXY_URL as string | undefined)?.replace(/\/$/, "");
+  const proxyUrl = useMemo(() => resolveProxyUrl(api), [api]);
   const proxyConfigured = Boolean(proxyUrl);
+  const secret = api?.middleware?.secret ?? "";
 
   const [rows, setRows] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,15 +47,13 @@ export function useSapProxy<T = Record<string, unknown>>(
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${proxyUrl}${schema.proxyPath}`, {
-          headers: { Accept: "application/json" },
-        });
+        const headers: Record<string, string> = { Accept: "application/json" };
+        if (secret) headers["x-proxy-secret"] = secret;
+        const res = await fetch(`${proxyUrl}${schema.proxyPath}`, { headers });
         const text = await res.text();
         const data = text ? JSON.parse(text) : null;
         if (!res.ok) {
-          throw new Error(
-            data?.error?.message || data?.error?.code || `HTTP ${res.status}`,
-          );
+          throw new Error(data?.error?.message || data?.error?.code || `HTTP ${res.status}`);
         }
         const collection = schema.rowsPath
           ? (getPath(data, schema.rowsPath) as T[])
@@ -59,7 +72,7 @@ export function useSapProxy<T = Record<string, unknown>>(
     return () => {
       cancelled = true;
     };
-  }, [proxyUrl, proxyConfigured, schema.proxyPath, schema.rowsPath, tick]);
+  }, [proxyUrl, proxyConfigured, secret, schema.proxyPath, schema.rowsPath, tick]);
 
-  return { rows, loading, error, lastFetched, proxyConfigured, refresh };
+  return { rows, loading, error, lastFetched, proxyConfigured, proxyUrl, refresh };
 }

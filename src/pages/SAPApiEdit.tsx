@@ -728,9 +728,20 @@ export default function SAPApiEdit() {
             const payload: SapApi = {
               ...api,
               tag: (api.tag ?? (details.connectionMode === "VPN Tunnel" ? "VPN Tunnel" : "Proxy")) as SapTag,
+              credentials: {
+                ...(api.credentials ?? defaultCreds()),
+                sapClient: details.sapClient || api.credentials?.sapClient || "100",
+              },
               advanced: {
                 ...(api.advanced ?? defaultAdvanced()),
                 timeoutMs: Number(details.timeout) || api.advanced?.timeoutMs || 30000,
+              },
+              middleware: {
+                url: details.middlewareUrl.trim().replace(/\/$/, ""),
+                port: details.middlewarePort,
+                secret: details.proxySecret,
+                connectionMode: details.connectionMode,
+                deploymentMode: details.deploymentMode,
               },
             };
             if (isNew) {

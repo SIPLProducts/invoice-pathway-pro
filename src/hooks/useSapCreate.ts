@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { SapApi } from "@/lib/sapApisStore";
 import { resolveProxyUrl } from "./useSapProxy";
+import { getSapSessionHeaders } from "@/lib/sapSession";
 
 export interface CreateResult {
   ok: boolean;
@@ -32,6 +33,7 @@ export function useSapCreate(api: SapApi | null | undefined, proxyPathOverride?:
         "Content-Type": "application/json",
         Accept: "application/json",
         "ngrok-skip-browser-warning": "true",
+        ...getSapSessionHeaders(),
       };
       if (secret) headers["x-proxy-secret"] = secret;
       const res = await fetch(`${proxyUrl}${proxyPath}`, {

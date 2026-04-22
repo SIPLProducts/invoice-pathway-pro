@@ -45,14 +45,21 @@ export function buildSchemaFromApi(api: SapApi): SapApiSchema {
     .filter((f) => f.showInTable !== false && f.key)
     .map(fieldToColumn);
 
+  // Detect "gate-shaped" APIs (Get_DMR, Create_Gate_Service, ZUI_Gate_Service, etc.)
+  // and apply sensible defaults so user-created APIs render correctly without
+  // forcing them to fill in obscure fields like rowsPath / rowKey / childKey.
+  const proxyPath = api.proxyPath ?? api.listEndpoint ?? "/api/gate/headers";
+  const isGateShaped =
+    proxyPath.startsWith("/api/gate") || /gate|dmr/i.test(api.name);
+
   return {
     id: api.name,
     label: api.name,
-    proxyPath: api.proxyPath ?? api.listEndpoint ?? "/api/gate/headers",
-    rowsPath: api.rowsPath ?? "value",
-    rowKey: api.rowKey ?? (headerCols[0]?.path ?? "id"),
+    proxyPath,
+    rowsPath: api.rowsPath ?? (isGateShaped ? "value" : "value"),
+    rowKey: api.rowKey ?? (isGateShaped ? "gate_id" : headerCols[0]?.path ?? "id"),
     columns: headerCols,
-    childKey: api.childKey,
+    childKey: api.childKey ?? (isGateShaped ? "_Item" : undefined),
     childColumns: itemCols.length ? itemCols : undefined,
   };
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -35,17 +35,16 @@ function coerce(v: string, type: FieldDef["type"]): string | number | boolean {
 export default function DMRNew() {
   const navigate = useNavigate();
   const apis = useSapApis();
-  // Show every configured API that can plausibly create or read records.
+  // Only show gate-shaped APIs (Get_DMR, Create_Gate_Service, ZUI_Gate_Service…)
+  // — hides MB52, ZMRB, SAP_343/344 from the New DMR source dropdown.
   const liveApis = apis.filter(
     (a) =>
-      a.type === "live" ||
-      a.type === "sync" ||
-      (a.requestHeaderFields?.length ?? 0) > 0 ||
-      (a.responseHeaderFields?.length ?? 0) > 0,
+      /gate|dmr/i.test(a.name) ||
+      (a.proxyPath ?? a.listEndpoint ?? "").startsWith("/api/gate"),
   );
 
   const [selectedName, setSelectedName] = useState<string>(
-    liveApis.find((a) => a.name === "ZUI_Gate_Service")?.name ?? liveApis[0]?.name ?? "",
+    liveApis.find((a) => /gate|dmr/i.test(a.name))?.name ?? liveApis[0]?.name ?? "",
   );
 
   const api: SapApi | undefined = useMemo(
@@ -73,14 +72,27 @@ export default function DMRNew() {
     itemFields.length ? [emptyRowFromFields(itemFields)] : [],
   );
 
-  // Reset state when switching API
+  // Reset state when switching API. If the chosen API has no request fields
+  // configured but does have response fields (e.g. user only filled Response Fields
+  // for Get_DMR / Create_Gate_Service), auto-derive the form from the response schema
+  // so the header form + line-item table appear immediately.
   const handleSelectApi = (name: string) => {
     setSelectedName(name);
-    setDerivedHeaderFields(null);
-    setDerivedItemFields(null);
     const next = apis.find((a) => a.name === name);
-    const hf = (next?.requestHeaderFields ?? []).filter((f) => f.showInForm !== false && f.key);
-    const itf = (next?.requestItemFields ?? []).filter((f) => f.showInForm !== false && f.key);
+    let hf = (next?.requestHeaderFields ?? []).filter((f) => f.showInForm !== false && f.key);
+    let itf = (next?.requestItemFields ?? []).filter((f) => f.showInForm !== false && f.key);
+    if (hf.length === 0 && (next?.responseHeaderFields?.length ?? 0) > 0) {
+      hf = (next?.responseHeaderFields ?? []).map((f) => ({ ...f, showInForm: true }));
+      setDerivedHeaderFields(hf);
+    } else {
+      setDerivedHeaderFields(null);
+    }
+    if (itf.length === 0 && (next?.responseItemFields?.length ?? 0) > 0) {
+      itf = (next?.responseItemFields ?? []).map((f) => ({ ...f, showInForm: true }));
+      setDerivedItemFields(itf);
+    } else {
+      setDerivedItemFields(null);
+    }
     setHeader(emptyRowFromFields(hf));
     setItems(itf.length ? [emptyRowFromFields(itf)] : []);
   };
@@ -107,6 +119,28 @@ export default function DMRNew() {
       `Generated ${hf.length} header + ${itf.length} item field(s) from response schema`,
     );
   };
+
+  // Auto-derive form fields on initial mount when the default-selected API
+  // has no request fields configured but does have a response schema.
+  useEffect(() => {
+    if (!api) return;
+    if (derivedHeaderFields !== null || derivedItemFields !== null) return;
+    const hasReqHeader = (api.requestHeaderFields ?? []).some((f) => f.showInForm !== false && f.key);
+    const hasReqItem = (api.requestItemFields ?? []).some((f) => f.showInForm !== false && f.key);
+    const hasRespHeader = (api.responseHeaderFields?.length ?? 0) > 0;
+    const hasRespItem = (api.responseItemFields?.length ?? 0) > 0;
+    if (!hasReqHeader && hasRespHeader) {
+      const hf = (api.responseHeaderFields ?? []).map((f) => ({ ...f, showInForm: true }));
+      setDerivedHeaderFields(hf);
+      setHeader(emptyRowFromFields(hf));
+    }
+    if (!hasReqItem && hasRespItem) {
+      const itf = (api.responseItemFields ?? []).map((f) => ({ ...f, showInForm: true }));
+      setDerivedItemFields(itf);
+      setItems([emptyRowFromFields(itf)]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api?.name]);
 
   const { submit, loading, proxyConfigured } = useSapCreate(api ?? null);
 

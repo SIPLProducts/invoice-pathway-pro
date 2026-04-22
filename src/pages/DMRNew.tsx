@@ -6,13 +6,8 @@ import { ArrowLeft, Camera, Save, Send, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useSapApis, type FieldDef, type SapApi } from "@/lib/sapApisStore";
 import { useSapCreate } from "@/hooks/useSapCreate";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+
 
 type Row = Record<string, string | number | boolean>;
 

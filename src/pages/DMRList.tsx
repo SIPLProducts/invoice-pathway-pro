@@ -122,15 +122,50 @@ export default function DMRPage() {
 
       {active === "SAP Gate Entries" ? (
         (() => {
-          const api = getSapApi("ZUI_Gate_Service");
-          if (!api) {
+          if (!selectedApi) {
             return (
               <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
-                ZUI_Gate_Service is not configured. Open SAP Settings to add it.
+                No live SAP API configured yet. Open{" "}
+                <Link to="/sap/settings" className="font-semibold text-primary hover:underline">
+                  SAP Settings
+                </Link>{" "}
+                to add one (e.g. <code className="font-mono text-xs">Get_DMR</code>).
               </div>
             );
           }
-          return <SapLiveTable schema={buildSchemaFromApi(api)} />;
+          return (
+            <div className="space-y-3">
+              {liveApis.length > 1 && (
+                <div className="flex items-center gap-2 rounded-xl border bg-card p-3 shadow-card">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Source API
+                  </span>
+                  <Select
+                    value={selectedApi.name}
+                    onValueChange={setSelectedApiName}
+                  >
+                    <SelectTrigger className="h-9 w-72">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {liveApis.map((a) => (
+                        <SelectItem key={a.name} value={a.name}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Link
+                    to={`/sap/settings/${encodeURIComponent(selectedApi.name)}`}
+                    className="ml-auto text-[11px] font-semibold text-primary hover:underline"
+                  >
+                    Edit fields →
+                  </Link>
+                </div>
+              )}
+              <SapLiveTable api={selectedApi} schema={buildSchemaFromApi(selectedApi)} />
+            </div>
+          );
         })()
       ) : (
         <>

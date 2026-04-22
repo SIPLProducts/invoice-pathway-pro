@@ -100,12 +100,13 @@ export default function SAPApiEdit() {
 
   const [api, setApi] = useState<SapApi>(initialApi);
   const [details, setDetails] = useState({
-    sapClient: api.credentials?.sapClient ?? "234",
+    sapClient: api.credentials?.sapClient ?? "100",
     timeout: String(api.advanced?.timeoutMs ?? 30000),
-    connectionMode: "Via Proxy Server",
-    deploymentMode: "Self-Hosted (Client Server)",
-    middlewarePort: "3202",
-    middlewareUrl: "http://10.10.4.178:3202",
+    connectionMode: api.middleware?.connectionMode ?? "Via Proxy Server",
+    deploymentMode: api.middleware?.deploymentMode ?? "Self-Hosted (Client Server)",
+    middlewarePort: api.middleware?.port ?? "3202",
+    middlewareUrl: api.middleware?.url ?? "",
+    proxySecret: api.middleware?.secret ?? "",
   });
 
   const setApiField = <K extends keyof SapApi>(k: K, v: SapApi[K]) =>

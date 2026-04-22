@@ -283,7 +283,12 @@ export default function SAPApiEdit() {
               <Field label="Connection Mode" hint="Route through a proxy server for on-premise SAP.">
                 <Select
                   value={details.connectionMode}
-                  onValueChange={(v) => setDetails((d) => ({ ...d, connectionMode: v }))}
+                  onValueChange={(v) =>
+                    setDetails((d) => ({
+                      ...d,
+                      connectionMode: v as "Direct" | "Via Proxy Server" | "VPN Tunnel",
+                    }))
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />

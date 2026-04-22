@@ -188,18 +188,26 @@ async function sapGet(path, extraCookies = "") {
 }
 
 async function sapWrite(method, path, body, extraHeaders = {}, extraCookies = "") {
+  // Stringify body ourselves so Axios cannot re-serialize and SAP always
+  // receives application/json on the wire (otherwise SAP defaults to XML and
+  // throws CX_SXML_PARSE_ERROR).
+  const serialized = body === undefined || body === null ? undefined : JSON.stringify(body);
+
   const doRequest = async () => {
     const token = await ensureCsrf(false, extraCookies);
     const cfg = buildRequestConfig(extraCookies, {
       "x-csrf-token": token,
-      "Content-Type": "application/json",
       "If-Match": "*",
       ...extraHeaders,
+      // Force these LAST so callers/extras cannot override them.
+      "Content-Type": "application/json",
+      Accept: "application/json",
     });
     return http.request({
       method,
       url: withClient(path),
-      data: body,
+      data: serialized,
+      transformRequest: [(d) => d],
       ...cfg,
     });
   };

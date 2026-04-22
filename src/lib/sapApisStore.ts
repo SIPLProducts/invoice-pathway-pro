@@ -271,6 +271,13 @@ const seed: SapApi[] = [
     listEndpoint: "/api/gate/headers",
     createEndpoint: "/api/gate/headers",
     proxyPath: "/api/gate/headers",
+    middleware: {
+      url: "",
+      port: "3202",
+      secret: "",
+      connectionMode: "Via Proxy Server",
+      deploymentMode: "Self-Hosted (Client Server)",
+    },
   },
 ];
 

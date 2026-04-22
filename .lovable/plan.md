@@ -1,146 +1,230 @@
 
+## Why your browser shows data but the application does not
 
-## Fix: SAP tenant is rejecting Basic auth — middleware must use Bearer token
+### Root cause
 
-### What is actually happening
+The problem is not the DMR table UI first. The failure happens before the table gets any rows.
 
-Your middleware is correctly reaching SAP. The proxy is healthy. The error is **not** a code bug.
+Your app is calling:
 
-```
-Middleware -> SAP /GateHeader?$expand=_Item
-SAP -> HTML page with "fragmentAfterLogin" + "locationAfterLogin" cookies
-       (this is the SAP BTP IDP / OAuth login interstitial)
-Middleware -> correctly detects HTML, returns 502 sap_auth_redirect
-UI -> shows "Failed to load from SAP"
-```
-
-The HTML SAP returned (`fragmentAfterLogin`, `signature=...`, `Secure;SameSite=None`) is the **SAP BTP IAS / XSUAA login redirect**. This tenant:
-
-```
-fa530628-e5cb-4817-8c70-9991654babd5.abap-web.us10.hana.ondemand.com
+```text
+Lovable frontend
+-> https://donation-pantyhose-starter.ngrok-free.dev/api/gate/headers
+-> middleware
+-> SAP /GateHeader?$expand=_Item
+-> SAP returns login HTML
+-> middleware returns 502 sap_auth_redirect
+-> table receives no JSON rows
 ```
 
-is an **ABAP Environment / Steampunk** tenant. These tenants do **not** accept plain Basic auth from a normal BTP user for OData v4 service calls from outside — they require either:
+The network snapshot from the app shows exactly this:
 
-1. A **Communication User** (created via a Communication Arrangement in SAP) — this user *can* use Basic auth, OR
-2. An **OAuth 2.0 Bearer token** obtained from the tenant's XSUAA / token endpoint.
-
-Your current `SAP_USER` / `SAP_PASSWORD` is almost certainly your normal developer/BTP login, which is why SAP is bouncing the middleware to the IDP login page.
-
-So the fix is **configuration, not code** — but I will also add small code improvements so this is easier next time.
-
----
-
-### Plan
-
-#### Step 1 — Decide which auth path to use (you must pick one)
-
-Option A — **Communication User + Basic auth** (simplest, recommended)
-- In SAP Fiori Launchpad of the ABAP tenant: open **Maintain Communication Users** → create a user (e.g. `GATE_PROXY`) with a strong password.
-- Open **Communication Arrangements** → create one for the scenario that exposes `ZUI_GATE_SERVICE` (or assign it to an existing arrangement) → assign the new Communication User as Inbound user.
-- Put those credentials into `middleware/.env`:
-  ```
-  SAP_AUTH_MODE=basic
-  SAP_USER=GATE_PROXY
-  SAP_PASSWORD=<the password you set>
-  ```
-
-Option B — **OAuth Bearer token**
-- In the same Communication Arrangement, switch Authentication Method to **OAuth 2.0**.
-- SAP gives you `clientid`, `clientsecret`, and a `tokenurl` (XSUAA).
-- Fetch a token via client_credentials and put it in `.env`:
-  ```
-  SAP_AUTH_MODE=bearer
-  SAP_BEARER_TOKEN=<token>
-  ```
-
-#### Step 2 — Code: auto-fetch & refresh OAuth token (so you don't paste tokens manually)
-
-Since manually pasting bearer tokens expires every hour, I will extend `middleware/src/sapClient.js` to support a third mode:
-
+```text
+GET /api/gate/headers -> 502
+code: sap_auth_redirect
+message: SAP redirected to login (OAuth/SAML/IDP)
 ```
+
+So the table is empty because the middleware never received the JSON payload from SAP.
+
+### Why it works in the browser
+
+When you paste the SAP OData URL directly into your browser:
+
+```text
+https://.../GateHeader?$expand=_Item&sap-client=100
+```
+
+the SAP tenant asks **you** to log in interactively. After you type username/password, SAP creates a browser session/cookie for that SAP domain, and then the JSON opens in that same browser tab.
+
+That proves only this:
+
+- your browser user can access the service interactively
+
+It does **not** prove this:
+
+- the Node middleware is authenticated
+
+### Why it still fails in the application after you typed username/password
+
+Because the application is **not using your browser’s SAP login session**.
+
+The app does not call the SAP URL directly. It calls the middleware URL:
+
+```text
+https://donation-pantyhose-starter.ngrok-free.dev/api/gate/headers
+```
+
+Then the middleware uses its own server-side credentials from its environment/config to call SAP.
+
+So these are two different authentication contexts:
+
+```text
+Browser manual login session      !=      Middleware server-to-server auth
+```
+
+Your SAP login in Edge/Chrome cannot be reused automatically by:
+
+- Node.js middleware
+- ngrok URL
+- the Lovable preview app
+
+### What the screenshots prove
+
+1. Screenshot 1:
+   SAP is redirecting to the XSUAA/IDP login page.
+   That means the tenant expects an authenticated SAP session, not anonymous access.
+
+2. Screenshot 2:
+   After interactive login, browser gets JSON successfully.
+   So the OData service itself is fine.
+
+3. Screenshot 3:
+   The app still gets `sap_auth_redirect`.
+   So middleware authentication is still not valid for this tenant.
+
+### What is actually wrong in this project
+
+The middleware code is already detecting this case on purpose:
+
+- `middleware/src/sapClient.js`
+- `middleware/src/util/errors.js`
+
+If SAP returns HTML instead of JSON, it throws `sap_auth_redirect`.
+
+So the current issue is:
+
+- not a table mapping issue
+- not a `Get_DMR` schema issue
+- not an item-popup issue
+- not a CORS issue
+
+It is an SAP authentication mode mismatch for the middleware.
+
+### Most likely SAP-side cause
+
+This ABAP Environment tenant is redirecting regular user credentials to SAP login/IDP flow.
+
+That usually means the middleware is using one of these invalid approaches:
+
+- a normal dialog/BTP user in `SAP_USER` / `SAP_PASSWORD`
+- credentials that only work interactively in a browser
+- no valid bearer token / OAuth client credentials
+
+For middleware, SAP usually needs one of these:
+
+1. **Communication User + Basic auth**
+2. **OAuth 2.0 client credentials / bearer token**
+
+### Important note about your URL
+
+Your sample URL has:
+
+```text
+...?$expand=_Item&sap-client=100?sap-client=100
+```
+
+There is a duplicated `sap-client` with `?` again.
+
+It should be only one of these forms:
+
+```text
+.../GateHeader?$expand=_Item&sap-client=100
+```
+
+or if there are no earlier query params:
+
+```text
+.../GateHeader?sap-client=100
+```
+
+This should be cleaned up, but it is not the main blocker because your browser still returned data after login.
+
+## What needs to be done to make the app work
+
+### Option A — Communication User
+Configure the middleware with a real SAP Communication User that is allowed to call this OData service directly:
+
+```text
+SAP_AUTH_MODE=basic
+SAP_USER=<communication user>
+SAP_PASSWORD=<communication password>
+```
+
+### Option B — OAuth client credentials
+Use OAuth for the middleware:
+
+```text
 SAP_AUTH_MODE=oauth_cc
-SAP_OAUTH_TOKEN_URL=https://<subaccount>.authentication.us10.hana.ondemand.com/oauth/token
+SAP_OAUTH_TOKEN_URL=...
 SAP_OAUTH_CLIENT_ID=...
 SAP_OAUTH_CLIENT_SECRET=...
 ```
 
-Behavior:
-- On first call, POST `grant_type=client_credentials` to the token URL.
-- Cache the `access_token` until ~60s before `expires_in`.
-- Inject `Authorization: Bearer <token>` automatically on every SAP request.
-- On `401` from SAP, force-refresh the token once and retry.
+This is usually the safer option for ABAP Environment tenants.
 
-This means once the Communication Arrangement is set to OAuth 2.0, the middleware just works with no manual token paste.
+### Verification target
 
-#### Step 3 — Better diagnostics in the middleware
+After fixing middleware auth, this must succeed:
 
-Update `middleware/src/sapClient.js`:
-- Log which auth mode is active on startup (`[sapClient] mode=basic user=GATE_PROXY` or `mode=oauth_cc tokenUrl=...`).
-- On `sap_auth_redirect`, also log a one-line hint: *"This usually means the SAP user is a dialog/IDP user, not a Communication User. See README."*
+```text
+GET /api/health/sap
+-> { ok: true, sapStatus: 200, rows: ... }
+```
 
-Update `middleware/src/util/errors.js`:
-- Include `hint` field in the error envelope so the UI shows actionable text.
+Then the DMR page will receive real JSON like:
 
-#### Step 4 — Better UI error in `src/hooks/useSapProxy.ts` and `SapLiveTable.tsx`
+```json
+{
+  "value": [
+    {
+      "gate_id": "A123I00005",
+      ...
+      "_Item": [ ... ]
+    }
+  ]
+}
+```
 
-- When `code === "sap_auth_redirect"`, render a yellow alert with:
-  - The exact `.env` keys that need to be set
-  - A "Test connection" link that calls a new `/api/health/sap` endpoint
-- Add a small "Show diagnostics" toggle that displays the proxy URL, auth mode, and last upstream status.
+and the existing UI will work as intended:
 
-#### Step 5 — Add `/api/health/sap` endpoint
+- header rows show in the main table
+- `_Item` opens in the popup dialog
 
-In `middleware/src/server.js` (or a new `routes/health.js`):
-- `GET /api/health/sap` calls `GET /GateHeader?$top=1` and returns:
-  ```json
-  { "ok": true, "authMode": "basic", "sapStatus": 200, "rows": 1 }
-  ```
-  or
-  ```json
-  { "ok": false, "code": "sap_auth_redirect", "authMode": "basic", "hint": "..." }
-  ```
-- Frontend "Test connection" button on **SAP Settings** page calls this and shows the result inline.
+## Technical details
 
-#### Step 6 — Update `middleware/.env.example` and `middleware/README.md`
+### Current frontend behavior
+`src/hooks/useSapProxy.ts`
+- fetches `proxyUrl + schema.proxyPath`
+- expects JSON
+- shows the middleware error if response is 502
 
-- Document all three auth modes (`basic`, `bearer`, `oauth_cc`) with required env keys.
-- Add the Communication User / Communication Arrangement steps as a checklist.
-- Note that `SAP_USER` must be a **Communication User**, not a BTP developer user.
+### Current table behavior
+`src/components/SapLiveTable.tsx`
+- renders rows from `schema.rowsPath`
+- for gate APIs that is `value`
+- opens `_Item` in the popup when row data exists
 
----
+### Current schema behavior
+`src/lib/sapApiSchemas.ts`
+- gate APIs default to:
+  - `rowsPath: "value"`
+  - `rowKey: "gate_id"`
+  - `childKey: "_Item"`
 
-### Files to change
+So once middleware auth is fixed, the current table design should already display your header rows and item popup.
 
-- `middleware/src/sapClient.js` — add `oauth_cc` mode + token cache + auto-refresh + 401 retry + startup log.
-- `middleware/src/util/errors.js` — add `hint` field on `sap_auth_redirect`.
-- `middleware/src/server.js` — mount new health route.
-- `middleware/src/routes/health.js` — new file with `/api/health/sap`.
-- `middleware/.env.example` — add OAuth client_credentials keys.
-- `middleware/README.md` — auth setup checklist.
-- `src/hooks/useSapProxy.ts` — surface `hint` and `code`.
-- `src/components/SapLiveTable.tsx` — render structured auth-error alert.
-- `src/pages/SAPSettings.tsx` — add "Test SAP connection" button hitting `/api/health/sap`.
+## Implementation plan
 
----
+1. Keep the DMR UI as-is because the rendering path is already correct for `GateHeader -> value[] -> _Item[]`.
+2. Reconfigure the middleware to use SAP credentials that work server-to-server, not browser-only interactive login.
+3. Verify `/api/health/sap` returns `ok: true`.
+4. Retest `/api/gate/headers` until it returns JSON instead of `sap_auth_redirect`.
+5. If needed, do a small cleanup to remove the duplicated `sap-client` query parameter in any saved SAP endpoint configuration.
 
-### What you must do (cannot be done from code)
+## Expected result after the fix
 
-The **root cause is on the SAP side** — no code change can authenticate a user that the SAP tenant refuses. You must, in SAP:
-
-1. Create a **Communication User** in the ABAP tenant.
-2. Create/extend a **Communication Arrangement** that exposes `ZUI_GATE_SERVICE` and assigns that Communication User as Inbound.
-3. Put those credentials (or the OAuth client_id/secret it generates) into `middleware/.env`.
-4. Restart `node server.js`.
-
-After that, the existing UI code will already render `Get_DMR` rows + the items popup — the table layer is already correct, it has just never received real JSON.
-
----
-
-### Expected result
-
-- `node server.js` startup line will print: `[sapClient] mode=basic user=GATE_PROXY` (or oauth_cc).
-- `GET /api/health/sap` returns `{ ok: true, sapStatus: 200 }`.
-- DMR → SAP Gate Entries shows header rows from `value[]` and the **Items** button opens the popup with `_Item[]`.
-- If auth ever breaks again, the UI shows the exact `.env` key to fix instead of a blank table.
-
+- SAP Gate Entries tab loads `Get_DMR` rows
+- Header data appears in the table
+- Item button opens popup with `_Item` rows
+- No more `sap_auth_redirect` banner in the app

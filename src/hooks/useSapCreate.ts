@@ -1,4 +1,6 @@
 import { useState } from "react";
+import type { SapApi } from "@/lib/sapApisStore";
+import { resolveProxyUrl } from "./useSapProxy";
 
 export interface CreateResult {
   ok: boolean;
@@ -7,25 +9,33 @@ export interface CreateResult {
 }
 
 /**
- * POSTs a header+items payload to the configured proxy path on the Node middleware.
- * Returns { ok, data, error } and exposes loading state.
+ * POSTs a payload to the configured proxy path. Resolves the middleware base URL
+ * from the API record (`api.middleware.url`) with VITE_SAP_PROXY_URL as a fallback.
  */
-export function useSapCreate(proxyPath: string) {
+export function useSapCreate(api: SapApi | null | undefined, proxyPathOverride?: string) {
   const [loading, setLoading] = useState(false);
-  const proxyUrl = (import.meta.env.VITE_SAP_PROXY_URL as string | undefined)?.replace(/\/$/, "");
+  const proxyUrl = resolveProxyUrl(api);
+  const proxyPath = proxyPathOverride ?? api?.createEndpoint ?? api?.proxyPath ?? "/api/gate/headers";
+  const secret = api?.middleware?.secret ?? "";
 
   const submit = async (body: Record<string, unknown>): Promise<CreateResult> => {
     if (!proxyUrl) {
       return {
         ok: false,
-        error: "VITE_SAP_PROXY_URL is not set. Configure your Node middleware URL.",
+        error:
+          "Middleware URL not set. Open SAP Settings → API Details and set the Node.js Middleware URL (or define VITE_SAP_PROXY_URL).",
       };
     }
     setLoading(true);
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      };
+      if (secret) headers["x-proxy-secret"] = secret;
       const res = await fetch(`${proxyUrl}${proxyPath}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers,
         body: JSON.stringify(body),
       });
       const text = await res.text();
@@ -44,5 +54,5 @@ export function useSapCreate(proxyPath: string) {
     }
   };
 
-  return { submit, loading, proxyConfigured: Boolean(proxyUrl) };
+  return { submit, loading, proxyConfigured: Boolean(proxyUrl), proxyUrl };
 }

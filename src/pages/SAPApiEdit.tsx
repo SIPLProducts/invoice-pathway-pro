@@ -242,6 +242,33 @@ export default function SAPApiEdit() {
         <Button
           className="gap-2"
           onClick={() => {
+            if (!form.name.trim() || !form.endpoint.trim()) {
+              toast.error("Name and Endpoint Path are required");
+              return;
+            }
+            const normalizedAuth: SapAuth =
+              form.auth === "Basic Auth" ? "Basic" : (form.auth as SapAuth);
+            const payload: SapApi = {
+              name: form.name.trim(),
+              description: form.description,
+              baseUrl: form.baseUrl,
+              endpoint: form.endpoint,
+              method: form.method as SapMethod,
+              auth: normalizedAuth,
+              status: existing?.status ?? "Active",
+              tag: (existing?.tag ?? (form.connectionMode === "VPN Tunnel" ? "VPN Tunnel" : "Proxy")) as SapTag,
+              type: existing?.type ?? "sync",
+              autoSync: existing?.autoSync ?? { enabled: false, frequencyMinutes: 5 },
+            };
+            if (isNew) {
+              if (getSapApi(payload.name)) {
+                toast.error(`An API named "${payload.name}" already exists`);
+                return;
+              }
+              addApi(payload);
+            } else {
+              updateApi(decodeURIComponent(id ?? ""), payload);
+            }
             toast.success("API details saved");
             navigate("/sap/settings");
           }}

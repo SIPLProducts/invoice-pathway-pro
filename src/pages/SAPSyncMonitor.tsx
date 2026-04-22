@@ -42,6 +42,8 @@ const previewRows = [
 
 export default function SAPSyncMonitor() {
   const [tab, setTab] = useState("connections");
+  const apis = useSapApis();
+  const activeCount = apis.filter((a) => a.status === "Active").length;
 
   return (
     <>
@@ -57,7 +59,7 @@ export default function SAPSyncMonitor() {
 
       {/* KPI cards */}
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Kpi icon={Plug} label="Active APIs" value="4" tone="primary" />
+        <Kpi icon={Plug} label="Active APIs" value={String(activeCount)} tone="primary" />
         <Kpi icon={CheckCircle2} label="Successful Syncs" value="50/50" tone="success" />
         <Kpi icon={XCircle} label="Failed Syncs" value="0" tone="destructive" />
         <Kpi icon={Download} label="Records Synced" value="4,847" tone="accent" />

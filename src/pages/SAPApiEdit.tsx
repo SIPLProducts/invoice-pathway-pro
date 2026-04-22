@@ -32,6 +32,7 @@ export default function SAPApiEdit() {
   const [showSecret, setShowSecret] = useState(false);
   const [tab, setTab] = useState("details");
 
+  const existing = !isNew ? getSapApi(decodeURIComponent(id ?? "")) : undefined;
   const initial = isNew
     ? {
         name: "",
@@ -48,12 +49,12 @@ export default function SAPApiEdit() {
         middlewareUrl: "http://10.10.4.178:3202",
       }
     : {
-        name: decodeURIComponent(id ?? ""),
-        description: "343 Movement - Moves blocked stock quantity to unrestricted stock in SAP.",
-        baseUrl: "http://10.10.6.115:8000",
-        endpoint: "/mrb/mb52/mat_stocks?sap-client=234",
-        method: "PUT",
-        auth: "Basic Auth",
+        name: existing?.name ?? decodeURIComponent(id ?? ""),
+        description: existing?.description ?? "",
+        baseUrl: existing?.baseUrl ?? "http://10.10.6.115:8000",
+        endpoint: existing?.endpoint ?? "",
+        method: (existing?.method ?? "PUT") as string,
+        auth: existing?.auth === "Basic" ? "Basic Auth" : existing?.auth ?? "Basic Auth",
         sapClient: "234",
         timeout: "30000",
         connectionMode: "Via Proxy Server",

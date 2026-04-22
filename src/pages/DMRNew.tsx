@@ -122,8 +122,9 @@ export default function DMRNew() {
         return;
       }
     }
+    const childKey = api.childKey ?? "_Item";
     const body: Record<string, unknown> = { ...header };
-    if (itemFields.length) body._Item = items;
+    if (itemFields.length) body[childKey] = items;
 
     if (!proxyConfigured) {
       toast.error(
@@ -134,7 +135,7 @@ export default function DMRNew() {
       return;
     }
 
-    const res = await submit(body);
+    const res = await submit(body, { headerFields, itemFields, childKey });
     if (res.ok) {
       const id = (res.data as Record<string, unknown> | undefined)?.[api.rowKey ?? "gate_id"] ?? "";
       toast.success(`Created ${id || "record"} in SAP`);

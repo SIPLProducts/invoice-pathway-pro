@@ -72,14 +72,27 @@ export default function DMRNew() {
     itemFields.length ? [emptyRowFromFields(itemFields)] : [],
   );
 
-  // Reset state when switching API
+  // Reset state when switching API. If the chosen API has no request fields
+  // configured but does have response fields (e.g. user only filled Response Fields
+  // for Get_DMR / Create_Gate_Service), auto-derive the form from the response schema
+  // so the header form + line-item table appear immediately.
   const handleSelectApi = (name: string) => {
     setSelectedName(name);
-    setDerivedHeaderFields(null);
-    setDerivedItemFields(null);
     const next = apis.find((a) => a.name === name);
-    const hf = (next?.requestHeaderFields ?? []).filter((f) => f.showInForm !== false && f.key);
-    const itf = (next?.requestItemFields ?? []).filter((f) => f.showInForm !== false && f.key);
+    let hf = (next?.requestHeaderFields ?? []).filter((f) => f.showInForm !== false && f.key);
+    let itf = (next?.requestItemFields ?? []).filter((f) => f.showInForm !== false && f.key);
+    if (hf.length === 0 && (next?.responseHeaderFields?.length ?? 0) > 0) {
+      hf = (next?.responseHeaderFields ?? []).map((f) => ({ ...f, showInForm: true }));
+      setDerivedHeaderFields(hf);
+    } else {
+      setDerivedHeaderFields(null);
+    }
+    if (itf.length === 0 && (next?.responseItemFields?.length ?? 0) > 0) {
+      itf = (next?.responseItemFields ?? []).map((f) => ({ ...f, showInForm: true }));
+      setDerivedItemFields(itf);
+    } else {
+      setDerivedItemFields(null);
+    }
     setHeader(emptyRowFromFields(hf));
     setItems(itf.length ? [emptyRowFromFields(itf)] : []);
   };

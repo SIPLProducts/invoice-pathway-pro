@@ -113,9 +113,10 @@ export default function SAPSettings() {
       toast.error("Both JSESSIONID and __VCAP_ID__ are required.");
       return;
     }
-    setSapSession({ jsessionid: jsessionInput.trim(), vcapId: vcapInput.trim() });
-    setJsessionInput("");
-    setVcapInput("");
+    const next = { jsessionid: jsessionInput.trim(), vcapId: vcapInput.trim() };
+    setSapSession(next);
+    setJsessionInput(next.jsessionid);
+    setVcapInput(next.vcapId);
     toast.success("Manual SAP cookies saved. They will be sent with every SAP call.");
   };
 

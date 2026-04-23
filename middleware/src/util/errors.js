@@ -1,7 +1,15 @@
 "use strict";
 
-function errorEnvelope(code, message, sapBody, hint) {
-  return { error: { code, message, sapBody: sapBody ?? null, hint: hint ?? null } };
+function errorEnvelope(code, message, sapBody, hint, fixSteps) {
+  return {
+    error: {
+      code,
+      message,
+      sapBody: sapBody ?? null,
+      hint: hint ?? null,
+      fixSteps: Array.isArray(fixSteps) ? fixSteps : null,
+    },
+  };
 }
 
 function fromAxios(err) {

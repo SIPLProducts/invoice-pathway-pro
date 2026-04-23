@@ -1,69 +1,48 @@
 
 
-## Plan: Resolve `sap_auth_redirect` — your SAP user is a dialog user, not a Communication User
+## Plan: Make SAP Browser Session support both Auto (dynamic) and Manual modes
 
-### What the error actually means
-The middleware is correctly configured and reaching SAP. SAP itself is rejecting the login:
+### Goal
+Today the **SAP Browser Session** card on `/sap/settings` only shows "Auto-managed" — middleware handles cookies. The user wants a switch: choose **Auto** (current behavior) or **Manual** (paste your own JSESSIONID + __VCAP_ID__ cookies, e.g. captured from a logged-in SAP browser tab).
 
-- `SAP_USER=kishore.pabbathi@cbcmpl.com` is an **email-style BTP/IDP login** (a dialog user).
-- ABAP Environment (Steampunk) tenants **do not accept Basic auth from dialog/IDP users**. They redirect to the OAuth/SAML login page.
-- The middleware sees that HTML redirect, recognizes it as `sap_auth_redirect`, and surfaces the message you see in the screenshot.
+The middleware already supports this — `buildCookieFromHeaders` reads `x-sap-jsessionid` / `x-sap-vcap-id` request headers and forwards them to SAP, taking priority over the auto-login. The frontend already calls `getSapSessionHeaders()` in every proxy call. Only two small pieces are missing: a real session store on the client, and a UI to populate it.
 
-This is **not a middleware bug** — the existing code is doing the right thing. The fix has to happen on the SAP side (create a proper service user) plus updating `middleware/.env` with that user's credentials.
+### Changes
 
-### What needs to change
+**1. `src/lib/sapSession.ts` — turn the no-op shim into a real localStorage-backed store**
+- Add a `mode: "auto" | "manual"` field plus `jsessionid`, `vcapId`, `savedAt`.
+- `getSapSessionHeaders()` returns `{ "x-sap-jsessionid": …, "x-sap-vcap-id": … }` only when `mode === "manual"` and both cookies are present. Otherwise returns `{}` (so middleware auto-login runs).
+- `setSapSession({ jsessionid, vcapId })` stores manual cookies and switches mode to `manual`.
+- `clearSapSession()` removes manual cookies and reverts to `auto`.
+- Add `setSapSessionMode("auto" | "manual")` and persist to `localStorage` under `sap.session.v1`.
+- Keep `useSapSession()` reactive via `useSyncExternalStore` so the UI updates instantly.
 
-The code is already correct. What's blocking you is one of two SAP-side setups. You need to do **one** of these:
+**2. `src/pages/SAPSettings.tsx` — add the mode switch on the SAP Browser Session card**
+- Replace the static "Auto-managed" badge with a small segmented toggle (two buttons: **Auto** / **Manual**), reflecting `useSapSession().mode`.
+- When **Auto** is selected: keep the existing description + "Test connection" button. Badge shows "Auto-managed" (success color).
+- When **Manual** is selected: render two inputs (`JSESSIONID`, `__VCAP_ID__`) with **Save**, **Clear**, and **Test connection** buttons. Show a small status line: "Saved 2m ago" + masked previews. Badge shows "Manual cookies" (warning color) when both are present, "Manual — not set" (muted) otherwise.
+- Add a one-line helper explaining how to grab the cookies (DevTools → Application → Cookies → copy `JSESSIONID` and `__VCAP_ID__` values from your SAP tab).
+- The existing "Test connection" call already includes `getSapSessionHeaders()`, so it will automatically validate either mode.
 
-#### Option A — Communication User + Basic auth (simplest, recommended)
-1. In SAP Fiori Launchpad, open **Maintain Communication Users** → **New**.
-   - Username: e.g. `GATE_COMM_USER`
-   - Set a strong password.
-2. Open **Communication Systems** → New → host = your SAP host, assign the Communication User above for inbound.
-3. Open **Communication Arrangements** → New → choose your scenario (the one exposing `ZUI_GATE_SERVICE`) → assign the Communication System.
-4. In `middleware/.env`:
-   ```
-   SAP_AUTH_MODE=basic
-   SAP_USER=GATE_COMM_USER
-   SAP_PASSWORD=<the password you set in step 1>
-   ```
-5. Restart `node server.js`.
+**3. No middleware changes needed**
+- `buildCookieFromHeaders` (in `middleware/src/sapClient.js`) already reads the headers and `resolveCookies` already prefers caller-supplied cookies over auto-login. Manual cookies will flow through end-to-end without touching middleware code.
 
-#### Option B — OAuth 2.0 client credentials (more secure, long-term)
-1. In the same Communication Arrangement, switch the **Inbound** auth method to **OAuth 2.0**.
-2. Copy the generated **Token Endpoint**, **Client ID**, **Client Secret**.
-3. In `middleware/.env`:
-   ```
-   SAP_AUTH_MODE=oauth_cc
-   SAP_OAUTH_TOKEN_URL=<token endpoint from step 2>
-   SAP_OAUTH_CLIENT_ID=<client id>
-   SAP_OAUTH_CLIENT_SECRET=<client secret>
-   ```
-4. Restart `node server.js`.
+### Behaviour matrix
 
-### Small code-side improvements I will make
-While the underlying problem is SAP-side, I'll make the frontend experience clearer so you don't hit a wall of red text:
-
-1. **`src/pages/SAPSettings.tsx`** — When **Test connection** returns `sap_auth_redirect`, show a compact, structured error card with two clearly-labeled "Fix path A / Fix path B" sections instead of one giant paragraph. The current toast/popover dumps everything in one block which is hard to read (visible in your screenshot).
-
-2. **`middleware/src/util/errors.js`** — Tighten the `sap_auth_redirect` hint to a one-line summary and move the long fix instructions into a separate `fixSteps` field on the error envelope. The frontend can render those steps as a numbered list.
-
-3. **`middleware/src/util/errors.js`** — Add an additional detection signal: if the HTML body contains `Communication Arrangement` or `Communication User`, surface a more confident message ("This tenant requires a Communication User — your current SAP_USER is a dialog user").
-
-4. **`src/pages/SAPSettings.tsx`** — Add a small "Auth troubleshooting" expandable panel under the SAP Browser Session card that always lists the two fix paths above, so users don't need to trigger the error to see them.
+| Mode    | Cookies set?     | What gets sent to middleware                | Middleware action                             |
+|---------|------------------|---------------------------------------------|-----------------------------------------------|
+| Auto    | n/a              | no `x-sap-*` headers                        | Auto-login + cookie cache (or stateless/oauth fallback) |
+| Manual  | both present     | `x-sap-jsessionid`, `x-sap-vcap-id` headers | Forwards them to SAP as `Cookie:` header      |
+| Manual  | missing/partial  | no `x-sap-*` headers                        | Falls back to auto-login (graceful)           |
 
 ### What stays the same
-- All auth-mode logic, auto-fallback, session store, gate routes — untouched.
-- `middleware/.env` schema — untouched. You still set `SAP_AUTH_MODE` + credentials the same way.
+- Middleware code, `.env`, all auth modes, auto-fallback logic, troubleshooting card, error envelope — unchanged.
+- Every existing caller (`useSapProxy`, `useSapCreate`, `testSapConnection`) already invokes `getSapSessionHeaders()`; no edits to those files.
 
 ### Files to change
-- `middleware/src/util/errors.js` — split the hint into `hint` + `fixSteps[]`.
-- `src/pages/SAPSettings.tsx` — render the structured error card and the always-visible troubleshooting panel.
+- `src/lib/sapSession.ts` — implement the real store (~80 lines).
+- `src/pages/SAPSettings.tsx` — add mode toggle + manual cookie inputs in the SAP Browser Session card (~60 added lines).
 
 ### Expected result
-- After you create a Communication User in SAP and update `middleware/.env`, restart the middleware. **Test connection** will succeed and DMR list will load.
-- Until then, the SAP Settings page will show a clean, readable two-option fix card instead of the wall of text in your screenshot.
-
-### Action you must take in SAP (cannot be done from code)
-Create a Communication User as in Option A (or switch to OAuth as in Option B). No amount of code changes in this project can make a dialog/IDP user authenticate via Basic auth against a Steampunk tenant — SAP itself blocks that.
+On `/sap/settings`, the SAP Browser Session card now has an **Auto / Manual** toggle. Picking **Manual** reveals two cookie input fields; saving them makes every subsequent SAP call (Test connection, DMR list, Submit, etc.) use those exact cookies. Switching back to **Auto** restores middleware-managed login. Both modes share the same Test connection button and the same error/troubleshooting cards already on the page.
 

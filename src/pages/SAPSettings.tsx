@@ -52,26 +52,7 @@ export default function SAPSettings() {
   const [tab, setTab] = useState("apis");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
-  const session = useSapSession();
-  const [jsessionInput, setJsessionInput] = useState("");
-  const [vcapInput, setVcapInput] = useState("");
-  const [showCookieHelp, setShowCookieHelp] = useState(false);
 
-  const saveSession = () => {
-    if (!jsessionInput.trim() && !vcapInput.trim()) {
-      toast.error("Paste at least one cookie value before saving.");
-      return;
-    }
-    setSapSession({ jsessionid: jsessionInput, vcapId: vcapInput });
-    setJsessionInput("");
-    setVcapInput("");
-    toast.success("SAP browser session saved. Refresh tables to use it.");
-  };
-
-  const removeSession = () => {
-    clearSapSession();
-    toast.success("SAP browser session cleared.");
-  };
 
   const testSapConnection = async () => {
     const base =

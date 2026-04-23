@@ -87,6 +87,7 @@ export function useSapProxy<T = Record<string, unknown>>(
           } as SapProxyError;
         }
         if (!res.ok) {
+          if (res.status === 401 || res.status === 403) markSapSessionExpired();
           const errObj = data as {
             error?: {
               message?: string;
@@ -95,6 +96,7 @@ export function useSapProxy<T = Record<string, unknown>>(
               details?: Array<{ message?: string; target?: string }>;
             };
           } | null;
+          if (errObj?.error?.code === "sap_auth_redirect") markSapSessionExpired();
           const detail =
             Array.isArray(errObj?.error?.details) && errObj?.error?.details?.[0]?.message
               ? errObj!.error!.details![0]!.message
@@ -105,6 +107,7 @@ export function useSapProxy<T = Record<string, unknown>>(
             hint: errObj?.error?.hint,
           } as SapProxyError;
         }
+        markSapSessionActive();
         const collection = schema.rowsPath
           ? (getPath(data, schema.rowsPath) as T[])
           : ((Array.isArray(data) ? data : [data]) as T[]);

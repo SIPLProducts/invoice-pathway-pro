@@ -19,7 +19,7 @@ const {
   SAP_CLIENT = "100",
   SAP_USER,
   SAP_PASSWORD,
-  SAP_AUTH_MODE = "basic", // "basic" | "bearer" | "oauth_cc"
+  SAP_AUTH_MODE = "basic", // "basic" | "basic_stateless" | "bearer" | "oauth_cc"
   SAP_BEARER_TOKEN,
   SAP_OAUTH_TOKEN_URL,
   SAP_OAUTH_CLIENT_ID,
@@ -29,7 +29,8 @@ const {
 const authMode = String(SAP_AUTH_MODE).toLowerCase();
 const useBearer = authMode === "bearer";
 const useOauthCc = authMode === "oauth_cc";
-const useBasic = !useBearer && !useOauthCc;
+const useBasicStateless = authMode === "basic_stateless";
+const useBasic = !useBearer && !useOauthCc && !useBasicStateless;
 
 if (!SAP_BASE_URL || !SAP_SERVICE_PATH) {
   console.warn("[sapClient] Missing SAP_BASE_URL / SAP_SERVICE_PATH.");
@@ -40,7 +41,7 @@ if (useBearer && !SAP_BEARER_TOKEN) {
   console.warn(
     "[sapClient] SAP_AUTH_MODE=oauth_cc but SAP_OAUTH_TOKEN_URL / SAP_OAUTH_CLIENT_ID / SAP_OAUTH_CLIENT_SECRET missing.",
   );
-} else if (useBasic && (!SAP_USER || !SAP_PASSWORD)) {
+} else if ((useBasic || useBasicStateless) && (!SAP_USER || !SAP_PASSWORD)) {
   console.warn("[sapClient] Basic auth selected but SAP_USER / SAP_PASSWORD missing.");
 }
 
@@ -50,7 +51,9 @@ console.log(
       ? `tokenUrl=${SAP_OAUTH_TOKEN_URL} clientId=${SAP_OAUTH_CLIENT_ID}`
       : useBearer
         ? "(static bearer token)"
-        : `user=${SAP_USER || "(unset)"} (auto-cookie session enabled)`
+        : useBasicStateless
+          ? `user=${SAP_USER || "(unset)"} (stateless: Basic auth on every request, no cookie cache)`
+          : `user=${SAP_USER || "(unset)"} (auto-cookie session enabled)`
   }`,
 );
 
@@ -133,6 +136,7 @@ async function resolveCookies(extraCookies) {
     return { cookies: String(extraCookies).trim(), source: "manual" };
   }
   if (!useBasic) {
+    // bearer / oauth_cc / basic_stateless: no cookies, auth is per-request header.
     return { cookies: "", source: "none" };
   }
   // Try cached first; if missing/expired, auto-login.
@@ -154,6 +158,7 @@ async function resolveCookies(extraCookies) {
 /**
  * Build per-request axios config that injects a Cookie header.
  * When forwarding session cookies, do NOT send Basic auth alongside.
+ * In basic_stateless mode, attach Basic auth on every request and skip cookies.
  */
 function buildRequestConfig(cookies, extraHeaders = {}) {
   const cfg = { headers: { ...extraHeaders } };
@@ -163,6 +168,8 @@ function buildRequestConfig(cookies, extraHeaders = {}) {
       cfg.auth = null;
       cfg.headers.Authorization = undefined;
     }
+  } else if (useBasicStateless && SAP_USER && SAP_PASSWORD) {
+    cfg.auth = { username: SAP_USER, password: SAP_PASSWORD };
   }
   return cfg;
 }
@@ -346,6 +353,7 @@ function getAuthInfo() {
     clientId: useOauthCc ? SAP_OAUTH_CLIENT_ID : null,
     hasBearer: useBearer ? Boolean(SAP_BEARER_TOKEN) : null,
     autoSession: useBasic,
+    stateless: useBasicStateless,
   };
 }
 

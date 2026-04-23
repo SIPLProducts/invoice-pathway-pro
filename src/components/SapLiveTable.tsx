@@ -98,13 +98,17 @@ export function SapLiveTable({ api, schema }: Props) {
         <div
           className={cn(
             "border-b px-4 py-3 text-sm",
-            error.code === "sap_session_expired" || error.code === "sap_auth_redirect"
+            error.code === "sap_session_expired" ||
+              error.code === "sap_auth_redirect" ||
+              error.code === "sap_no_cookies"
               ? "bg-warning/10 text-warning-foreground"
               : "bg-destructive/5 text-destructive",
           )}
         >
           <div className="flex items-center gap-2 font-semibold">
-            {error.code === "sap_session_expired" || error.code === "sap_auth_redirect" ? (
+            {error.code === "sap_session_expired" ||
+            error.code === "sap_auth_redirect" ||
+            error.code === "sap_no_cookies" ? (
               <KeyRound className="h-4 w-4 text-warning" />
             ) : (
               <AlertCircle className="h-4 w-4" />
@@ -113,7 +117,9 @@ export function SapLiveTable({ api, schema }: Props) {
               ? "SAP browser session expired"
               : error.code === "sap_auth_redirect"
                 ? "SAP authentication required"
-                : "Failed to load from SAP"}
+                : error.code === "sap_no_cookies"
+                  ? "SAP did not issue session cookies"
+                  : "Failed to load from SAP"}
             {error.code && (
               <code className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[10px]">
                 {error.code}
@@ -121,10 +127,34 @@ export function SapLiveTable({ api, schema }: Props) {
             )}
           </div>
           <div className="mt-1 whitespace-pre-wrap text-xs">{error.message}</div>
-          {error.hint && (
+          {error.hint && error.code !== "sap_no_cookies" && (
             <div className="mt-2 rounded border border-border bg-background/60 px-3 py-2 text-xs text-foreground">
               <span className="font-semibold">How to fix: </span>
               {error.hint}
+            </div>
+          )}
+          {error.code === "sap_no_cookies" && (
+            <div className="mt-2 space-y-2 text-xs text-foreground">
+              <div className="rounded border border-border bg-background/60 px-3 py-2">
+                <div className="font-semibold">How to fix — pick one option:</div>
+                <div className="mt-2">
+                  <span className="font-semibold">Option A (quick):</span> your SAP tenant is
+                  stateless. In <code className="rounded bg-muted px-1 font-mono">middleware/.env</code>{" "}
+                  set:
+                  <pre className="mt-1 overflow-x-auto rounded bg-muted px-2 py-1 font-mono text-[11px]">{`SAP_AUTH_MODE=basic_stateless
+SAP_USER=<comm-user>
+SAP_PASSWORD=<comm-password>`}</pre>
+                  Then restart the middleware.
+                </div>
+                <div className="mt-2">
+                  <span className="font-semibold">Option B (recommended):</span> use OAuth 2.0 from
+                  a Communication Arrangement:
+                  <pre className="mt-1 overflow-x-auto rounded bg-muted px-2 py-1 font-mono text-[11px]">{`SAP_AUTH_MODE=oauth_cc
+SAP_OAUTH_TOKEN_URL=https://<tenant>.authentication.<region>.hana.ondemand.com/oauth/token
+SAP_OAUTH_CLIENT_ID=...
+SAP_OAUTH_CLIENT_SECRET=...`}</pre>
+                </div>
+              </div>
             </div>
           )}
           {(error.code === "sap_session_expired" || error.code === "sap_auth_redirect") && (

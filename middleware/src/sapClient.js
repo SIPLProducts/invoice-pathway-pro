@@ -19,7 +19,7 @@ const {
   SAP_CLIENT = "100",
   SAP_USER,
   SAP_PASSWORD,
-  SAP_AUTH_MODE = "basic", // "basic" | "bearer" | "oauth_cc"
+  SAP_AUTH_MODE = "basic", // "basic" | "basic_stateless" | "bearer" | "oauth_cc"
   SAP_BEARER_TOKEN,
   SAP_OAUTH_TOKEN_URL,
   SAP_OAUTH_CLIENT_ID,
@@ -29,7 +29,8 @@ const {
 const authMode = String(SAP_AUTH_MODE).toLowerCase();
 const useBearer = authMode === "bearer";
 const useOauthCc = authMode === "oauth_cc";
-const useBasic = !useBearer && !useOauthCc;
+const useBasicStateless = authMode === "basic_stateless";
+const useBasic = !useBearer && !useOauthCc && !useBasicStateless;
 
 if (!SAP_BASE_URL || !SAP_SERVICE_PATH) {
   console.warn("[sapClient] Missing SAP_BASE_URL / SAP_SERVICE_PATH.");

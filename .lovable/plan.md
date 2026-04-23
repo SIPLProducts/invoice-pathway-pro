@@ -1,68 +1,171 @@
 
 
-## Plan: Fix `sap_no_cookies` error — support cookieless auth modes
+## Plan: Fix the current `sap_no_cookies` failure by auto-falling back to stateless auth
 
-### Root cause
-SAP responded **200 OK** to the middleware's login call but did **not** issue `JSESSIONID` / `__VCAP_ID__` cookies. This happens on ABAP Environment (Steampunk) tenants where:
-- The Communication Arrangement is configured for **OAuth 2.0**, not Basic auth, OR
-- Basic auth is allowed but the tenant is **stateless** (sends `sap-stateful-session: false`), so no session cookies are ever issued — every request must carry `Authorization: Basic …` or a fresh Bearer token.
+### What the actual issue is
+Your middleware is still going through the **cookie-session login path**:
 
-Either way, the current code path (`sap_no_cookies` thrown from `sapSessionStore.loginToSap`) blocks every API call.
-
-### Fix — two complementary changes
-
-**1. Add a new `SAP_AUTH_MODE=basic_stateless` mode in the middleware** *(zero-config workaround)*
-- When set, the middleware sends `Authorization: Basic <user:pass>` on **every** SAP request (no login step, no cookie cache, no `sap_no_cookies` error).
-- Implemented inside `middleware/src/sapClient.js`:
-  - `useBasicStateless = authMode === "basic_stateless"`.
-  - Skip `sapSessionStore.ensureSession()` entirely when in this mode.
-  - In `buildRequestConfig`, attach `auth: { username: SAP_USER, password: SAP_PASSWORD }` and **do not** add a `Cookie` header.
-  - The startup banner reflects the new mode.
-- This is the fastest unblock for the screenshot's tenant if Basic creds are accepted but cookies are stripped.
-
-**2. Update the OAuth path to actually be usable** *(recommended long-term)*
-- Already supported via `SAP_AUTH_MODE=oauth_cc` + `SAP_OAUTH_TOKEN_URL` / `SAP_OAUTH_CLIENT_ID` / `SAP_OAUTH_CLIENT_SECRET`. No code change required — only documentation.
-- Update `middleware/.env.example` to clearly describe the three working modes:
-  - `basic` — stateful tenants that issue `JSESSIONID` cookies (today's default; not your tenant).
-  - `basic_stateless` — stateless tenants that accept Basic auth on every call (new — your likely fix).
-  - `oauth_cc` — proper Communication Arrangement with OAuth 2.0 (long-term recommended).
-
-**3. Improve the frontend error message** *(better UX so the next person isn't stuck)*
-- In `src/components/SapLiveTable.tsx`, when `error.code === "sap_no_cookies"`, render a clearer "How to fix" block listing the two options:
-  - Option A (quick): set `SAP_AUTH_MODE=basic_stateless` in `middleware/.env` and restart middleware.
-  - Option B (recommended): set `SAP_AUTH_MODE=oauth_cc` plus `SAP_OAUTH_*` envs.
-- Also surface the same actionable hint in the toast that fires on **Submit to SAP** failure (the second screenshot), via `useSapCreate` already passing the `hint` field through — verify the toast in `DMRNew.tsx` reads `result.error` and append `result.sapBody?.error?.hint` when present.
-
-### Files to change
-- `middleware/src/sapClient.js` — add `basic_stateless` mode (skip session store, attach Basic auth per request).
-- `middleware/.env.example` — document the three modes; add `SAP_AUTH_MODE=basic_stateless` example.
-- `src/components/SapLiveTable.tsx` — extend the error panel to handle `sap_no_cookies` with the two-option fix-it guide.
-- `src/pages/DMRNew.tsx` — append `hint` to the failure toast when the middleware returns one.
-
-### What stays the same
-- `sapSessionStore.js`, auto-login flow, per-call `[SAP]` logging — untouched and still used by `basic` mode.
-- All API rows, schemas, `STORAGE_KEY`, middleware URLs — unchanged.
-- No DB changes.
-
-### Required `.env` change for the user (after these code changes ship)
-Edit `middleware/.env`:
-```
-SAP_AUTH_MODE=basic_stateless
-SAP_USER=GANGADHARV
-SAP_PASSWORD=********
-```
-…then restart the middleware. The `Get DMR LIST` table and `Submit to SAP` should both work immediately.
-
-If Basic isn't accepted at all, switch to:
-```
-SAP_AUTH_MODE=oauth_cc
-SAP_OAUTH_TOKEN_URL=https://<tenant>.authentication.us10.hana.ondemand.com/oauth/token
-SAP_OAUTH_CLIENT_ID=<from Communication Arrangement>
-SAP_OAUTH_CLIENT_SECRET=<from Communication Arrangement>
+```text
+resolveCookies -> ensureSession -> loginToSap -> sap_no_cookies
 ```
 
-### Expected result
-- The `Failed to load from SAP — sap_no_cookies` red banner disappears once the middleware is restarted with `SAP_AUTH_MODE=basic_stateless` (or `oauth_cc`).
-- `Get DMR LIST` populates rows; `Submit to SAP` succeeds.
-- Middleware terminal still prints one `[SAP] …` line per call (without `savedAt/expiresAt` in stateless/oauth modes — replaced by `auth=basic_stateless` or `auth=oauth_cc token=…`).
+That means the running process is behaving as `SAP_AUTH_MODE=basic`, not as a stateless mode.
+
+For your SAP tenant, login succeeds but SAP does **not** issue `JSESSIONID` / `__VCAP_ID__`. So the current middleware throws `sap_no_cookies` before the real API call is sent.
+
+### What to build
+Make the middleware **recover automatically** when SAP does not return cookies:
+
+- If `SAP_AUTH_MODE=basic` tries cookie login and SAP returns `sap_no_cookies`,
+- the middleware should **switch to per-request Basic auth automatically** for that process,
+- then continue the API call without failing the user.
+
+This removes the need for manual SAP login, manual cookie paste, and even manual env switching for this tenant.
+
+## Implementation
+
+### 1. Harden the middleware auth flow
+Update `middleware/src/sapClient.js` so auth is resolved in this order:
+
+```text
+manual cookies from headers
+→ cached SAP cookies (stateful mode)
+→ if cookie login returns sap_no_cookies, auto-fallback to basic_stateless
+→ if oauth_cc is configured, keep current OAuth flow
+```
+
+Changes:
+- Add a runtime fallback flag like `effectiveBasicStateless`.
+- In `resolveCookies()`:
+  - if normal `basic` login throws `sap_no_cookies`, do **not** rethrow immediately.
+  - mark the process as stateless for subsequent calls.
+  - return `{ cookies: "", source: "basic-stateless-fallback" }`.
+- In `buildRequestConfig()`:
+  - if effective mode is stateless, attach:
+    - `cfg.auth = { username: SAP_USER, password: SAP_PASSWORD }`
+  - do not attach `Cookie`.
+- In `withAutoSession()`:
+  - only attempt cookie re-login when effective mode is truly cookie-based.
+  - skip cookie retry logic for stateless mode.
+
+Result: `GET /api/gate/headers` and save/POST requests will continue to SAP with Basic auth on every request instead of failing at cookie login.
+
+### 2. Make the session store explicitly report “no cookies available”
+Update `middleware/src/sapSessionStore.js`:
+- keep the current cookie-login behavior for real stateful tenants.
+- when SAP returns no cookies, preserve `err.code = "sap_no_cookies"`, but improve the hint to say:
+  - tenant is likely stateless or OAuth-based
+  - middleware can fall back to stateless Basic auth if enabled/allowed
+
+No UI should depend on cookie existence anymore.
+
+### 3. Fix logging so it matches the real auth mode
+Right now the logs are cookie-oriented. For your tenant that is misleading.
+
+Update `middleware/src/util/sessionLog.js` and its call sites so logs are mode-aware:
+
+#### For stateful cookie mode
+```text
+[SAP] GET /GateHeader  auth=basic session=ACTIVE savedAt=... expiresAt=... remaining=...
+```
+
+#### For auto-fallback stateless mode
+```text
+[SAP] GET /GateHeader  auth=basic_stateless source=auto-fallback cookies=none
+```
+
+#### On fallback event
+```text
+[SAP] LOGIN no-cookies -> switching to auth=basic_stateless
+```
+
+#### For OAuth mode
+```text
+[SAP] GET /GateHeader  auth=oauth_cc token=active expiresAt=...
+```
+
+Important:
+- `savedAt` / `expiresAt` only make sense when a real cookie session or OAuth token exists.
+- In stateless Basic mode there is **no session expiry**, because each request sends fresh credentials.
+
+### 4. Return the effective mode from health checks
+Update `middleware/src/routes/health.js` and `getAuthInfo()` in `middleware/src/sapClient.js` so the frontend receives:
+- configured auth mode
+- effective auth mode
+- whether cookies are active
+- whether stateless fallback is active
+
+Example response:
+```json
+{
+  "ok": true,
+  "authMode": "basic",
+  "effectiveAuthMode": "basic_stateless",
+  "cookieSession": false,
+  "statelessFallback": true
+}
+```
+
+This prevents the frontend from showing misleading “auto-managed cookies” wording.
+
+### 5. Correct the SAP Settings wording
+Update `src/pages/SAPSettings.tsx`:
+- replace cookie-specific text like:
+  - “JSESSIONID and __VCAP_ID__ cookies are obtained automatically...”
+- with auth-mode-neutral text like:
+  - “SAP authentication is handled automatically by the middleware. Depending on your tenant, it will use session cookies, stateless Basic auth, or OAuth.”
+
+Also update the status card to display:
+- Stateful cookie session
+- Stateless Basic auth
+- OAuth client credentials
+
+whichever is actually active.
+
+### 6. Improve frontend error handling for the transition case
+Update:
+- `src/components/SapLiveTable.tsx`
+- `src/pages/DMRNew.tsx`
+
+Behavior:
+- if backend auto-fallback succeeds, no error is shown.
+- if backend still returns `sap_no_cookies`, show a smaller message:
+  - “This SAP tenant does not issue browser session cookies. Middleware must use stateless Basic auth or OAuth.”
+- stop telling the user to do manual browser-cookie steps.
+
+### 7. Clarify runtime configuration
+Update:
+- `middleware/.env.example`
+- `middleware/README.md`
+
+Clarify that:
+- `.env.example` is only a template
+- the running server uses `middleware/.env` or deployment env vars
+- if the server is already deployed with `SAP_AUTH_MODE=basic`, it will keep failing until the real runtime config or fallback code is in place
+
+## Files to change
+- `middleware/src/sapClient.js`
+- `middleware/src/sapSessionStore.js`
+- `middleware/src/util/sessionLog.js`
+- `middleware/src/routes/health.js`
+- `src/pages/SAPSettings.tsx`
+- `src/components/SapLiveTable.tsx`
+- `src/pages/DMRNew.tsx`
+- `middleware/.env.example`
+- `middleware/README.md`
+
+## Expected result
+- `GET /api/gate/headers` stops failing with `sap_no_cookies`.
+- Save/submit calls stop failing for the same reason.
+- No manual SAP login or manual cookie entry is needed.
+- Middleware terminal logs clearly show whether it is using:
+  - cookie session with `savedAt/expiresAt`, or
+  - stateless Basic auth with no expiry, or
+  - OAuth token expiry.
+
+## Small unrelated cleanup to include while editing
+There is also an existing React warning in the console:
+- `Function components cannot be given refs` in `SapLiveTable`
+
+While touching the same area, fix the dialog/ref issue so the SAP table screen is clean during testing.
 

@@ -43,6 +43,8 @@ import {
   setSapSession,
   clearSapSession,
   setSapSessionMode,
+  markSapSessionActive,
+  markSapSessionExpired,
 } from "@/lib/sapSession";
 
 const methodColor: Record<SapMethod, string> = {
@@ -74,8 +76,8 @@ export default function SAPSettings() {
   const [testing, setTesting] = useState(false);
   const [authError, setAuthError] = useState<AuthError | null>(null);
   const [troubleshootOpen, setTroubleshootOpen] = useState(false);
-  const [jsessionInput, setJsessionInput] = useState("");
-  const [vcapInput, setVcapInput] = useState("");
+  const [jsessionInput, setJsessionInput] = useState(() => session.jsessionid);
+  const [vcapInput, setVcapInput] = useState(() => session.vcapId);
 
   const manualCookiesActive =
     session.mode === "manual" && Boolean(session.jsessionid) && Boolean(session.vcapId);
@@ -95,14 +97,26 @@ export default function SAPSettings() {
     return `${Math.floor(h / 24)}d ago`;
   };
 
+  const formatRemaining = (iso: string) => {
+    if (!iso) return "";
+    const diff = new Date(iso).getTime() - Date.now();
+    if (Number.isNaN(diff) || diff <= 0) return "expired";
+    const m = Math.floor(diff / 60000);
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    const remM = m % 60;
+    return remM ? `${h}h ${remM}m` : `${h}h`;
+  };
+
   const handleSaveManual = () => {
     if (!jsessionInput.trim() || !vcapInput.trim()) {
       toast.error("Both JSESSIONID and __VCAP_ID__ are required.");
       return;
     }
-    setSapSession({ jsessionid: jsessionInput.trim(), vcapId: vcapInput.trim() });
-    setJsessionInput("");
-    setVcapInput("");
+    const next = { jsessionid: jsessionInput.trim(), vcapId: vcapInput.trim() };
+    setSapSession(next);
+    setJsessionInput(next.jsessionid);
+    setVcapInput(next.vcapId);
     toast.success("Manual SAP cookies saved. They will be sent with every SAP call.");
   };
 
@@ -138,10 +152,14 @@ export default function SAPSettings() {
           `SAP OK (auth: ${eff}${fallback}${data.user ? `, user: ${data.user}` : ""}) — rows: ${data.rows}`,
         );
         setAuthError(null);
+        markSapSessionActive();
       } else {
         const code: string = data?.code || "sap_error";
         const message: string = data?.message || `HTTP ${res.status}`;
         const fixSteps: FixStep[] | null = Array.isArray(data?.fixSteps) ? data.fixSteps : null;
+        if (res.status === 401 || res.status === 403 || code === "sap_auth_redirect") {
+          markSapSessionExpired();
+        }
         if (code === "sap_auth_redirect" || fixSteps) {
           setAuthError({ code, message, hint: data?.hint, fixSteps });
           toast.error(`${code}: see the resolution card on this page for fix steps.`, {
@@ -329,12 +347,28 @@ export default function SAPSettings() {
                       Auto-managed
                     </Badge>
                   ) : manualCookiesActive ? (
-                    <Badge
-                      variant="outline"
-                      className="border-warning/40 bg-warning/10 text-warning"
-                    >
-                      Manual cookies
-                    </Badge>
+                    session.status === "expired" ? (
+                      <Badge
+                        variant="outline"
+                        className="border-destructive/40 bg-destructive/10 text-destructive"
+                      >
+                        Manual — expired
+                      </Badge>
+                    ) : session.status === "active" ? (
+                      <Badge
+                        variant="outline"
+                        className="border-success/40 bg-success/10 text-success"
+                      >
+                        Manual — active
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="border-warning/40 bg-warning/10 text-warning"
+                      >
+                        Manual cookies
+                      </Badge>
+                    )
                   ) : (
                     <Badge variant="outline" className="text-muted-foreground">
                       Manual — not set
@@ -416,6 +450,39 @@ export default function SAPSettings() {
                           __VCAP_ID__: <span className="text-foreground">{maskCookie(session.vcapId)}</span>
                         </span>
                       </div>
+                      {(() => {
+                        const remaining = formatRemaining(session.expiresAt);
+                        const isExpired =
+                          session.status === "expired" || remaining === "expired";
+                        if (isExpired) {
+                          return (
+                            <div className="mt-2 flex items-center gap-2 text-warning">
+                              <span className="inline-block h-2 w-2 rounded-full bg-warning" />
+                              <span>
+                                Expired. Paste fresh cookies from your SAP tab and click{" "}
+                                <span className="font-semibold">Save</span>.
+                              </span>
+                            </div>
+                          );
+                        }
+                        if (session.status === "active") {
+                          return (
+                            <div className="mt-2 flex items-center gap-2 text-success">
+                              <span className="inline-block h-2 w-2 rounded-full bg-success" />
+                              <span>Active. Expires in {remaining}.</span>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="mt-2 flex items-center gap-2 text-muted-foreground">
+                            <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/60" />
+                            <span>
+                              Click <span className="font-semibold">Test connection</span> to verify
+                              {remaining ? ` — expires in ${remaining}` : ""}.
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 

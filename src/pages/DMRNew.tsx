@@ -141,7 +141,22 @@ export default function DMRNew() {
       toast.success(`Created ${id || "record"} in SAP`);
       navigate("/dmr");
     } else {
-      toast.error(res.error ?? "Failed to create");
+      const sapErr = (res.sapBody as { error?: { hint?: string; code?: string } } | undefined)
+        ?.error;
+      const hint = sapErr?.hint;
+      const code = sapErr?.code;
+      if (code === "sap_no_cookies") {
+        toast.error("SAP did not issue session cookies", {
+          description:
+            "Set SAP_AUTH_MODE=basic_stateless in middleware/.env and restart the middleware. Or switch to oauth_cc with SAP_OAUTH_* envs.",
+          duration: 10000,
+        });
+      } else {
+        toast.error(res.error ?? "Failed to create", {
+          description: hint,
+          duration: hint ? 10000 : 5000,
+        });
+      }
     }
   };
 

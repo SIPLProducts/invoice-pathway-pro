@@ -119,7 +119,9 @@ export function useSapCreate(api: SapApi | null | undefined, proxyPathOverride?:
       const text = await res.text();
       const data = text ? JSON.parse(text) : null;
       if (!res.ok) {
+        if (res.status === 401 || res.status === 403) markSapSessionExpired();
         const sapErr = data?.error;
+        if (sapErr?.code === "sap_auth_redirect") markSapSessionExpired();
         // Surface specific field-level message from SAP details when present
         // (e.g. CX_SXML_PARSE_ERROR -> "Property X not allowed")
         const detail =
@@ -133,6 +135,7 @@ export function useSapCreate(api: SapApi | null | undefined, proxyPathOverride?:
           sapBody: data,
         };
       }
+      markSapSessionActive();
       return { ok: true, data };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };

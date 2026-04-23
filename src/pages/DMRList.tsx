@@ -42,11 +42,14 @@ export default function DMRPage() {
   const liveApis = apis.filter((a) => {
     if (a.method !== "GET") return false;
     if (a.status !== "Active") return false;
-    const isGateByName = /get[_ ]?dmr|gate/i.test(a.name);
-    const isGateByPath = /gate(header|service)/i.test(`${a.endpoint} ${a.proxyPath ?? ""}`);
-    return isGateByName || isGateByPath;
+    const hay = `${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`.toLowerCase();
+    return /get[ _-]?dmr|dmr[ _-]?list|gate(header|service)/.test(hay);
   });
-  const selectedApi = liveApis[0] ?? null;
+  // Prefer an explicit "GET DMR LIST" API when present
+  const selectedApi =
+    liveApis.find((a) => /get[ _-]?dmr[ _-]?list/i.test(a.name)) ??
+    liveApis[0] ??
+    null;
 
   const filtered = dmrs.filter((d) => {
     const tab = tabMap[active];
@@ -124,9 +127,9 @@ export default function DMRPage() {
                 <Link to="/sap/settings" className="font-semibold text-primary hover:underline">
                   SAP Settings
                 </Link>{" "}
-                and add a GET API for the gate service (e.g.{" "}
-                <code className="font-mono text-xs">Get_DMR</code> or{" "}
-                <code className="font-mono text-xs">ZUI_Gate_Service</code>).
+                and add an Active GET API named{" "}
+                <code className="font-mono text-xs">GET DMR LIST</code> (or{" "}
+                <code className="font-mono text-xs">ZUI_Gate_Service</code>) pointing at the gate header endpoint.
               </div>
             );
           }

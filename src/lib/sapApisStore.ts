@@ -184,43 +184,6 @@ export const DEFAULT_GATE_RESPONSE_ITEM = GATE_ITEM_RESPONSE;
 
 const seed: SapApi[] = [
   {
-    name: "SAP_343_Blocked_To_Unrestricted",
-    description: "343 Movement - Moves blocked stock quantity to unrestricted stock in SAP.",
-    baseUrl: "http://10.10.6.115:8000",
-    endpoint: "/mrb/mb52/mat_stocks?sap-client=234",
-    method: "PUT",
-    auth: "Basic",
-    status: "Active",
-    tag: "Proxy",
-    type: "action",
-    autoSync: { enabled: false, frequencyMinutes: 5 },
-  },
-  {
-    name: "SAP_344_Unrestricted_To_Blocked",
-    description: "344 Movement - Moves unrestricted stock quantity to blocked stock in SAP.",
-    baseUrl: "http://10.10.6.115:8000",
-    endpoint: "/mrb/mb52/mat_stocks?sap-client=234",
-    method: "GET",
-    auth: "Basic",
-    status: "Active",
-    tag: "Proxy",
-    type: "action",
-    autoSync: { enabled: false, frequencyMinutes: 5 },
-  },
-  {
-    name: "MB52_Stock_Report",
-    description:
-      "MB52 - Material Stock Report. Returns stock quantities (unrestricted, blocked, QI, transfer) by plant, storage location, material and batch.",
-    baseUrl: "http://10.10.6.115:8000",
-    endpoint: "/mrb/mb52/mat_stocks?sap-client=234",
-    method: "POST",
-    auth: "Basic",
-    status: "Active",
-    tag: "Proxy",
-    type: "live",
-    autoSync: { enabled: false, frequencyMinutes: 5 },
-  },
-  {
     name: "ZMRB_Inward_Inspection",
     description:
       "ZMRB01/ZMRB04 - Inward Inspection Report. Fetches inspection lots with vendor, PO, batch and quantity details. Use ART=01 for ZMRB01, ART=04 for ZMRB04.",
@@ -288,8 +251,27 @@ function load(): SapApi[] {
     if (!raw) return seed;
     const parsed = JSON.parse(raw) as SapApi[];
     if (!Array.isArray(parsed) || parsed.length === 0) return seed;
+
+    // One-time cleanup: remove deprecated default APIs without resetting other edits.
+    const CLEANUP_FLAG = "dmr.sapApis.cleanup.v1";
+    const REMOVED_NAMES = new Set([
+      "SAP_343_Blocked_To_Unrestricted",
+      "SAP_344_Unrestricted_To_Blocked",
+      "MB52_Stock_Report",
+    ]);
+    let cleaned = parsed;
+    if (!localStorage.getItem(CLEANUP_FLAG)) {
+      cleaned = parsed.filter((a) => !REMOVED_NAMES.has(a.name));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+        localStorage.setItem(CLEANUP_FLAG, "1");
+      } catch {
+        /* ignore quota */
+      }
+    }
+
     // Merge: ensure ZUI_Gate_Service has field schemas (in case older cached version)
-    return parsed.map((a) => {
+    return cleaned.map((a) => {
       if (a.name === "ZUI_Gate_Service" && !a.requestHeaderFields) {
         return { ...seed.find((s) => s.name === "ZUI_Gate_Service")!, ...a, requestHeaderFields: GATE_HEADER_REQUEST, requestItemFields: GATE_ITEM_REQUEST, responseHeaderFields: GATE_HEADER_RESPONSE, responseItemFields: GATE_ITEM_RESPONSE };
       }

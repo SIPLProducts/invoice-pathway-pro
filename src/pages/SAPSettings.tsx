@@ -73,20 +73,93 @@ export default function SAPSettings() {
   const [jsessionInput, setJsessionInput] = useState("");
   const [vcapInput, setVcapInput] = useState("");
   const [showCookieHelp, setShowCookieHelp] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAltCreds, setShowAltCreds] = useState(false);
+  const [altUser, setAltUser] = useState("");
+  const [altPassword, setAltPassword] = useState("");
+  const [logging, setLogging] = useState(false);
+  const [serverStatus, setServerStatus] = useState<SapMiddlewareSessionStatus | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  // Resolve middleware base URL once per render from configured APIs (or env fallback).
+  const middlewareUrl = useMemo(() => {
+    const fromApi = apis.find((a) => a.middleware?.url)?.middleware?.url?.trim().replace(/\/$/, "");
+    if (fromApi) return fromApi;
+    return ((import.meta.env.VITE_SAP_PROXY_URL as string | undefined)?.trim().replace(/\/$/, "") ?? "");
+  }, [apis]);
+
+  // Poll middleware session status every 30s while page is open.
+  useEffect(() => {
+    if (!middlewareUrl) return;
+    let cancelled = false;
+    const tick = async () => {
+      const s = await refreshSapSessionStatus(middlewareUrl);
+      if (!cancelled) setServerStatus(s);
+    };
+    tick();
+    const id = setInterval(tick, 30_000);
+    const clock = setInterval(() => setNow(Date.now()), 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      clearInterval(clock);
+    };
+  }, [middlewareUrl]);
+
+  const remainingLabel = useMemo(() => {
+    if (!serverStatus?.expiresAt) return null;
+    const ms = new Date(serverStatus.expiresAt).getTime() - now;
+    if (ms <= 0) return "expired";
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  }, [serverStatus, now]);
+
+  const doDynamicLogin = async (useAlt: boolean) => {
+    if (!middlewareUrl) {
+      toast.error("No middleware URL configured. Set it on any API → API Details.");
+      return;
+    }
+    setLogging(true);
+    try {
+      const body = useAlt ? { user: altUser.trim(), password: altPassword } : undefined;
+      const status = await loginToSapDynamic(middlewareUrl, body);
+      setServerStatus(status);
+      toast.success(`Logged in to SAP as ${status.sapUser ?? "configured user"}.`);
+      setAltPassword("");
+    } catch (err) {
+      const e = err as Error & { code?: string; hint?: string };
+      toast.error(`${e.code || "login_failed"}: ${e.message}${e.hint ? `\n\n${e.hint}` : ""}`, {
+        duration: 12000,
+      });
+    } finally {
+      setLogging(false);
+    }
+  };
 
   const saveSession = () => {
     if (!jsessionInput.trim() && !vcapInput.trim()) {
       toast.error("Paste at least one cookie value before saving.");
       return;
     }
-    setSapSession({ jsessionid: jsessionInput, vcapId: vcapInput });
+    setSapSession({ jsessionid: jsessionInput, vcapId: vcapInput, source: "manual" });
     setJsessionInput("");
     setVcapInput("");
     toast.success("SAP browser session saved. Refresh tables to use it.");
   };
 
-  const removeSession = () => {
-    clearSapSession();
+  const removeSession = async () => {
+    if (middlewareUrl) {
+      await logoutSapDynamic(middlewareUrl);
+      const s = await refreshSapSessionStatus(middlewareUrl);
+      setServerStatus(s);
+    } else {
+      clearSapSession();
+    }
     toast.success("SAP browser session cleared.");
   };
 

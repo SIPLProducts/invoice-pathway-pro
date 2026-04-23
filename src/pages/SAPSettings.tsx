@@ -434,6 +434,39 @@ export default function SAPSettings() {
                           __VCAP_ID__: <span className="text-foreground">{maskCookie(session.vcapId)}</span>
                         </span>
                       </div>
+                      {(() => {
+                        const remaining = formatRemaining(session.expiresAt);
+                        const isExpired =
+                          session.status === "expired" || remaining === "expired";
+                        if (isExpired) {
+                          return (
+                            <div className="mt-2 flex items-center gap-2 text-warning">
+                              <span className="inline-block h-2 w-2 rounded-full bg-warning" />
+                              <span>
+                                Expired. Paste fresh cookies from your SAP tab and click{" "}
+                                <span className="font-semibold">Save</span>.
+                              </span>
+                            </div>
+                          );
+                        }
+                        if (session.status === "active") {
+                          return (
+                            <div className="mt-2 flex items-center gap-2 text-success">
+                              <span className="inline-block h-2 w-2 rounded-full bg-success" />
+                              <span>Active. Expires in {remaining}.</span>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="mt-2 flex items-center gap-2 text-muted-foreground">
+                            <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/60" />
+                            <span>
+                              Click <span className="font-semibold">Test connection</span> to verify
+                              {remaining ? ` — expires in ${remaining}` : ""}.
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 

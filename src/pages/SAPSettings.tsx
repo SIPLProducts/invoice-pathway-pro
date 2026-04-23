@@ -37,7 +37,13 @@ import {
 import { toast } from "sonner";
 import { useSapApis, deleteApi, type SapMethod } from "@/lib/sapApisStore";
 import { AddApiDialog } from "@/components/AddApiDialog";
-import { getSapSessionHeaders } from "@/lib/sapSession";
+import {
+  getSapSessionHeaders,
+  useSapSession,
+  setSapSession,
+  clearSapSession,
+  setSapSessionMode,
+} from "@/lib/sapSession";
 
 const methodColor: Record<SapMethod, string> = {
   GET: "bg-success/15 text-success border-success/30",

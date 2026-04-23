@@ -347,12 +347,28 @@ export default function SAPSettings() {
                       Auto-managed
                     </Badge>
                   ) : manualCookiesActive ? (
-                    <Badge
-                      variant="outline"
-                      className="border-warning/40 bg-warning/10 text-warning"
-                    >
-                      Manual cookies
-                    </Badge>
+                    session.status === "expired" ? (
+                      <Badge
+                        variant="outline"
+                        className="border-destructive/40 bg-destructive/10 text-destructive"
+                      >
+                        Manual — expired
+                      </Badge>
+                    ) : session.status === "active" ? (
+                      <Badge
+                        variant="outline"
+                        className="border-success/40 bg-success/10 text-success"
+                      >
+                        Manual — active
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="border-warning/40 bg-warning/10 text-warning"
+                      >
+                        Manual cookies
+                      </Badge>
+                    )
                   ) : (
                     <Badge variant="outline" className="text-muted-foreground">
                       Manual — not set

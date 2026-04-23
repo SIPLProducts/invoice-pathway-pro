@@ -44,11 +44,20 @@ export function getSapSession(): SapSession | null {
   return readSession();
 }
 
-export function setSapSession(session: { jsessionid: string; vcapId: string }) {
+export function setSapSession(session: {
+  jsessionid: string;
+  vcapId: string;
+  source?: "manual" | "dynamic";
+  expiresAt?: string;
+  sapUser?: string;
+}) {
   const clean: SapSession = {
     jsessionid: session.jsessionid.trim(),
     vcapId: session.vcapId.trim(),
     savedAt: new Date().toISOString(),
+    source: session.source ?? "manual",
+    expiresAt: session.expiresAt,
+    sapUser: session.sapUser,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
   emit();

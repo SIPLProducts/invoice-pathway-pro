@@ -97,6 +97,17 @@ export default function SAPSettings() {
     return `${Math.floor(h / 24)}d ago`;
   };
 
+  const formatRemaining = (iso: string) => {
+    if (!iso) return "";
+    const diff = new Date(iso).getTime() - Date.now();
+    if (Number.isNaN(diff) || diff <= 0) return "expired";
+    const m = Math.floor(diff / 60000);
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    const remM = m % 60;
+    return remM ? `${h}h ${remM}m` : `${h}h`;
+  };
+
   const handleSaveManual = () => {
     if (!jsessionInput.trim() || !vcapInput.trim()) {
       toast.error("Both JSESSIONID and __VCAP_ID__ are required.");

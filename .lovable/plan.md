@@ -1,32 +1,50 @@
 
 
-## Plan: Fix `ReferenceError: useBasicStateless is not defined`
+## Plan: Fix `sap_config_missing` — make middleware load `.env` regardless of CWD
 
 ### Root cause
-In `middleware/src/sapClient.js`, the variable was renamed to `configuredBasicStateless` (line 32), but two leftover references to the old name `useBasicStateless` remain:
+The middleware crashes with `sap_config_missing` because `require("dotenv").config()` (line 3 of `middleware/src/server.js`) loads from the **current working directory**, not from the file's location.
 
-- **Line 57** — in the warn-check: `(useBasic || useBasicStateless) && (!SAP_USER || !SAP_PASSWORD)`
-- **Line 67** — in the startup banner ternary: `: useBasicStateless`
+The user is running:
+```
+PS D:\invoice-pathway-pro\middleware\src> node server.js
+```
+…from inside `middleware/src/`. So dotenv looks for `middleware/src/.env` (which doesn't exist) instead of `middleware/.env` (which does).
 
-Node throws on line 67 the moment the file is evaluated, which is why the server crashes immediately on `node server.js`.
+That's why the startup banner already showed:
+```
+[sapClient] Missing SAP_BASE_URL / SAP_SERVICE_PATH.
+[sapClient] Basic auth selected but SAP_USER / SAP_PASSWORD missing.
+```
+…and every API call returns `{"code":"sap_config_missing"}`.
 
-### Fix
-Single-file edit in `middleware/src/sapClient.js`:
+### Fix — one line in `middleware/src/server.js`
+Change line 3 from:
+```js
+require("dotenv").config();
+```
+to:
+```js
+require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
+```
 
-- Line 57 → replace `useBasicStateless` with `configuredBasicStateless`.
-- Line 67 → replace `useBasicStateless` with `configuredBasicStateless`.
-
-That's the entire change. No other files, no logic changes, no env changes.
+This pins the `.env` path to `middleware/.env` relative to `server.js`, so the middleware loads the same env file no matter what directory it's launched from (`middleware/`, `middleware/src/`, or anywhere else).
 
 ### What stays the same
-- `.env`, auth modes, auto-fallback behavior, session store, logging — all untouched.
-- `effectiveBasicStateless` (runtime flag) is intentionally separate from `configuredBasicStateless` and stays as-is.
+- `middleware/.env` contents — already correct (has `SAP_BASE_URL`, `SAP_USER`, `SAP_PASSWORD`, `SAP_AUTH_MODE=basic`).
+- All auth-mode logic, auto-fallback, session store, frontend — untouched.
+- No new dependencies (`path` is built-in).
 
 ### Expected result
-- `node server.js` starts cleanly and prints:
-  ```
-  [sapClient] mode=basic user=kishore.pabbathi@cbcmpl.com (auto-cookie session enabled)
-  SAP proxy listening on http://localhost:8080
-  ```
-- The first call to `/api/gate/headers` will then trigger the existing auto-fallback path (cookie login → `sap_no_cookies` → switch to `basic_stateless` → continue), and the DMR table loads without the red banner.
+After restarting the middleware (`node server.js` from any directory), the startup log will show:
+```
+[sapClient] mode=basic user=kishore.pabbathi@cbcmpl.com (auto-cookie session enabled)
+SAP proxy listening on http://localhost:8080
+```
+- **Test Connection** button on `/sap/settings` will succeed (or return the real SAP error, not `sap_config_missing`).
+- **Get DMR LIST** table will fetch rows.
+- If the tenant still doesn't issue cookies, the previously-built auto-fallback to `basic_stateless` will kick in transparently.
+
+### Files to change
+- `middleware/src/server.js` — single-line change to dotenv config.
 

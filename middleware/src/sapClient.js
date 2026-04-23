@@ -353,6 +353,7 @@ function getAuthInfo() {
     clientId: useOauthCc ? SAP_OAUTH_CLIENT_ID : null,
     hasBearer: useBearer ? Boolean(SAP_BEARER_TOKEN) : null,
     autoSession: useBasic,
+    stateless: useBasicStateless,
   };
 }
 

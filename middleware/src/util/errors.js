@@ -1,7 +1,15 @@
 "use strict";
 
-function errorEnvelope(code, message, sapBody, hint) {
-  return { error: { code, message, sapBody: sapBody ?? null, hint: hint ?? null } };
+function errorEnvelope(code, message, sapBody, hint, fixSteps) {
+  return {
+    error: {
+      code,
+      message,
+      sapBody: sapBody ?? null,
+      hint: hint ?? null,
+      fixSteps: Array.isArray(fixSteps) ? fixSteps : null,
+    },
+  };
 }
 
 function fromAxios(err) {
@@ -35,17 +43,56 @@ function detectAuthHtml(res) {
       bodyStr,
     );
 
-  const err = new Error(
-    isAuthRedirect
-      ? "SAP redirected to login (OAuth/SAML/IDP). The middleware is not authenticated against this SAP tenant."
-      : "SAP returned HTML instead of JSON. Check SAP_BASE_URL / SAP_SERVICE_PATH and that the user has access to this OData service.",
-  );
+  const mentionsCommUser =
+    /communication\s+arrangement|communication\s+user|communication\s+system/i.test(
+      bodyStr,
+    );
+
+  let message;
+  if (isAuthRedirect && mentionsCommUser) {
+    message =
+      "SAP rejected the login: this tenant requires a Communication User. Your current SAP_USER appears to be a dialog/IDP user.";
+  } else if (isAuthRedirect) {
+    message =
+      "SAP redirected to login (OAuth/SAML/IDP). Your SAP_USER appears to be a dialog/IDP user — ABAP Environment tenants reject Basic auth from these.";
+  } else {
+    message =
+      "SAP returned HTML instead of JSON. Check SAP_BASE_URL / SAP_SERVICE_PATH and that the user has access to this OData service.";
+  }
+
+  const err = new Error(message);
   err.code = isAuthRedirect ? "sap_auth_redirect" : "sap_non_json_response";
   err.sapStatus = 502;
   err.sapBody = bodyStr.slice(0, 500);
-  err.hint = isAuthRedirect
-    ? "Your SAP_USER appears to be a dialog/IDP user. ABAP Environment (Steampunk) tenants reject Basic auth from regular BTP users. Fix: (1) create a Communication User via Communication Arrangement in SAP and put its credentials in middleware/.env as SAP_USER/SAP_PASSWORD with SAP_AUTH_MODE=basic; OR (2) switch the Communication Arrangement to OAuth 2.0 and set SAP_AUTH_MODE=oauth_cc with SAP_OAUTH_TOKEN_URL/SAP_OAUTH_CLIENT_ID/SAP_OAUTH_CLIENT_SECRET. Then restart `node server.js`."
-    : "Verify SAP_BASE_URL and SAP_SERVICE_PATH in middleware/.env match a valid OData v4 service the user can access.";
+
+  if (isAuthRedirect) {
+    err.hint =
+      "Create a Communication User in SAP (Option A) or switch to OAuth 2.0 client credentials (Option B), then update middleware/.env and restart.";
+    err.fixSteps = [
+      {
+        title: "Option A — Communication User + Basic auth (recommended)",
+        steps: [
+          "In SAP Fiori, open 'Maintain Communication Users' → New. Create e.g. GATE_COMM_USER with a strong password.",
+          "Open 'Communication Systems' → New. Set host to your SAP host and assign the Communication User above for inbound.",
+          "Open 'Communication Arrangements' → New. Pick the scenario exposing ZUI_GATE_SERVICE and assign the Communication System.",
+          "In middleware/.env set SAP_AUTH_MODE=basic, SAP_USER=GATE_COMM_USER, SAP_PASSWORD=<password>.",
+          "Restart `node server.js`.",
+        ],
+      },
+      {
+        title: "Option B — OAuth 2.0 client credentials",
+        steps: [
+          "In the Communication Arrangement, switch the Inbound auth method to OAuth 2.0.",
+          "Copy the generated Token Endpoint, Client ID, and Client Secret.",
+          "In middleware/.env set SAP_AUTH_MODE=oauth_cc, SAP_OAUTH_TOKEN_URL=<token endpoint>, SAP_OAUTH_CLIENT_ID=<id>, SAP_OAUTH_CLIENT_SECRET=<secret>.",
+          "Restart `node server.js`.",
+        ],
+      },
+    ];
+  } else {
+    err.hint =
+      "Verify SAP_BASE_URL and SAP_SERVICE_PATH in middleware/.env match a valid OData v4 service the user can access.";
+  }
   return err;
 }
 

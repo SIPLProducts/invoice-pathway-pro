@@ -27,6 +27,7 @@ router.get("/sap", async (req, res) => {
       code: e.code || "sap_error",
       message: e.message,
       hint: e.hint || null,
+      fixSteps: e.fixSteps || null,
       usedBrowserSession: Boolean(cookies),
     });
   }

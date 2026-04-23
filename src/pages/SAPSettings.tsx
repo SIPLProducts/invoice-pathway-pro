@@ -28,6 +28,9 @@ import {
   Monitor,
   Activity,
   KeyRound,
+  AlertTriangle,
+  HelpCircle,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSapApis, deleteApi, type SapMethod } from "@/lib/sapApisStore";
@@ -47,11 +50,21 @@ function formatNextSync(lastSync: string | undefined, frequencyMinutes: number) 
   return `+${frequencyMinutes} min after last`;
 }
 
+type FixStep = { title: string; steps: string[] };
+type AuthError = {
+  code: string;
+  message: string;
+  hint?: string | null;
+  fixSteps?: FixStep[] | null;
+};
+
 export default function SAPSettings() {
   const apis = useSapApis();
   const [tab, setTab] = useState("apis");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const [authError, setAuthError] = useState<AuthError | null>(null);
+  const [troubleshootOpen, setTroubleshootOpen] = useState(false);
 
 
   const testSapConnection = async () => {
@@ -78,13 +91,23 @@ export default function SAPSettings() {
         toast.success(
           `SAP OK (auth: ${eff}${fallback}${data.user ? `, user: ${data.user}` : ""}) — rows: ${data.rows}`,
         );
+        setAuthError(null);
       } else {
-        toast.error(
-          `${data?.code || "sap_error"}: ${data?.message || `HTTP ${res.status}`}${
-            data?.hint ? `\n\nFix: ${data.hint}` : ""
-          }`,
-          { duration: 12000 },
-        );
+        const code: string = data?.code || "sap_error";
+        const message: string = data?.message || `HTTP ${res.status}`;
+        const fixSteps: FixStep[] | null = Array.isArray(data?.fixSteps) ? data.fixSteps : null;
+        if (code === "sap_auth_redirect" || fixSteps) {
+          setAuthError({ code, message, hint: data?.hint, fixSteps });
+          toast.error(`${code}: see the resolution card on this page for fix steps.`, {
+            duration: 8000,
+          });
+        } else {
+          setAuthError(null);
+          toast.error(
+            `${code}: ${message}${data?.hint ? `\n\nFix: ${data.hint}` : ""}`,
+            { duration: 12000 },
+          );
+        }
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
@@ -282,6 +305,130 @@ export default function SAPSettings() {
                 {" "}<code className="font-mono">auth=basic_stateless</code>, or
                 {" "}<code className="font-mono">auth=oauth_cc</code>.
               </p>
+            </div>
+
+            {authError && (
+              <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-5">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-md bg-destructive/15 p-2">
+                      <AlertTriangle className="h-5 w-5 text-destructive" />
+                    </div>
+                    <div>
+                      <div className="font-display font-semibold text-destructive">
+                        SAP authentication failed ({authError.code})
+                      </div>
+                      <p className="mt-1 max-w-3xl text-sm text-foreground/80">
+                        {authError.message}
+                      </p>
+                      {authError.hint && (
+                        <p className="mt-2 max-w-3xl text-xs text-muted-foreground">
+                          {authError.hint}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setAuthError(null)}
+                    aria-label="Dismiss error"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {authError.fixSteps && authError.fixSteps.length > 0 && (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {authError.fixSteps.map((fix, i) => (
+                      <div key={i} className="rounded-lg border bg-card p-4">
+                        <div className="mb-2 text-sm font-semibold text-foreground">
+                          {fix.title}
+                        </div>
+                        <ol className="list-decimal space-y-1.5 pl-5 text-xs text-muted-foreground">
+                          {fix.steps.map((s, j) => (
+                            <li key={j}>{s}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="rounded-xl border bg-muted/30 p-5">
+              <button
+                type="button"
+                onClick={() => setTroubleshootOpen((v) => !v)}
+                className="flex w-full items-center justify-between gap-3 text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <HelpCircle className="h-5 w-5 text-primary" />
+                  <span className="font-display font-semibold">
+                    Auth troubleshooting — Steampunk / ABAP Environment tenants
+                  </span>
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  {troubleshootOpen ? "Hide" : "Show"}
+                </Badge>
+              </button>
+              {troubleshootOpen && (
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-lg border bg-card p-4">
+                    <div className="mb-2 text-sm font-semibold">
+                      Option A — Communication User + Basic auth (recommended)
+                    </div>
+                    <ol className="list-decimal space-y-1.5 pl-5 text-xs text-muted-foreground">
+                      <li>
+                        In SAP Fiori, open <span className="font-semibold text-foreground">Maintain Communication Users</span> → New. Create e.g. <code className="font-mono">GATE_COMM_USER</code>.
+                      </li>
+                      <li>
+                        Open <span className="font-semibold text-foreground">Communication Systems</span> → New. Set host to your SAP host and assign the Communication User above for inbound.
+                      </li>
+                      <li>
+                        Open <span className="font-semibold text-foreground">Communication Arrangements</span> → New. Pick the scenario exposing <code className="font-mono">ZUI_GATE_SERVICE</code> and assign the Communication System.
+                      </li>
+                      <li>
+                        In <code className="font-mono">middleware/.env</code> set{" "}
+                        <code className="font-mono">SAP_AUTH_MODE=basic</code>,{" "}
+                        <code className="font-mono">SAP_USER=GATE_COMM_USER</code>,{" "}
+                        <code className="font-mono">SAP_PASSWORD=&lt;password&gt;</code>.
+                      </li>
+                      <li>
+                        Restart <code className="font-mono">node server.js</code>.
+                      </li>
+                    </ol>
+                  </div>
+                  <div className="rounded-lg border bg-card p-4">
+                    <div className="mb-2 text-sm font-semibold">
+                      Option B — OAuth 2.0 client credentials
+                    </div>
+                    <ol className="list-decimal space-y-1.5 pl-5 text-xs text-muted-foreground">
+                      <li>
+                        In the Communication Arrangement, switch the Inbound auth method to <span className="font-semibold text-foreground">OAuth 2.0</span>.
+                      </li>
+                      <li>
+                        Copy the generated <span className="font-semibold text-foreground">Token Endpoint</span>, <span className="font-semibold text-foreground">Client ID</span>, and <span className="font-semibold text-foreground">Client Secret</span>.
+                      </li>
+                      <li>
+                        In <code className="font-mono">middleware/.env</code> set{" "}
+                        <code className="font-mono">SAP_AUTH_MODE=oauth_cc</code>,{" "}
+                        <code className="font-mono">SAP_OAUTH_TOKEN_URL=…</code>,{" "}
+                        <code className="font-mono">SAP_OAUTH_CLIENT_ID=…</code>,{" "}
+                        <code className="font-mono">SAP_OAUTH_CLIENT_SECRET=…</code>.
+                      </li>
+                      <li>
+                        Restart <code className="font-mono">node server.js</code>.
+                      </li>
+                    </ol>
+                  </div>
+                  <div className="md:col-span-2 rounded-lg border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground">
+                    💡 Why? ABAP Environment (Steampunk) tenants reject Basic auth from dialog/IDP users (email-style BTP logins). They only accept Communication Users or OAuth 2.0 client credentials issued through a Communication Arrangement.
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end">

@@ -175,14 +175,54 @@ function withClient(path) {
   return path + (path.includes("?") ? "&" : "?") + `sap-client=${SAP_CLIENT}`;
 }
 
+/**
+ * Returns true if this error indicates the SAP session cookies are invalid/expired
+ * and we should attempt a silent middleware re-login.
+ * Triggered when:
+ *  - we used cached middleware cookies (not caller-supplied), AND
+ *  - SAP responded with the auth-redirect / expired-session marker.
+ */
+function shouldAutoRelogin(err, cookieSource) {
+  if (cookieSource !== "cache") return false;
+  return err?.code === "sap_session_expired" || err?.code === "sap_auth_redirect";
+}
+
 async function sapGet(path, extraCookies = "") {
-  const cfg = buildRequestConfig(extraCookies);
-  let res = await http.get(withClient(path), cfg);
+  let cfg = buildRequestConfig(extraCookies);
+  const cookieSource = cfg.__cookieSource;
+  logSapCall({ method: "GET", path, source: cookieSource || "none" });
+
+  const send = () => http.get(withClient(path), cfg);
+  let res = await send();
   if (res.status === 401 && useOauthCc) {
     cachedToken = null;
-    res = await http.get(withClient(path), cfg);
+    res = await send();
   }
-  ensureJson(res, `GET ${path}`, Boolean(extraCookies));
+  try {
+    ensureJson(res, `GET ${path}`, Boolean(cfg.headers.Cookie));
+  } catch (err) {
+    if (shouldAutoRelogin(err, cookieSource)) {
+      logAutoRelogin("GET", path);
+      const ok = await tryAutoRelogin();
+      if (ok) {
+        cfg = buildRequestConfig(extraCookies);
+        res = await http.get(withClient(path), cfg);
+        try {
+          ensureJson(res, `GET ${path}`, Boolean(cfg.headers.Cookie));
+          if (res.status < 400) {
+            logRetry("GET", path, true);
+            return res.data;
+          }
+        } catch (retryErr) {
+          logRetry("GET", path, false);
+          throw retryErr;
+        }
+      } else {
+        logRetry("GET", path, false);
+      }
+    }
+    throw err;
+  }
   if (res.status >= 400) {
     throw fromAxios({ message: `GET ${path} failed`, response: res });
   }
@@ -195,6 +235,7 @@ async function sapWrite(method, path, body, extraHeaders = {}, extraCookies = ""
   // throws CX_SXML_PARSE_ERROR).
   const serialized = body === undefined || body === null ? undefined : JSON.stringify(body);
 
+  let lastCookieSource = null;
   const doRequest = async () => {
     const token = await ensureCsrf(false, extraCookies);
     const cfg = buildRequestConfig(extraCookies, {
@@ -205,6 +246,7 @@ async function sapWrite(method, path, body, extraHeaders = {}, extraCookies = ""
       "Content-Type": "application/json",
       Accept: "application/json",
     });
+    lastCookieSource = cfg.__cookieSource;
     return http.request({
       method,
       url: withClient(path),
@@ -214,6 +256,7 @@ async function sapWrite(method, path, body, extraHeaders = {}, extraCookies = ""
     });
   };
 
+  logSapCall({ method, path, source: "pending" });
   let res = await doRequest();
   if (res.status === 401 && useOauthCc) {
     cachedToken = null;
@@ -226,7 +269,31 @@ async function sapWrite(method, path, body, extraHeaders = {}, extraCookies = ""
     csrfToken = null;
     res = await doRequest();
   }
-  ensureJson(res, `${method} ${path}`, Boolean(extraCookies));
+  try {
+    ensureJson(res, `${method} ${path}`, true);
+  } catch (err) {
+    if (shouldAutoRelogin(err, lastCookieSource)) {
+      logAutoRelogin(method, path);
+      const ok = await tryAutoRelogin();
+      if (ok) {
+        csrfToken = null; // CSRF tied to old session
+        res = await doRequest();
+        try {
+          ensureJson(res, `${method} ${path}`, true);
+          if (res.status < 400) {
+            logRetry(method, path, true);
+            return res.data;
+          }
+        } catch (retryErr) {
+          logRetry(method, path, false);
+          throw retryErr;
+        }
+      } else {
+        logRetry(method, path, false);
+      }
+    }
+    throw err;
+  }
   if (res.status >= 400) {
     throw fromAxios({ message: `${method} ${path} failed`, response: res });
   }
@@ -234,6 +301,7 @@ async function sapWrite(method, path, body, extraHeaders = {}, extraCookies = ""
 }
 
 async function sapBatch(multipartBody, boundary, extraCookies = "") {
+  let lastCookieSource = null;
   const doRequest = async () => {
     const token = await ensureCsrf(false, extraCookies);
     const cfg = buildRequestConfig(extraCookies, {
@@ -241,6 +309,7 @@ async function sapBatch(multipartBody, boundary, extraCookies = "") {
       "Content-Type": `multipart/mixed; boundary=${boundary}`,
       Accept: "multipart/mixed",
     });
+    lastCookieSource = cfg.__cookieSource;
     return http.request({
       method: "POST",
       url: withClient(`/$batch`),
@@ -250,6 +319,7 @@ async function sapBatch(multipartBody, boundary, extraCookies = "") {
     });
   };
 
+  logSapCall({ method: "POST", path: "/$batch", source: "pending" });
   let res = await doRequest();
   if (res.status === 401 && useOauthCc) {
     cachedToken = null;
@@ -259,7 +329,31 @@ async function sapBatch(multipartBody, boundary, extraCookies = "") {
     csrfToken = null;
     res = await doRequest();
   }
-  ensureJson(res, "$batch", Boolean(extraCookies));
+  try {
+    ensureJson(res, "$batch", true);
+  } catch (err) {
+    if (shouldAutoRelogin(err, lastCookieSource)) {
+      logAutoRelogin("POST", "/$batch");
+      const ok = await tryAutoRelogin();
+      if (ok) {
+        csrfToken = null;
+        res = await doRequest();
+        try {
+          ensureJson(res, "$batch", true);
+          if (res.status < 400) {
+            logRetry("POST", "/$batch", true);
+            return res.data;
+          }
+        } catch (retryErr) {
+          logRetry("POST", "/$batch", false);
+          throw retryErr;
+        }
+      } else {
+        logRetry("POST", "/$batch", false);
+      }
+    }
+    throw err;
+  }
   if (res.status >= 400) {
     throw fromAxios({ message: `$batch failed`, response: res });
   }

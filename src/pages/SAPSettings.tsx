@@ -140,10 +140,14 @@ export default function SAPSettings() {
           `SAP OK (auth: ${eff}${fallback}${data.user ? `, user: ${data.user}` : ""}) — rows: ${data.rows}`,
         );
         setAuthError(null);
+        markSapSessionActive();
       } else {
         const code: string = data?.code || "sap_error";
         const message: string = data?.message || `HTTP ${res.status}`;
         const fixSteps: FixStep[] | null = Array.isArray(data?.fixSteps) ? data.fixSteps : null;
+        if (res.status === 401 || res.status === 403 || code === "sap_auth_redirect") {
+          markSapSessionExpired();
+        }
         if (code === "sap_auth_redirect" || fixSteps) {
           setAuthError({ code, message, hint: data?.hint, fixSteps });
           toast.error(`${code}: see the resolution card on this page for fix steps.`, {

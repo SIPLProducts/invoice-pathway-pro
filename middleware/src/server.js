@@ -76,6 +76,7 @@ app.use((err, _req, res, _next) => {
         err.message || "Unknown error",
         err.sapBody,
         err.hint,
+        err.fixSteps,
       ),
     );
 });

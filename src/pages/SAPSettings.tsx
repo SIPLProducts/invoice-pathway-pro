@@ -28,22 +28,11 @@ import {
   Monitor,
   Activity,
   KeyRound,
-  ChevronDown,
-  ChevronRight,
-  Save,
-  Eraser,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSapApis, deleteApi, type SapMethod } from "@/lib/sapApisStore";
 import { AddApiDialog } from "@/components/AddApiDialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  useSapSession,
-  setSapSession,
-  clearSapSession,
-  getSapSessionHeaders,
-} from "@/lib/sapSession";
+import { getSapSessionHeaders } from "@/lib/sapSession";
 
 const methodColor: Record<SapMethod, string> = {
   GET: "bg-success/15 text-success border-success/30",

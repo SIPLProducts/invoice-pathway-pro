@@ -28,6 +28,9 @@ import {
   Monitor,
   Activity,
   KeyRound,
+  AlertTriangle,
+  HelpCircle,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSapApis, deleteApi, type SapMethod } from "@/lib/sapApisStore";

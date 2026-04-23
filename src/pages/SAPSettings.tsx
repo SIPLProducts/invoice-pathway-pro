@@ -321,37 +321,152 @@ export default function SAPSettings() {
                 <div className="flex items-center gap-2">
                   <KeyRound className="h-5 w-5 text-success" />
                   <span className="font-display font-semibold">SAP Browser Session</span>
-                  <Badge
-                    variant="outline"
-                    className="border-success/40 bg-success/10 text-success"
-                  >
-                    Auto-managed
-                  </Badge>
+                  {session.mode === "auto" ? (
+                    <Badge
+                      variant="outline"
+                      className="border-success/40 bg-success/10 text-success"
+                    >
+                      Auto-managed
+                    </Badge>
+                  ) : manualCookiesActive ? (
+                    <Badge
+                      variant="outline"
+                      className="border-warning/40 bg-warning/10 text-warning"
+                    >
+                      Manual cookies
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-muted-foreground">
+                      Manual — not set
+                    </Badge>
+                  )}
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={testSapConnection}
-                  disabled={testing}
-                >
-                  <Activity className="h-4 w-4" />
-                  {testing ? "Testing…" : "Test connection"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex rounded-md border bg-card p-0.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setSapSessionMode("auto")}
+                      className={`rounded px-3 py-1 font-medium transition-colors ${
+                        session.mode === "auto"
+                          ? "bg-success/15 text-success"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Auto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSapSessionMode("manual")}
+                      className={`rounded px-3 py-1 font-medium transition-colors ${
+                        session.mode === "manual"
+                          ? "bg-warning/15 text-warning"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Manual
+                    </button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={testSapConnection}
+                    disabled={testing}
+                  >
+                    <Activity className="h-4 w-4" />
+                    {testing ? "Testing…" : "Test connection"}
+                  </Button>
+                </div>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                SAP authentication is handled automatically by the middleware. Depending on your
-                tenant, it will use a stateful cookie session (JSESSIONID / __VCAP_ID__),
-                stateless Basic auth (per-request, when the tenant does not issue cookies), or
-                OAuth client credentials. Credentials and mode come from{" "}
-                <code className="rounded bg-muted px-1 font-mono">middleware/.env</code>. Watch
-                the middleware terminal for per-call auth logs
-                (<code className="rounded bg-muted px-1 font-mono">[SAP] …</code>) — they show
-                whether each request used <code className="font-mono">auth=basic</code>,
-                {" "}<code className="font-mono">auth=basic_stateless</code>, or
-                {" "}<code className="font-mono">auth=oauth_cc</code>.
-              </p>
+
+              {session.mode === "auto" ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  SAP authentication is handled automatically by the middleware. Depending on your
+                  tenant, it will use a stateful cookie session (JSESSIONID / __VCAP_ID__),
+                  stateless Basic auth (per-request, when the tenant does not issue cookies), or
+                  OAuth client credentials. Credentials and mode come from{" "}
+                  <code className="rounded bg-muted px-1 font-mono">middleware/.env</code>. Watch
+                  the middleware terminal for per-call auth logs
+                  (<code className="rounded bg-muted px-1 font-mono">[SAP] …</code>) — they show
+                  whether each request used <code className="font-mono">auth=basic</code>,
+                  {" "}<code className="font-mono">auth=basic_stateless</code>, or
+                  {" "}<code className="font-mono">auth=oauth_cc</code>.
+                </p>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Paste cookies from a logged-in SAP browser tab. In DevTools open{" "}
+                    <span className="font-semibold text-foreground">
+                      Application → Cookies → your SAP host
+                    </span>{" "}
+                    and copy the values of{" "}
+                    <code className="rounded bg-muted px-1 font-mono">JSESSIONID</code> and{" "}
+                    <code className="rounded bg-muted px-1 font-mono">__VCAP_ID__</code>. They will
+                    be forwarded with every SAP call until you clear them.
+                  </p>
+
+                  {manualCookiesActive && (
+                    <div className="rounded-md border bg-card px-3 py-2 text-xs">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                        <span className="text-muted-foreground">Saved {formatRelative(session.savedAt)}</span>
+                        <span className="font-mono">
+                          JSESSIONID: <span className="text-foreground">{maskCookie(session.jsessionid)}</span>
+                        </span>
+                        <span className="font-mono">
+                          __VCAP_ID__: <span className="text-foreground">{maskCookie(session.vcapId)}</span>
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="sap-jsessionid" className="text-xs">
+                        JSESSIONID
+                      </Label>
+                      <Input
+                        id="sap-jsessionid"
+                        value={jsessionInput}
+                        onChange={(e) => setJsessionInput(e.target.value)}
+                        placeholder="paste cookie value"
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="sap-vcapid" className="text-xs">
+                        __VCAP_ID__
+                      </Label>
+                      <Input
+                        id="sap-vcapid"
+                        value={vcapInput}
+                        onChange={(e) => setVcapInput(e.target.value)}
+                        placeholder="paste cookie value"
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" onClick={handleSaveManual} className="gap-2">
+                      Save cookies
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleClearManual}
+                      disabled={!manualCookiesActive && !session.jsessionid && !session.vcapId}
+                    >
+                      Clear
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Switching back to <span className="font-semibold text-foreground">Auto</span> restores
+                      middleware-managed login.
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
+
 
             {authError && (
               <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-5">

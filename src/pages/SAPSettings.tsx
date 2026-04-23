@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,8 @@ import {
   ChevronRight,
   Save,
   Eraser,
+  LogIn,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSapApis, deleteApi, type SapMethod } from "@/lib/sapApisStore";
@@ -43,6 +45,10 @@ import {
   setSapSession,
   clearSapSession,
   getSapSessionHeaders,
+  loginToSapDynamic,
+  refreshSapSessionStatus,
+  logoutSapDynamic,
+  type SapMiddlewareSessionStatus,
 } from "@/lib/sapSession";
 
 const methodColor: Record<SapMethod, string> = {

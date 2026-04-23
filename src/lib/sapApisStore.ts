@@ -251,8 +251,27 @@ function load(): SapApi[] {
     if (!raw) return seed;
     const parsed = JSON.parse(raw) as SapApi[];
     if (!Array.isArray(parsed) || parsed.length === 0) return seed;
+
+    // One-time cleanup: remove deprecated default APIs without resetting other edits.
+    const CLEANUP_FLAG = "dmr.sapApis.cleanup.v1";
+    const REMOVED_NAMES = new Set([
+      "SAP_343_Blocked_To_Unrestricted",
+      "SAP_344_Unrestricted_To_Blocked",
+      "MB52_Stock_Report",
+    ]);
+    let cleaned = parsed;
+    if (!localStorage.getItem(CLEANUP_FLAG)) {
+      cleaned = parsed.filter((a) => !REMOVED_NAMES.has(a.name));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+        localStorage.setItem(CLEANUP_FLAG, "1");
+      } catch {
+        /* ignore quota */
+      }
+    }
+
     // Merge: ensure ZUI_Gate_Service has field schemas (in case older cached version)
-    return parsed.map((a) => {
+    return cleaned.map((a) => {
       if (a.name === "ZUI_Gate_Service" && !a.requestHeaderFields) {
         return { ...seed.find((s) => s.name === "ZUI_Gate_Service")!, ...a, requestHeaderFields: GATE_HEADER_REQUEST, requestItemFields: GATE_ITEM_REQUEST, responseHeaderFields: GATE_HEADER_RESPONSE, responseItemFields: GATE_ITEM_RESPONSE };
       }

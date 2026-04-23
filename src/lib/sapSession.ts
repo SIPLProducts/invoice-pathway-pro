@@ -99,3 +99,99 @@ function subscribe(cb: () => void) {
 export function useSapSession(): SapSession | null {
   return useSyncExternalStore(subscribe, getSapSession, () => null);
 }
+
+// ----------------------------------------------------------------------------
+// Dynamic middleware-managed SAP login (auto session)
+// ----------------------------------------------------------------------------
+
+export interface SapMiddlewareSessionStatus {
+  ok?: boolean;
+  active: boolean;
+  hasEnvCredentials: boolean;
+  sapUser?: string | null;
+  savedAt?: string;
+  expiresAt?: string;
+  remainingMs?: number;
+  jsessionidPreview?: string | null;
+  vcapIdPreview?: string | null;
+}
+
+function trimSlash(u: string) {
+  return u.replace(/\/$/, "");
+}
+
+/** POST {middlewareUrl}/api/sap-session/login — uses .env creds by default. */
+export async function loginToSapDynamic(
+  middlewareUrl: string,
+  body?: { user?: string; password?: string },
+): Promise<SapMiddlewareSessionStatus> {
+  const base = trimSlash(middlewareUrl);
+  const res = await fetch(`${base}/api/sap-session/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "ngrok-skip-browser-warning": "true",
+    },
+    body: JSON.stringify(body || {}),
+  });
+  const data = (await res.json().catch(() => null)) as
+    | (SapMiddlewareSessionStatus & { code?: string; message?: string; hint?: string })
+    | null;
+  if (!res.ok || !data?.ok) {
+    const err = new Error(
+      data?.message || `Login failed (HTTP ${res.status})`,
+    ) as Error & { code?: string; hint?: string };
+    err.code = data?.code;
+    err.hint = data?.hint;
+    throw err;
+  }
+
+  // Mirror the session into the browser store so existing UI keeps working.
+  // The middleware now manages cookies on its own — the browser-stored
+  // values here are just previews used by the badge / table UI.
+  setSapSession({
+    jsessionid: data.jsessionidPreview || "auto",
+    vcapId: data.vcapIdPreview || "auto",
+    source: "dynamic",
+    expiresAt: data.expiresAt,
+    sapUser: data.sapUser ?? undefined,
+  });
+  return data;
+}
+
+/** GET {middlewareUrl}/api/sap-session/status */
+export async function refreshSapSessionStatus(
+  middlewareUrl: string,
+): Promise<SapMiddlewareSessionStatus | null> {
+  try {
+    const base = trimSlash(middlewareUrl);
+    const res = await fetch(`${base}/api/sap-session/status`, {
+      headers: {
+        Accept: "application/json",
+        "ngrok-skip-browser-warning": "true",
+      },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as SapMiddlewareSessionStatus;
+  } catch {
+    return null;
+  }
+}
+
+/** POST {middlewareUrl}/api/sap-session/logout — also clears the local mirror. */
+export async function logoutSapDynamic(middlewareUrl: string): Promise<void> {
+  try {
+    const base = trimSlash(middlewareUrl);
+    await fetch(`${base}/api/sap-session/logout`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "ngrok-skip-browser-warning": "true",
+      },
+    });
+  } finally {
+    clearSapSession();
+  }
+}
+

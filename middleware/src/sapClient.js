@@ -5,6 +5,8 @@ const qs = require("querystring");
 const { CookieJar } = require("tough-cookie");
 const { wrapper } = require("axios-cookiejar-support");
 const { fromAxios, detectAuthHtml } = require("./util/errors");
+const sapSessionStore = require("./sapSessionStore");
+const { logSapCall, logLoginResult, logRetry, logAutoRelogin } = require("./util/sessionLog");
 
 const {
   SAP_BASE_URL,

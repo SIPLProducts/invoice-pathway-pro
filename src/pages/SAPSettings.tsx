@@ -43,6 +43,8 @@ import {
   setSapSession,
   clearSapSession,
   setSapSessionMode,
+  markSapSessionActive,
+  markSapSessionExpired,
 } from "@/lib/sapSession";
 
 const methodColor: Record<SapMethod, string> = {

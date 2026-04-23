@@ -7,7 +7,6 @@ const morgan = require("morgan");
 
 const gateRoutes = require("./routes/gate");
 const healthRoutes = require("./routes/health");
-const sapSessionRoutes = require("./routes/sapSession");
 const { errorEnvelope } = require("./util/errors");
 
 const PORT = Number(process.env.PORT || 8080);
@@ -57,7 +56,6 @@ app.use(
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "sap-gate-proxy" }));
 
 app.use("/api/health", healthRoutes);
-app.use("/api/sap-session", sapSessionRoutes);
 app.use("/api/gate", gateRoutes);
 
 // 404

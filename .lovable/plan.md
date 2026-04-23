@@ -1,92 +1,56 @@
 
 
-## Plan: Dynamic SAP Browser Session + per-API session lifetime logging
+## Plan: Wire "GET DMR LIST" to the SAP Gate Entries tab + remove 3 unwanted APIs (no storage reset)
 
-### Part 1 — Dynamic auto-login (same as the previously approved plan)
+### What you want
+1. Keep the **GET DMR LIST** API you just added in API Settings — do not remove it, do not reset it.
+2. Make the **SAP Gate Entries** tab on Daily Material Receipts use that GET DMR LIST API.
+3. Permanently remove `SAP_343_Blocked_To_Unrestricted`, `SAP_344_Unrestricted_To_Blocked`, `MB52_Stock_Report` from API Settings without wiping any of your other edits.
 
-**Backend (middleware):**
-- **New** `middleware/src/sapSessionStore.js` — in-memory cache `{ jsessionid, vcapId, savedAt, expiresAt, sapUser }`.
-  - `loginToSap({ user, password })`: `GET /GateHeader?$top=0&sap-client=...` with Basic auth, parses `set-cookie`, stores `JSESSIONID` + `__VCAP_ID__`, sets `expiresAt = now + 4h`.
-  - `getCachedCookies()` → cookie string or `null` if missing/expired.
-  - `clearSession()`.
-- **New** `middleware/src/routes/sapSession.js`:
-  - `POST /api/sap-session/login` — uses `.env` credentials by default; body can override.
-  - `GET /api/sap-session/status` — returns previews + timestamps.
-  - `POST /api/sap-session/logout` — clears cache.
-- **Update** `middleware/src/server.js` — mount the new route.
-- **Update** `middleware/src/sapClient.js`:
-  - `buildRequestConfig` falls back to `sapSessionStore.getCachedCookies()` when caller didn't pass cookies.
-  - On `sap_session_expired` from `ensureJson`, auto-call `loginToSap` once and retry; if it still fails, surface the original error.
-  - Caller-supplied `x-sap-jsessionid` / `x-sap-vcap-id` always wins (manual paste fallback preserved).
+### Approach (no `STORAGE_KEY` bump — your edits and your GET DMR LIST stay intact)
 
-**Frontend:**
-- **Update** `src/lib/sapSession.ts` — add `loginToSapDynamic({ user?, password? })`, `refreshSapSessionStatus()`. Keep `setSapSession` for manual paste.
-- **Update** `src/pages/SAPSettings.tsx` — replace JSESSIONID/__VCAP_ID__ paste block with:
-  - Primary **"Login to SAP"** button (uses middleware `.env` creds).
-  - Optional **"Use different credentials"** disclosure (sent only on the request, never persisted in browser).
-  - Display: `JSESSIONID` preview, `__VCAP_ID__` preview, **Saved at**, **Expires at**, **Time remaining**.
-  - Buttons: **Re-login**, **Clear session**.
-  - Old manual paste UI moved into a collapsed **"Advanced — paste cookies manually"** accordion.
-- **Update** `src/App.tsx` — silent auto-login on app start if no cached session and middleware reports `.env` creds present.
+**1. `src/lib/sapApisStore.ts`**
+- Remove the 3 unwanted entries from the in-memory `seed` array so they never come back on a fresh install.
+- Add a tiny one-time **migration** inside `load()` (keyed by a separate flag like `dmr.sapApis.cleanup.v1` in `localStorage`) that:
+  - deletes any stored entries named `SAP_343_Blocked_To_Unrestricted`, `SAP_344_Unrestricted_To_Blocked`, `MB52_Stock_Report`,
+  - writes the cleaned list back,
+  - sets the flag so it only runs once.
+- Does **not** touch `STORAGE_KEY`. Your `GET DMR LIST` API and all other edits remain untouched.
 
-### Part 2 — Per-API session lifetime logging in middleware (the new ask)
+**2. `src/pages/DMRList.tsx` — SAP Gate Entries tab selection**
+- Update the `liveApis` filter to prefer `GET DMR LIST` (your new API) when present, falling back to the existing gate-service match:
+  ```ts
+  const liveApis = apis.filter((a) => {
+    if (a.method !== "GET" || a.status !== "Active") return false;
+    const hay = `${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`.toLowerCase();
+    return /get[ _-]?dmr|dmr[ _-]?list|gate(header|service)/.test(hay);
+  });
+  // Prefer an explicit "GET DMR LIST" match if present
+  const selectedApi =
+    liveApis.find((a) => /get[ _-]?dmr[ _-]?list/i.test(a.name)) ??
+    liveApis[0] ??
+    null;
+  ```
+- Update the empty-state hint to mention `GET DMR LIST`.
 
-Add a tiny logging helper in `middleware/src/sapClient.js` that runs on **every** outgoing SAP call (`sapGet`, `sapWrite`, `sapBatch`) and emits a single, easy-to-grep line like:
-
-```
-[SAP] GET  /GateHeader?$top=20      session=ACTIVE   savedAt=2026-04-23T06:11:39.000Z   expiresAt=2026-04-23T10:11:39.000Z   remaining=3h59m   jsess=s%3A5pRr…   vcap=d275984a…
-[SAP] POST /GateHeader               session=ACTIVE   savedAt=…   expiresAt=…             remaining=3h12m   jsess=…   vcap=…
-[SAP] GET  /GateHeader?$top=0        session=NONE                                       (login attempt)
-[SAP] LOGIN ok user=GANGADHARV       savedAt=2026-04-23T06:11:39.000Z   expiresAt=2026-04-23T10:11:39.000Z   ttl=4h
-[SAP] GET  /GateHeader?$top=20      session=EXPIRED  savedAt=…   expiresAt=…             remaining=-12m   → auto re-login
-[SAP] LOGIN ok user=GANGADHARV       savedAt=…   expiresAt=…   ttl=4h
-[SAP] GET  /GateHeader?$top=20      retry=ok
-```
-
-**Implementation details:**
-- **New** `middleware/src/util/sessionLog.js` exporting `logSapCall({ method, path, source })`:
-  - Reads `sapSessionStore.getStatus()` → `{ jsessionid, vcapId, savedAt, expiresAt }`.
-  - Computes `remaining = expiresAt - now` formatted as `XhYm` / `Ym` / `Xs`.
-  - Marks session as `NONE` (no cache), `EXPIRED` (expiresAt < now), or `ACTIVE`.
-  - Masks cookies to first 8 chars + `…` so logs are safe to share.
-- Call `logSapCall(...)` at the **start** of `sapGet`, `sapWrite`, `sapBatch` in `middleware/src/sapClient.js`.
-- Also log on `sapSessionStore.loginToSap` success/failure with `LOGIN ok` / `LOGIN fail reason=...` and the new `expiresAt` + `ttl=4h`.
-- On the auto-retry path (after `sap_session_expired` triggers re-login), log `→ auto re-login` and then `retry=ok|fail`.
-- Respect existing `morgan` logger — these lines go via `console.log` so they appear alongside `morgan` output without changing its format.
-- Add an env toggle `SAP_SESSION_LOG=1` (default on); set `0` to silence if needed.
-
-### Part 3 — UI surfacing of session lifetime
-
-In `src/pages/SAPSettings.tsx`, the **"SAP Browser Session"** card will show a small live readout:
-```
-Session: ACTIVE
-Saved at:    2026-04-23 11:41:39
-Expires at:  2026-04-23 15:41:39
-Remaining:   3h 47m
-```
-Polled from `GET /api/sap-session/status` every 30s while the page is open.
-
-### Files to change / add
-- **new** `middleware/src/sapSessionStore.js`
-- **new** `middleware/src/routes/sapSession.js`
-- **new** `middleware/src/util/sessionLog.js`
-- `middleware/src/server.js` — mount route
-- `middleware/src/sapClient.js` — cookie fallback, auto re-login, per-call logging
-- `src/lib/sapSession.ts` — dynamic login + status helpers
-- `src/pages/SAPSettings.tsx` — Login to SAP UI + live session readout + collapsed manual-paste fallback
-- `src/App.tsx` — silent auto-login on app start
+**3. No middleware change.** The proxy/middleware path already handled by `useSapProxy` works for any GET API row, including your `GET DMR LIST`.
 
 ### What stays the same
-- Manual cookie paste still works as a fallback (under "Advanced").
-- `ZUI_Gate_Service`, `Get DMR List`, Submit-to-SAP, `useSapProxy`, `useSapCreate` — untouched.
-- No DB changes.
+- `STORAGE_KEY` is **not** bumped — none of your saved API edits, middleware URLs, pasted cookies, or the new `GET DMR LIST` row are reset.
+- `Create_Gate_Service` (New DMR submit) is untouched.
+- Per-row delete in API Settings still works as before.
 
 ### Caveats
-- Some SAP BTP tenants disallow Basic auth from non-browser clients (forces OAuth/SSO). If that happens, login returns `sap_auth_redirect` and the UI falls back to the manual paste card; long-term fix is OAuth `client_credentials` (already supported in `sapClient.js` via `SAP_AUTH_MODE=oauth_cc`).
-- Session cache is in-memory; restarting the middleware drops it and triggers one auto re-login on the next call.
+- For the GET DMR LIST tab to actually return rows, that API row must have:
+  - `method: GET`, `status: Active`,
+  - a working `proxyPath` (or middleware URL) pointing at the gate header endpoint,
+  - a response schema configured (so columns render). If it was created via "Add API" without response fields, open it in advanced edit and paste a sample response so columns auto-detect — same as `ZUI_Gate_Service`.
+
+### Files to change
+- `src/lib/sapApisStore.ts` — drop the 3 entries from `seed`; add one-time cleanup migration in `load()` keyed by a separate flag.
+- `src/pages/DMRList.tsx` — broaden filter to also match `GET DMR LIST` / `dmr_list`; prefer it as the selected API; update empty-state copy.
 
 ### Expected result
-- One click on **Login to SAP** (or zero clicks if `.env` creds are present and auto-login runs at startup) → session active and self-refreshing.
-- Middleware logs every SAP call with current session state, save time, expiry, and remaining lifetime — easy to verify when re-login fires.
-- SAP Settings page shows the same info live.
+- API Settings: the 3 unwanted APIs are gone (one-time, automatic). `GET DMR LIST` and every other API you configured remain exactly as you left them.
+- DMR → SAP Gate Entries tab: rows are fetched via your `GET DMR LIST` API.
 

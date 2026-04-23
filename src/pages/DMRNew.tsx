@@ -148,7 +148,7 @@ export default function DMRNew() {
       if (code === "sap_no_cookies") {
         toast.error("SAP did not issue session cookies", {
           description:
-            "Set SAP_AUTH_MODE=basic_stateless in middleware/.env and restart the middleware. Or switch to oauth_cc with SAP_OAUTH_* envs.",
+            "The middleware will auto-fallback to stateless Basic auth on the next call. Try Submit again. If it persists, ensure SAP_USER/SAP_PASSWORD are set in middleware/.env, or switch to SAP_AUTH_MODE=oauth_cc.",
           duration: 10000,
         });
       } else {

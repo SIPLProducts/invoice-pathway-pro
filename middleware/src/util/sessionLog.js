@@ -27,17 +27,48 @@ function pad(method) {
   return String(method || "").toUpperCase().padEnd(4, " ");
 }
 
-/** Log a SAP outbound call with current session lifetime info. */
+// Lazy require to avoid circular import at module load.
+function getEffective() {
+  try {
+    const { effectiveAuthMode, getAuthInfo } = require("../sapClient");
+    return {
+      mode: effectiveAuthMode ? effectiveAuthMode() : "basic",
+      info: getAuthInfo ? getAuthInfo() : {},
+    };
+  } catch {
+    return { mode: "basic", info: {} };
+  }
+}
+
+/** Log a SAP outbound call with current auth mode info. */
 function logSapCall({ method, path, phase = "" }) {
   if (!ENABLED) return;
-  const st = sapSessionStore.getStatus();
+  const { mode, info } = getEffective();
   const tail = phase ? `  ${phase}` : "";
+
+  if (mode === "oauth_cc") {
+    console.log(`[SAP] ${pad(method)} ${path}  auth=oauth_cc token=active${tail}`);
+    return;
+  }
+  if (mode === "bearer") {
+    console.log(`[SAP] ${pad(method)} ${path}  auth=bearer${tail}`);
+    return;
+  }
+  if (mode === "basic_stateless") {
+    const src = info.statelessFallback ? "auto-fallback" : "configured";
+    console.log(
+      `[SAP] ${pad(method)} ${path}  auth=basic_stateless source=${src} cookies=none${tail}`,
+    );
+    return;
+  }
+  // basic (stateful cookies)
+  const st = sapSessionStore.getStatus();
   if (st.state === "NONE") {
-    console.log(`[SAP] ${pad(method)} ${path}  session=NONE${tail}`);
+    console.log(`[SAP] ${pad(method)} ${path}  auth=basic session=NONE${tail}`);
     return;
   }
   console.log(
-    `[SAP] ${pad(method)} ${path}  session=${st.state}  savedAt=${st.savedAt}  expiresAt=${st.expiresAt}  remaining=${fmtRemaining(
+    `[SAP] ${pad(method)} ${path}  auth=basic session=${st.state}  savedAt=${st.savedAt}  expiresAt=${st.expiresAt}  remaining=${fmtRemaining(
       st.remainingMs,
     )}  jsess=${st.jsessionidPreview ?? "—"}  vcap=${st.vcapIdPreview ?? "—"}${tail}`,
   );

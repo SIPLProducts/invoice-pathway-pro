@@ -28,11 +28,25 @@ npm install
 npm start
 ```
 
+> **Important:** `.env.example` is only a template. The running server reads
+> `middleware/.env` (or the deployment's environment variables). Editing
+> `.env.example` has no effect — edit `.env` and restart the middleware.
+
 You should see:
 
 ```
 SAP proxy listening on http://localhost:8080
 ```
+
+### Auth modes (`SAP_AUTH_MODE`)
+
+| Mode | When to use |
+|------|-------------|
+| `basic` (default) | Stateful tenants that issue JSESSIONID/__VCAP_ID__ cookies. Middleware logs in once and reuses cookies. **If SAP returns 200 but no cookies, the middleware auto-falls back to `basic_stateless` for the rest of the process.** |
+| `basic_stateless` | Stateless tenants. Sends `Authorization: Basic …` on every request. No cookie cache. |
+| `bearer` | Static `SAP_BEARER_TOKEN`. |
+| `oauth_cc` | OAuth 2.0 client_credentials via a Communication Arrangement. Recommended long-term for ABAP Environment (Steampunk). |
+
 
 Quick test:
 

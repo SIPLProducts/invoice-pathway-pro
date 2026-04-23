@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SapApiSchema } from "@/lib/sapApiSchemas";
 import type { SapApi } from "@/lib/sapApisStore";
 import { getPath } from "@/lib/getPath";
-import { getSapSessionHeaders, useSapSession } from "@/lib/sapSession";
+import {
+  getSapSessionHeaders,
+  useSapSession,
+  markSapSessionActive,
+  markSapSessionExpired,
+} from "@/lib/sapSession";
 
 export interface SapProxyError {
   message: string;

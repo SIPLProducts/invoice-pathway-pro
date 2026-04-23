@@ -359,12 +359,19 @@ export default function SAPSettings() {
                 <div className="flex items-center gap-2">
                   <KeyRound className="h-5 w-5 text-warning" />
                   <span className="font-display font-semibold">SAP Browser Session</span>
-                  {session ? (
+                  {serverStatus?.active ? (
                     <Badge
                       variant="outline"
                       className="border-success/40 bg-success/10 text-success"
                     >
-                      Active · saved {new Date(session.savedAt).toLocaleTimeString()}
+                      Active{remainingLabel ? ` · ${remainingLabel} left` : ""}
+                    </Badge>
+                  ) : session ? (
+                    <Badge
+                      variant="outline"
+                      className="border-warning/40 bg-warning/10 text-warning"
+                    >
+                      Manual paste · saved {new Date(session.savedAt).toLocaleTimeString()}
                     </Badge>
                   ) : (
                     <Badge
@@ -375,94 +382,99 @@ export default function SAPSettings() {
                     </Badge>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowCookieHelp((v) => !v)}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                >
-                  {showCookieHelp ? (
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  )}
-                  How to get these cookies
-                </button>
               </div>
 
               <p className="mb-3 text-xs text-muted-foreground">
-                Paste the <code className="rounded bg-muted px-1 font-mono">JSESSIONID</code> and{" "}
-                <code className="rounded bg-muted px-1 font-mono">__VCAP_ID__</code> cookies from
-                your logged-in SAP browser tab. The middleware will forward them to SAP on every
-                request, exactly like Postman.
+                Click <span className="font-semibold text-foreground">Login to SAP</span> — the middleware will sign in
+                using its stored credentials, capture the SAP session cookies, cache them, and auto-refresh when they
+                expire. No more pasting from DevTools.
               </p>
 
-              {showCookieHelp && (
-                <div className="mb-3 rounded-lg border bg-card p-3 text-xs text-muted-foreground">
-                  <ol className="list-decimal space-y-1 pl-5">
-                    <li>
-                      Open the SAP OData URL in Chrome and log in with username/password.
-                    </li>
-                    <li>
-                      Open <span className="font-semibold text-foreground">DevTools (F12)</span> →{" "}
-                      <span className="font-semibold text-foreground">Application</span> tab →{" "}
-                      <span className="font-semibold text-foreground">Cookies</span> →
-                      select the SAP host (e.g.{" "}
-                      <code className="rounded bg-muted px-1 font-mono">
-                        *.abap-web.us10.hana.ondemand.com
-                      </code>
-                      ).
-                    </li>
-                    <li>
-                      Copy the <strong>Value</strong> column for{" "}
-                      <code className="rounded bg-muted px-1 font-mono">JSESSIONID</code> and{" "}
-                      <code className="rounded bg-muted px-1 font-mono">__VCAP_ID__</code>.
-                    </li>
-                    <li>Paste both into the fields below and click Save.</li>
-                    <li>
-                      Cookies typically expire after a few hours. Repaste when the table shows
-                      "session expired".
-                    </li>
-                  </ol>
+              {/* Live session readout */}
+              {serverStatus && (
+                <div className="mb-3 grid gap-2 rounded-lg border bg-card p-3 text-xs sm:grid-cols-2">
+                  <div>
+                    <div className="text-muted-foreground">Session</div>
+                    <div className="font-mono">
+                      {serverStatus.active ? "ACTIVE" : "NONE"}
+                      {serverStatus.sapUser ? ` · ${serverStatus.sapUser}` : ""}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Remaining</div>
+                    <div className="font-mono">{remainingLabel ?? "—"}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Saved at</div>
+                    <div className="font-mono">
+                      {serverStatus.savedAt ? new Date(serverStatus.savedAt).toLocaleString() : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Expires at</div>
+                    <div className="font-mono">
+                      {serverStatus.expiresAt ? new Date(serverStatus.expiresAt).toLocaleString() : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">JSESSIONID</div>
+                    <div className="font-mono">{serverStatus.jsessionidPreview ?? "—"}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">__VCAP_ID__</div>
+                    <div className="font-mono">{serverStatus.vcapIdPreview ?? "—"}</div>
+                  </div>
                 </div>
               )}
 
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="sap-jsessionid" className="text-xs font-semibold">
-                    JSESSIONID
-                  </Label>
-                  <Input
-                    id="sap-jsessionid"
-                    value={jsessionInput}
-                    onChange={(e) => setJsessionInput(e.target.value)}
-                    placeholder={
-                      session?.jsessionid
-                        ? `Current: ${session.jsessionid.slice(0, 12)}…`
-                        : "Paste JSESSIONID value"
-                    }
-                    className="font-mono text-xs"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="sap-vcap" className="text-xs font-semibold">
-                    __VCAP_ID__
-                  </Label>
-                  <Input
-                    id="sap-vcap"
-                    value={vcapInput}
-                    onChange={(e) => setVcapInput(e.target.value)}
-                    placeholder={
-                      session?.vcapId
-                        ? `Current: ${session.vcapId.slice(0, 12)}…`
-                        : "Paste __VCAP_ID__ value"
-                    }
-                    className="font-mono text-xs"
-                  />
-                </div>
-              </div>
+              {/* Optional: alternate credentials */}
+              <button
+                type="button"
+                onClick={() => setShowAltCreds((v) => !v)}
+                className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                {showAltCreds ? (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5" />
+                )}
+                Use different credentials (one-time, not stored in browser)
+              </button>
 
-              <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-                {session && (
+              {showAltCreds && (
+                <div className="mb-3 grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="alt-user" className="text-xs font-semibold">
+                      SAP User
+                    </Label>
+                    <Input
+                      id="alt-user"
+                      value={altUser}
+                      onChange={(e) => setAltUser(e.target.value)}
+                      placeholder="Communication user"
+                      className="font-mono text-xs"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="alt-password" className="text-xs font-semibold">
+                      Password
+                    </Label>
+                    <Input
+                      id="alt-password"
+                      type="password"
+                      value={altPassword}
+                      onChange={(e) => setAltPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="font-mono text-xs"
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {(serverStatus?.active || session) && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -473,10 +485,127 @@ export default function SAPSettings() {
                     Clear session
                   </Button>
                 )}
-                <Button size="sm" className="gap-2" onClick={saveSession}>
-                  <Save className="h-4 w-4" />
-                  Save session
+                <Button
+                  size="sm"
+                  variant={serverStatus?.active ? "outline" : "default"}
+                  className="gap-2"
+                  onClick={() => doDynamicLogin(showAltCreds && altUser.trim().length > 0)}
+                  disabled={logging || (showAltCreds && (!altUser.trim() || !altPassword))}
+                >
+                  {serverStatus?.active ? (
+                    <RefreshCw className={`h-4 w-4 ${logging ? "animate-spin" : ""}`} />
+                  ) : (
+                    <LogIn className={`h-4 w-4 ${logging ? "animate-pulse" : ""}`} />
+                  )}
+                  {logging
+                    ? "Logging in…"
+                    : serverStatus?.active
+                      ? "Re-login"
+                      : "Login to SAP"}
                 </Button>
+              </div>
+
+              {/* Advanced — manual paste fallback */}
+              <div className="mt-4 border-t pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced((v) => !v)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                >
+                  {showAdvanced ? (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  )}
+                  Advanced — paste cookies manually
+                </button>
+
+                {showAdvanced && (
+                  <div className="mt-3 space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Fallback: paste the <code className="rounded bg-muted px-1 font-mono">JSESSIONID</code> and{" "}
+                      <code className="rounded bg-muted px-1 font-mono">__VCAP_ID__</code> cookies from your logged-in
+                      SAP browser tab. Only needed if dynamic login is blocked (e.g. tenant requires SSO).
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowCookieHelp((v) => !v)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      {showCookieHelp ? (
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      )}
+                      How to get these cookies
+                    </button>
+
+                    {showCookieHelp && (
+                      <div className="rounded-lg border bg-card p-3 text-xs text-muted-foreground">
+                        <ol className="list-decimal space-y-1 pl-5">
+                          <li>Open the SAP OData URL in Chrome and log in with username/password.</li>
+                          <li>
+                            DevTools (F12) → <strong>Application</strong> → <strong>Cookies</strong> → select the SAP
+                            host (e.g.{" "}
+                            <code className="rounded bg-muted px-1 font-mono">
+                              *.abap-web.us10.hana.ondemand.com
+                            </code>
+                            ).
+                          </li>
+                          <li>
+                            Copy the <strong>Value</strong> column for{" "}
+                            <code className="rounded bg-muted px-1 font-mono">JSESSIONID</code> and{" "}
+                            <code className="rounded bg-muted px-1 font-mono">__VCAP_ID__</code>.
+                          </li>
+                          <li>Paste both into the fields below and click Save.</li>
+                        </ol>
+                      </div>
+                    )}
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="sap-jsessionid" className="text-xs font-semibold">
+                          JSESSIONID
+                        </Label>
+                        <Input
+                          id="sap-jsessionid"
+                          value={jsessionInput}
+                          onChange={(e) => setJsessionInput(e.target.value)}
+                          placeholder={
+                            session?.jsessionid
+                              ? `Current: ${session.jsessionid.slice(0, 12)}…`
+                              : "Paste JSESSIONID value"
+                          }
+                          className="font-mono text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="sap-vcap" className="text-xs font-semibold">
+                          __VCAP_ID__
+                        </Label>
+                        <Input
+                          id="sap-vcap"
+                          value={vcapInput}
+                          onChange={(e) => setVcapInput(e.target.value)}
+                          placeholder={
+                            session?.vcapId
+                              ? `Current: ${session.vcapId.slice(0, 12)}…`
+                              : "Paste __VCAP_ID__ value"
+                          }
+                          className="font-mono text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button size="sm" className="gap-2" onClick={saveSession}>
+                        <Save className="h-4 w-4" />
+                        Save manual session
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -184,43 +184,6 @@ export const DEFAULT_GATE_RESPONSE_ITEM = GATE_ITEM_RESPONSE;
 
 const seed: SapApi[] = [
   {
-    name: "SAP_343_Blocked_To_Unrestricted",
-    description: "343 Movement - Moves blocked stock quantity to unrestricted stock in SAP.",
-    baseUrl: "http://10.10.6.115:8000",
-    endpoint: "/mrb/mb52/mat_stocks?sap-client=234",
-    method: "PUT",
-    auth: "Basic",
-    status: "Active",
-    tag: "Proxy",
-    type: "action",
-    autoSync: { enabled: false, frequencyMinutes: 5 },
-  },
-  {
-    name: "SAP_344_Unrestricted_To_Blocked",
-    description: "344 Movement - Moves unrestricted stock quantity to blocked stock in SAP.",
-    baseUrl: "http://10.10.6.115:8000",
-    endpoint: "/mrb/mb52/mat_stocks?sap-client=234",
-    method: "GET",
-    auth: "Basic",
-    status: "Active",
-    tag: "Proxy",
-    type: "action",
-    autoSync: { enabled: false, frequencyMinutes: 5 },
-  },
-  {
-    name: "MB52_Stock_Report",
-    description:
-      "MB52 - Material Stock Report. Returns stock quantities (unrestricted, blocked, QI, transfer) by plant, storage location, material and batch.",
-    baseUrl: "http://10.10.6.115:8000",
-    endpoint: "/mrb/mb52/mat_stocks?sap-client=234",
-    method: "POST",
-    auth: "Basic",
-    status: "Active",
-    tag: "Proxy",
-    type: "live",
-    autoSync: { enabled: false, frequencyMinutes: 5 },
-  },
-  {
     name: "ZMRB_Inward_Inspection",
     description:
       "ZMRB01/ZMRB04 - Inward Inspection Report. Fetches inspection lots with vendor, PO, batch and quantity details. Use ART=01 for ZMRB01, ART=04 for ZMRB04.",

@@ -1,55 +1,56 @@
 
 
-## Fix: SAP Gate Entries tab not showing the Get_DMR API
+## Plan: Wire "GET DMR LIST" to the SAP Gate Entries tab + remove 3 unwanted APIs (no storage reset)
 
-### Root cause
+### What you want
+1. Keep the **GET DMR LIST** API you just added in API Settings — do not remove it, do not reset it.
+2. Make the **SAP Gate Entries** tab on Daily Material Receipts use that GET DMR LIST API.
+3. Permanently remove `SAP_343_Blocked_To_Unrestricted`, `SAP_344_Unrestricted_To_Blocked`, `MB52_Stock_Report` from API Settings without wiping any of your other edits.
 
-`src/pages/DMRList.tsx` filters APIs with a hard-coded regex on the **name**:
+### Approach (no `STORAGE_KEY` bump — your edits and your GET DMR LIST stay intact)
 
-```ts
-const liveApis = apis.filter((a) => /get[_ ]?dmr/i.test(a.name));
-```
+**1. `src/lib/sapApisStore.ts`**
+- Remove the 3 unwanted entries from the in-memory `seed` array so they never come back on a fresh install.
+- Add a tiny one-time **migration** inside `load()` (keyed by a separate flag like `dmr.sapApis.cleanup.v1` in `localStorage`) that:
+  - deletes any stored entries named `SAP_343_Blocked_To_Unrestricted`, `SAP_344_Unrestricted_To_Blocked`, `MB52_Stock_Report`,
+  - writes the cleaned list back,
+  - sets the flag so it only runs once.
+- Does **not** touch `STORAGE_KEY`. Your `GET DMR LIST` API and all other edits remain untouched.
 
-After the recent `STORAGE_KEY` bump (`dmr.sapApis.v2` → `v3`) the user's localStorage was re-seeded. The seed only contains `ZUI_Gate_Service` — there is no API whose name matches `get_dmr` anymore, so the tab shows the "No live SAP API configured yet" empty state even though the gate API is configured and working (POST/Submit succeeds, per the network logs).
+**2. `src/pages/DMRList.tsx` — SAP Gate Entries tab selection**
+- Update the `liveApis` filter to prefer `GET DMR LIST` (your new API) when present, falling back to the existing gate-service match:
+  ```ts
+  const liveApis = apis.filter((a) => {
+    if (a.method !== "GET" || a.status !== "Active") return false;
+    const hay = `${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`.toLowerCase();
+    return /get[ _-]?dmr|dmr[ _-]?list|gate(header|service)/.test(hay);
+  });
+  // Prefer an explicit "GET DMR LIST" match if present
+  const selectedApi =
+    liveApis.find((a) => /get[ _-]?dmr[ _-]?list/i.test(a.name)) ??
+    liveApis[0] ??
+    null;
+  ```
+- Update the empty-state hint to mention `GET DMR LIST`.
 
-### Fix
-
-Widen the selection in `src/pages/DMRList.tsx` so it matches **any GET API that targets the gate service**, not just the literal name "Get_DMR":
-
-```ts
-const liveApis = apis.filter((a) => {
-  if (a.method !== "GET") return false;
-  if (a.status !== "Active") return false;
-  const isGateByName = /get[_ ]?dmr|gate/i.test(a.name);
-  const isGateByPath = /gate(header|service)/i.test(`${a.endpoint} ${a.proxyPath ?? ""}`);
-  return isGateByName || isGateByPath;
-});
-```
-
-This matches:
-- the seeded `ZUI_Gate_Service` (GET, endpoint `…/GateHeader…`)
-- any user-created API named `Get_DMR`, `Get DMR`, `GetDMRList`, etc.
-- any other GET API whose endpoint hits `GateHeader` / `gate_service`
-
-If multiple match, keep the first (`liveApis[0]`) — same as today.
-
-### Also update the empty-state hint
-
-In the same file, change the empty-state text so it points to the actually-seeded API name as well:
-
-> "No live SAP API configured yet. Open SAP Settings and add a GET API for the gate service (e.g. `Get_DMR` or `ZUI_Gate_Service`)."
-
-### Files to change
-
-- `src/pages/DMRList.tsx` — broaden `liveApis` filter and update empty-state copy.
+**3. No middleware change.** The proxy/middleware path already handled by `useSapProxy` works for any GET API row, including your `GET DMR LIST`.
 
 ### What stays the same
+- `STORAGE_KEY` is **not** bumped — none of your saved API edits, middleware URLs, pasted cookies, or the new `GET DMR LIST` row are reset.
+- `Create_Gate_Service` (New DMR submit) is untouched.
+- Per-row delete in API Settings still works as before.
 
-- No middleware change.
-- No store / seed change (nothing to re-seed; the user can still rename the API to `Get_DMR` in SAP Settings if they prefer).
-- New DMR page logic (which uses `Create_Gate_Service`) is untouched.
+### Caveats
+- For the GET DMR LIST tab to actually return rows, that API row must have:
+  - `method: GET`, `status: Active`,
+  - a working `proxyPath` (or middleware URL) pointing at the gate header endpoint,
+  - a response schema configured (so columns render). If it was created via "Add API" without response fields, open it in advanced edit and paste a sample response so columns auto-detect — same as `ZUI_Gate_Service`.
+
+### Files to change
+- `src/lib/sapApisStore.ts` — drop the 3 entries from `seed`; add one-time cleanup migration in `load()` keyed by a separate flag.
+- `src/pages/DMRList.tsx` — broaden filter to also match `GET DMR LIST` / `dmr_list`; prefer it as the selected API; update empty-state copy.
 
 ### Expected result
-
-DMR → SAP Gate Entries tab immediately shows the configured `ZUI_Gate_Service` rows fetched via the middleware, exactly like before the storage bump.
+- API Settings: the 3 unwanted APIs are gone (one-time, automatic). `GET DMR LIST` and every other API you configured remain exactly as you left them.
+- DMR → SAP Gate Entries tab: rows are fetched via your `GET DMR LIST` API.
 

@@ -1,83 +1,40 @@
 import { useSyncExternalStore } from "react";
 
+/**
+ * Cookie management is now fully handled by the middleware (auto-login + cache).
+ * This module is a no-op shim retained so existing callers (useSapProxy,
+ * useSapCreate) compile unchanged. Manual cookie paste UI has been removed.
+ */
+
 export interface SapSession {
   jsessionid: string;
   vcapId: string;
   savedAt: string;
 }
 
-const STORAGE_KEY = "sap.session.cookies.v1";
 const listeners = new Set<() => void>();
 
-let cachedRaw: string | null = null;
-let cachedSession: SapSession | null = null;
-
-function readSession(): SapSession | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === cachedRaw) return cachedSession;
-    cachedRaw = raw;
-    if (!raw) {
-      cachedSession = null;
-      return null;
-    }
-    const parsed = JSON.parse(raw) as SapSession;
-    if (!parsed?.jsessionid && !parsed?.vcapId) {
-      cachedSession = null;
-      return null;
-    }
-    cachedSession = parsed;
-    return parsed;
-  } catch {
-    cachedSession = null;
-    return null;
-  }
-}
-
-function emit() {
-  // Invalidate cache so subscribers get fresh value
-  cachedRaw = null;
-  listeners.forEach((l) => l());
-}
-
 export function getSapSession(): SapSession | null {
-  return readSession();
+  return null;
 }
 
-export function setSapSession(session: { jsessionid: string; vcapId: string }) {
-  const clean: SapSession = {
-    jsessionid: session.jsessionid.trim(),
-    vcapId: session.vcapId.trim(),
-    savedAt: new Date().toISOString(),
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
-  emit();
+export function setSapSession(_session: { jsessionid: string; vcapId: string }) {
+  // no-op: middleware now manages cookies automatically
 }
 
 export function clearSapSession() {
-  localStorage.removeItem(STORAGE_KEY);
-  emit();
+  // no-op
 }
 
 /** Returns headers to attach to outgoing middleware requests. */
 export function getSapSessionHeaders(): Record<string, string> {
-  const s = getSapSession();
-  if (!s) return {};
-  const headers: Record<string, string> = {};
-  if (s.jsessionid) headers["x-sap-jsessionid"] = s.jsessionid;
-  if (s.vcapId) headers["x-sap-vcap-id"] = s.vcapId;
-  return headers;
+  return {};
 }
 
 function subscribe(cb: () => void) {
   listeners.add(cb);
-  const onStorage = (e: StorageEvent) => {
-    if (e.key === STORAGE_KEY) cb();
-  };
-  window.addEventListener("storage", onStorage);
   return () => {
     listeners.delete(cb);
-    window.removeEventListener("storage", onStorage);
   };
 }
 

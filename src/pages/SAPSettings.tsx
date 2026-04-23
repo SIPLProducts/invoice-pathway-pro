@@ -68,14 +68,51 @@ type AuthError = {
 
 export default function SAPSettings() {
   const apis = useSapApis();
+  const session = useSapSession();
   const [tab, setTab] = useState("apis");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [authError, setAuthError] = useState<AuthError | null>(null);
   const [troubleshootOpen, setTroubleshootOpen] = useState(false);
+  const [jsessionInput, setJsessionInput] = useState("");
+  const [vcapInput, setVcapInput] = useState("");
 
+  const manualCookiesActive =
+    session.mode === "manual" && Boolean(session.jsessionid) && Boolean(session.vcapId);
 
-  const testSapConnection = async () => {
+  const maskCookie = (v: string) =>
+    !v ? "" : v.length <= 10 ? `${v.slice(0, 2)}…` : `${v.slice(0, 4)}…${v.slice(-4)}`;
+
+  const formatRelative = (iso: string) => {
+    if (!iso) return "";
+    const diff = Date.now() - new Date(iso).getTime();
+    if (Number.isNaN(diff)) return "";
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
+
+  const handleSaveManual = () => {
+    if (!jsessionInput.trim() || !vcapInput.trim()) {
+      toast.error("Both JSESSIONID and __VCAP_ID__ are required.");
+      return;
+    }
+    setSapSession({ jsessionid: jsessionInput.trim(), vcapId: vcapInput.trim() });
+    setJsessionInput("");
+    setVcapInput("");
+    toast.success("Manual SAP cookies saved. They will be sent with every SAP call.");
+  };
+
+  const handleClearManual = () => {
+    clearSapSession();
+    setJsessionInput("");
+    setVcapInput("");
+    toast.success("Manual cookies cleared. Reverted to Auto-managed.");
+  };
+
     const base =
       apis.find((a) => a.middleware?.url)?.middleware?.url?.trim().replace(/\/$/, "") ||
       ((import.meta.env.VITE_SAP_PROXY_URL as string | undefined)?.trim().replace(/\/$/, "") ?? "");

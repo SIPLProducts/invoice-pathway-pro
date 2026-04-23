@@ -76,8 +76,8 @@ export default function SAPSettings() {
   const [testing, setTesting] = useState(false);
   const [authError, setAuthError] = useState<AuthError | null>(null);
   const [troubleshootOpen, setTroubleshootOpen] = useState(false);
-  const [jsessionInput, setJsessionInput] = useState("");
-  const [vcapInput, setVcapInput] = useState("");
+  const [jsessionInput, setJsessionInput] = useState(() => session.jsessionid);
+  const [vcapInput, setVcapInput] = useState(() => session.vcapId);
 
   const manualCookiesActive =
     session.mode === "manual" && Boolean(session.jsessionid) && Boolean(session.vcapId);

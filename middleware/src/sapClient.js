@@ -136,6 +136,7 @@ async function resolveCookies(extraCookies) {
     return { cookies: String(extraCookies).trim(), source: "manual" };
   }
   if (!useBasic) {
+    // bearer / oauth_cc / basic_stateless: no cookies, auth is per-request header.
     return { cookies: "", source: "none" };
   }
   // Try cached first; if missing/expired, auto-login.
@@ -157,6 +158,7 @@ async function resolveCookies(extraCookies) {
 /**
  * Build per-request axios config that injects a Cookie header.
  * When forwarding session cookies, do NOT send Basic auth alongside.
+ * In basic_stateless mode, attach Basic auth on every request and skip cookies.
  */
 function buildRequestConfig(cookies, extraHeaders = {}) {
   const cfg = { headers: { ...extraHeaders } };
@@ -166,6 +168,8 @@ function buildRequestConfig(cookies, extraHeaders = {}) {
       cfg.auth = null;
       cfg.headers.Authorization = undefined;
     }
+  } else if (useBasicStateless && SAP_USER && SAP_PASSWORD) {
+    cfg.auth = { username: SAP_USER, password: SAP_PASSWORD };
   }
   return cfg;
 }

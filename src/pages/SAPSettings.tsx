@@ -50,11 +50,21 @@ function formatNextSync(lastSync: string | undefined, frequencyMinutes: number) 
   return `+${frequencyMinutes} min after last`;
 }
 
+type FixStep = { title: string; steps: string[] };
+type AuthError = {
+  code: string;
+  message: string;
+  hint?: string | null;
+  fixSteps?: FixStep[] | null;
+};
+
 export default function SAPSettings() {
   const apis = useSapApis();
   const [tab, setTab] = useState("apis");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const [authError, setAuthError] = useState<AuthError | null>(null);
+  const [troubleshootOpen, setTroubleshootOpen] = useState(false);
 
 
   const testSapConnection = async () => {
@@ -81,13 +91,23 @@ export default function SAPSettings() {
         toast.success(
           `SAP OK (auth: ${eff}${fallback}${data.user ? `, user: ${data.user}` : ""}) — rows: ${data.rows}`,
         );
+        setAuthError(null);
       } else {
-        toast.error(
-          `${data?.code || "sap_error"}: ${data?.message || `HTTP ${res.status}`}${
-            data?.hint ? `\n\nFix: ${data.hint}` : ""
-          }`,
-          { duration: 12000 },
-        );
+        const code: string = data?.code || "sap_error";
+        const message: string = data?.message || `HTTP ${res.status}`;
+        const fixSteps: FixStep[] | null = Array.isArray(data?.fixSteps) ? data.fixSteps : null;
+        if (code === "sap_auth_redirect" || fixSteps) {
+          setAuthError({ code, message, hint: data?.hint, fixSteps });
+          toast.error(`${code}: see the resolution card on this page for fix steps.`, {
+            duration: 8000,
+          });
+        } else {
+          setAuthError(null);
+          toast.error(
+            `${code}: ${message}${data?.hint ? `\n\nFix: ${data.hint}` : ""}`,
+            { duration: 12000 },
+          );
+        }
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));

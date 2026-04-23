@@ -41,7 +41,7 @@ if (useBearer && !SAP_BEARER_TOKEN) {
   console.warn(
     "[sapClient] SAP_AUTH_MODE=oauth_cc but SAP_OAUTH_TOKEN_URL / SAP_OAUTH_CLIENT_ID / SAP_OAUTH_CLIENT_SECRET missing.",
   );
-} else if (useBasic && (!SAP_USER || !SAP_PASSWORD)) {
+} else if ((useBasic || useBasicStateless) && (!SAP_USER || !SAP_PASSWORD)) {
   console.warn("[sapClient] Basic auth selected but SAP_USER / SAP_PASSWORD missing.");
 }
 
@@ -51,7 +51,9 @@ console.log(
       ? `tokenUrl=${SAP_OAUTH_TOKEN_URL} clientId=${SAP_OAUTH_CLIENT_ID}`
       : useBearer
         ? "(static bearer token)"
-        : `user=${SAP_USER || "(unset)"} (auto-cookie session enabled)`
+        : useBasicStateless
+          ? `user=${SAP_USER || "(unset)"} (stateless: Basic auth on every request, no cookie cache)`
+          : `user=${SAP_USER || "(unset)"} (auto-cookie session enabled)`
   }`,
 );
 

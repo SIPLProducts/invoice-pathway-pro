@@ -86,12 +86,12 @@ async function loginToSap() {
     const { jsessionid, vcapId } = parseSetCookie(res.headers);
     if (!jsessionid && !vcapId) {
       const err = new Error(
-        "SAP did not return JSESSIONID / __VCAP_ID__ cookies on login. The tenant likely requires OAuth/SSO.",
+        "SAP did not return JSESSIONID / __VCAP_ID__ cookies on login. The tenant is likely stateless or OAuth-based.",
       );
       err.code = "sap_no_cookies";
       err.sapStatus = 502;
       err.hint =
-        "Switch to OAuth client_credentials by setting SAP_AUTH_MODE=oauth_cc plus SAP_OAUTH_* envs.";
+        "The middleware will auto-fallback to stateless Basic auth (per-request) when SAP_USER/SAP_PASSWORD are set. For long-term, use SAP_AUTH_MODE=oauth_cc with SAP_OAUTH_* envs.";
       throw err;
     }
 

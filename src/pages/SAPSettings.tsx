@@ -73,8 +73,10 @@ export default function SAPSettings() {
       });
       const data = await res.json().catch(() => null);
       if (res.ok && data?.ok) {
+        const eff = data.effectiveAuthMode || data.authMode;
+        const fallback = data.statelessFallback ? " (auto-fallback)" : "";
         toast.success(
-          `SAP OK (mode: ${data.authMode}${data.user ? `, user: ${data.user}` : ""}) — rows: ${data.rows}`,
+          `SAP OK (auth: ${eff}${fallback}${data.user ? `, user: ${data.user}` : ""}) — rows: ${data.rows}`,
         );
       } else {
         toast.error(
@@ -269,11 +271,16 @@ export default function SAPSettings() {
                 </Button>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                JSESSIONID and __VCAP_ID__ cookies are obtained automatically by the middleware
-                using the SAP credentials in <code className="rounded bg-muted px-1 font-mono">middleware/.env</code>.
-                Cookies are cached in memory and auto-refreshed when they expire — no manual login
-                or cookie paste required. Watch the middleware terminal for per-call session
-                lifetime logs (<code className="rounded bg-muted px-1 font-mono">[SAP] …</code>).
+                SAP authentication is handled automatically by the middleware. Depending on your
+                tenant, it will use a stateful cookie session (JSESSIONID / __VCAP_ID__),
+                stateless Basic auth (per-request, when the tenant does not issue cookies), or
+                OAuth client credentials. Credentials and mode come from{" "}
+                <code className="rounded bg-muted px-1 font-mono">middleware/.env</code>. Watch
+                the middleware terminal for per-call auth logs
+                (<code className="rounded bg-muted px-1 font-mono">[SAP] …</code>) — they show
+                whether each request used <code className="font-mono">auth=basic</code>,
+                {" "}<code className="font-mono">auth=basic_stateless</code>, or
+                {" "}<code className="font-mono">auth=oauth_cc</code>.
               </p>
             </div>
 

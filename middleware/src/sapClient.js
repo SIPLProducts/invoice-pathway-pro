@@ -29,8 +29,21 @@ const {
 const authMode = String(SAP_AUTH_MODE).toLowerCase();
 const useBearer = authMode === "bearer";
 const useOauthCc = authMode === "oauth_cc";
-const useBasicStateless = authMode === "basic_stateless";
-const useBasic = !useBearer && !useOauthCc && !useBasicStateless;
+const configuredBasicStateless = authMode === "basic_stateless";
+const useBasic = !useBearer && !useOauthCc && !configuredBasicStateless;
+
+// Runtime fallback: if cookie-based login returns sap_no_cookies, we flip this
+// flag for the rest of the process and switch to per-request Basic auth.
+let effectiveBasicStateless = configuredBasicStateless;
+function isStatelessActive() {
+  return effectiveBasicStateless;
+}
+function effectiveAuthMode() {
+  if (useBearer) return "bearer";
+  if (useOauthCc) return "oauth_cc";
+  if (effectiveBasicStateless) return "basic_stateless";
+  return "basic";
+}
 
 if (!SAP_BASE_URL || !SAP_SERVICE_PATH) {
   console.warn("[sapClient] Missing SAP_BASE_URL / SAP_SERVICE_PATH.");
@@ -135,11 +148,14 @@ async function resolveCookies(extraCookies) {
   if (extraCookies && String(extraCookies).trim()) {
     return { cookies: String(extraCookies).trim(), source: "manual" };
   }
-  if (!useBasic) {
-    // bearer / oauth_cc / basic_stateless: no cookies, auth is per-request header.
+  if (useBearer || useOauthCc) {
     return { cookies: "", source: "none" };
   }
-  // Try cached first; if missing/expired, auto-login.
+  if (effectiveBasicStateless) {
+    // Already in stateless mode (configured or auto-fallback): no cookies, Basic auth per request.
+    return { cookies: "", source: configuredBasicStateless ? "stateless" : "auto-fallback" };
+  }
+  // Stateful basic: try cached first; if missing/expired, auto-login.
   let cookies = sapSessionStore.getCachedCookies();
   let source = "cache";
   if (!cookies) {
@@ -148,6 +164,15 @@ async function resolveCookies(extraCookies) {
       logLoginOk();
       source = "fresh-login";
     } catch (e) {
+      // Auto-fallback: tenant returned 200 but no JSESSIONID/__VCAP_ID__ cookies.
+      // Switch to stateless Basic auth for the rest of this process.
+      if (e?.code === "sap_no_cookies" && SAP_USER && SAP_PASSWORD) {
+        effectiveBasicStateless = true;
+        console.log(
+          "[SAP] LOGIN no-cookies -> switching to auth=basic_stateless (auto-fallback). Subsequent requests will send Basic auth on every call.",
+        );
+        return { cookies: "", source: "auto-fallback" };
+      }
       logLoginFail(e);
       throw e;
     }
@@ -168,7 +193,7 @@ function buildRequestConfig(cookies, extraHeaders = {}) {
       cfg.auth = null;
       cfg.headers.Authorization = undefined;
     }
-  } else if (useBasicStateless && SAP_USER && SAP_PASSWORD) {
+  } else if (effectiveBasicStateless && SAP_USER && SAP_PASSWORD) {
     cfg.auth = { username: SAP_USER, password: SAP_PASSWORD };
   }
   return cfg;
@@ -223,7 +248,9 @@ async function withAutoSession(method, path, extraCookies, attempt) {
     return await attempt({ cookies });
   } catch (e) {
     const isExpired = e?.code === "sap_session_expired" || e?.code === "sap_auth_redirect";
-    const canRelogin = useBasic && (!extraCookies || !String(extraCookies).trim());
+    // Only retry cookie-relogin when we are actually using stateful cookie mode.
+    const canRelogin =
+      useBasic && !effectiveBasicStateless && (!extraCookies || !String(extraCookies).trim());
     if (!isExpired || !canRelogin) throw e;
 
     logSapCall({ method, path, phase: "→ auto re-login" });
@@ -346,14 +373,18 @@ async function sapBatch(multipartBody, boundary, extraCookies = "") {
 }
 
 function getAuthInfo() {
+  const eff = effectiveAuthMode();
   return {
     authMode,
+    effectiveAuthMode: eff,
     user: useOauthCc || useBearer ? null : SAP_USER || null,
     tokenUrl: useOauthCc ? SAP_OAUTH_TOKEN_URL : null,
     clientId: useOauthCc ? SAP_OAUTH_CLIENT_ID : null,
     hasBearer: useBearer ? Boolean(SAP_BEARER_TOKEN) : null,
-    autoSession: useBasic,
-    stateless: useBasicStateless,
+    autoSession: useBasic && !effectiveBasicStateless,
+    cookieSession: useBasic && !effectiveBasicStateless,
+    stateless: eff === "basic_stateless",
+    statelessFallback: effectiveBasicStateless && !configuredBasicStateless,
   };
 }
 
@@ -379,4 +410,6 @@ module.exports = {
   SAP_CLIENT,
   getAuthInfo,
   buildCookieFromHeaders,
+  isStatelessActive,
+  effectiveAuthMode,
 };

@@ -1,7 +1,11 @@
 import { useState } from "react";
 import type { SapApi, FieldDef } from "@/lib/sapApisStore";
 import { resolveProxyUrl } from "./useSapProxy";
-import { getSapSessionHeaders } from "@/lib/sapSession";
+import {
+  getSapSessionHeaders,
+  markSapSessionActive,
+  markSapSessionExpired,
+} from "@/lib/sapSession";
 
 export interface CreateResult {
   ok: boolean;

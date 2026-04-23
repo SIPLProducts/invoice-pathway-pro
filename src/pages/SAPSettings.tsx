@@ -113,6 +113,7 @@ export default function SAPSettings() {
     toast.success("Manual cookies cleared. Reverted to Auto-managed.");
   };
 
+  const testSapConnection = async () => {
     const base =
       apis.find((a) => a.middleware?.url)?.middleware?.url?.trim().replace(/\/$/, "") ||
       ((import.meta.env.VITE_SAP_PROXY_URL as string | undefined)?.trim().replace(/\/$/, "") ?? "");

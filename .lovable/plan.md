@@ -1,50 +1,69 @@
 
 
-## Plan: Fix `sap_config_missing` — make middleware load `.env` regardless of CWD
+## Plan: Resolve `sap_auth_redirect` — your SAP user is a dialog user, not a Communication User
 
-### Root cause
-The middleware crashes with `sap_config_missing` because `require("dotenv").config()` (line 3 of `middleware/src/server.js`) loads from the **current working directory**, not from the file's location.
+### What the error actually means
+The middleware is correctly configured and reaching SAP. SAP itself is rejecting the login:
 
-The user is running:
-```
-PS D:\invoice-pathway-pro\middleware\src> node server.js
-```
-…from inside `middleware/src/`. So dotenv looks for `middleware/src/.env` (which doesn't exist) instead of `middleware/.env` (which does).
+- `SAP_USER=kishore.pabbathi@cbcmpl.com` is an **email-style BTP/IDP login** (a dialog user).
+- ABAP Environment (Steampunk) tenants **do not accept Basic auth from dialog/IDP users**. They redirect to the OAuth/SAML login page.
+- The middleware sees that HTML redirect, recognizes it as `sap_auth_redirect`, and surfaces the message you see in the screenshot.
 
-That's why the startup banner already showed:
-```
-[sapClient] Missing SAP_BASE_URL / SAP_SERVICE_PATH.
-[sapClient] Basic auth selected but SAP_USER / SAP_PASSWORD missing.
-```
-…and every API call returns `{"code":"sap_config_missing"}`.
+This is **not a middleware bug** — the existing code is doing the right thing. The fix has to happen on the SAP side (create a proper service user) plus updating `middleware/.env` with that user's credentials.
 
-### Fix — one line in `middleware/src/server.js`
-Change line 3 from:
-```js
-require("dotenv").config();
-```
-to:
-```js
-require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
-```
+### What needs to change
 
-This pins the `.env` path to `middleware/.env` relative to `server.js`, so the middleware loads the same env file no matter what directory it's launched from (`middleware/`, `middleware/src/`, or anywhere else).
+The code is already correct. What's blocking you is one of two SAP-side setups. You need to do **one** of these:
+
+#### Option A — Communication User + Basic auth (simplest, recommended)
+1. In SAP Fiori Launchpad, open **Maintain Communication Users** → **New**.
+   - Username: e.g. `GATE_COMM_USER`
+   - Set a strong password.
+2. Open **Communication Systems** → New → host = your SAP host, assign the Communication User above for inbound.
+3. Open **Communication Arrangements** → New → choose your scenario (the one exposing `ZUI_GATE_SERVICE`) → assign the Communication System.
+4. In `middleware/.env`:
+   ```
+   SAP_AUTH_MODE=basic
+   SAP_USER=GATE_COMM_USER
+   SAP_PASSWORD=<the password you set in step 1>
+   ```
+5. Restart `node server.js`.
+
+#### Option B — OAuth 2.0 client credentials (more secure, long-term)
+1. In the same Communication Arrangement, switch the **Inbound** auth method to **OAuth 2.0**.
+2. Copy the generated **Token Endpoint**, **Client ID**, **Client Secret**.
+3. In `middleware/.env`:
+   ```
+   SAP_AUTH_MODE=oauth_cc
+   SAP_OAUTH_TOKEN_URL=<token endpoint from step 2>
+   SAP_OAUTH_CLIENT_ID=<client id>
+   SAP_OAUTH_CLIENT_SECRET=<client secret>
+   ```
+4. Restart `node server.js`.
+
+### Small code-side improvements I will make
+While the underlying problem is SAP-side, I'll make the frontend experience clearer so you don't hit a wall of red text:
+
+1. **`src/pages/SAPSettings.tsx`** — When **Test connection** returns `sap_auth_redirect`, show a compact, structured error card with two clearly-labeled "Fix path A / Fix path B" sections instead of one giant paragraph. The current toast/popover dumps everything in one block which is hard to read (visible in your screenshot).
+
+2. **`middleware/src/util/errors.js`** — Tighten the `sap_auth_redirect` hint to a one-line summary and move the long fix instructions into a separate `fixSteps` field on the error envelope. The frontend can render those steps as a numbered list.
+
+3. **`middleware/src/util/errors.js`** — Add an additional detection signal: if the HTML body contains `Communication Arrangement` or `Communication User`, surface a more confident message ("This tenant requires a Communication User — your current SAP_USER is a dialog user").
+
+4. **`src/pages/SAPSettings.tsx`** — Add a small "Auth troubleshooting" expandable panel under the SAP Browser Session card that always lists the two fix paths above, so users don't need to trigger the error to see them.
 
 ### What stays the same
-- `middleware/.env` contents — already correct (has `SAP_BASE_URL`, `SAP_USER`, `SAP_PASSWORD`, `SAP_AUTH_MODE=basic`).
-- All auth-mode logic, auto-fallback, session store, frontend — untouched.
-- No new dependencies (`path` is built-in).
-
-### Expected result
-After restarting the middleware (`node server.js` from any directory), the startup log will show:
-```
-[sapClient] mode=basic user=kishore.pabbathi@cbcmpl.com (auto-cookie session enabled)
-SAP proxy listening on http://localhost:8080
-```
-- **Test Connection** button on `/sap/settings` will succeed (or return the real SAP error, not `sap_config_missing`).
-- **Get DMR LIST** table will fetch rows.
-- If the tenant still doesn't issue cookies, the previously-built auto-fallback to `basic_stateless` will kick in transparently.
+- All auth-mode logic, auto-fallback, session store, gate routes — untouched.
+- `middleware/.env` schema — untouched. You still set `SAP_AUTH_MODE` + credentials the same way.
 
 ### Files to change
-- `middleware/src/server.js` — single-line change to dotenv config.
+- `middleware/src/util/errors.js` — split the hint into `hint` + `fixSteps[]`.
+- `src/pages/SAPSettings.tsx` — render the structured error card and the always-visible troubleshooting panel.
+
+### Expected result
+- After you create a Communication User in SAP and update `middleware/.env`, restart the middleware. **Test connection** will succeed and DMR list will load.
+- Until then, the SAP Settings page will show a clean, readable two-option fix card instead of the wall of text in your screenshot.
+
+### Action you must take in SAP (cannot be done from code)
+Create a Communication User as in Option A (or switch to OAuth as in Option B). No amount of code changes in this project can make a dialog/IDP user authenticate via Basic auth against a Steampunk tenant — SAP itself blocks that.
 

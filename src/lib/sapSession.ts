@@ -4,6 +4,12 @@ export interface SapSession {
   jsessionid: string;
   vcapId: string;
   savedAt: string;
+  /** Set when the session was created via dynamic middleware login. */
+  source?: "manual" | "dynamic";
+  /** Optional ISO timestamp at which the middleware considers the session expired. */
+  expiresAt?: string;
+  /** SAP user the session was created for (dynamic login only). */
+  sapUser?: string;
 }
 
 const STORAGE_KEY = "sap.session.cookies.v1";

@@ -190,7 +190,7 @@ export function SapLiveTable({ api, schema, onEdit }: Props) {
               {loading && rows.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={schema.columns.length + (hasChildren ? 1 : 0)}
+                    colSpan={schema.columns.length + (hasChildren ? 1 : 0) + (onEdit ? 1 : 0)}
                     className="py-8 text-center text-sm text-muted-foreground"
                   >
                     Loading…
@@ -200,7 +200,7 @@ export function SapLiveTable({ api, schema, onEdit }: Props) {
               {!loading && rows.length === 0 && !error && (
                 <TableRow>
                   <TableCell
-                    colSpan={schema.columns.length + (hasChildren ? 1 : 0)}
+                    colSpan={schema.columns.length + (hasChildren ? 1 : 0) + (onEdit ? 1 : 0)}
                     className="py-8 text-center text-sm text-muted-foreground"
                   >
                     No records returned by SAP.
@@ -212,6 +212,9 @@ export function SapLiveTable({ api, schema, onEdit }: Props) {
                 const children = hasChildren
                   ? ((getPath(row, schema.childKey!) as Record<string, unknown>[]) ?? [])
                   : [];
+                const keyFieldName = api.keyField ?? api.rowKey ?? schema.rowKey;
+                const editKey = keyFieldName ? row[keyFieldName] : undefined;
+                const canEdit = editKey !== undefined && editKey !== null && editKey !== "";
                 return (
                   <TableRow key={key} className="hover:bg-muted/30">
                     {schema.columns.map((c) => (
@@ -236,6 +239,21 @@ export function SapLiveTable({ api, schema, onEdit }: Props) {
                         >
                           <Package className="h-3 w-3" />
                           {children.length} item{children.length === 1 ? "" : "s"}
+                        </Button>
+                      </TableCell>
+                    )}
+                    {onEdit && (
+                      <TableCell className="whitespace-nowrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1.5 text-xs"
+                          disabled={!canEdit}
+                          onClick={() => onEdit(row)}
+                          title={canEdit ? "Edit header" : `Missing ${String(keyFieldName)}`}
+                        >
+                          <Pencil className="h-3 w-3" />
+                          Edit
                         </Button>
                       </TableCell>
                     )}

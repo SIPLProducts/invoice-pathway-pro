@@ -1,60 +1,65 @@
 
 
-## Plan: Stop user-created APIs from "disappearing"
+## Plan: Fix "Error while parsing an XML stream" on Save (numeric fields sent as strings)
 
-### Why it's happening (root cause)
+### Real root cause (not what SAP's headline says)
 
-Your three APIs (`Get DMR List`, `Update Header Details`, `Update Selected Item Data`) are **never deleted by code** — `sapApisStore.ts` only removes 3 specific deprecated default names (`SAP_343_…`, `SAP_344_…`, `MB52_Stock_Report`), and the table on `/sap/settings` renders every API without filtering.
+SAP's top-level error is misleading. The **second** detail in the response is the real one:
 
-What actually wipes them is **`localStorage` scoping**. APIs are persisted ONLY in `localStorage["dmr.sapApis.v3"]` of the current iframe origin. When ANY of these happen, the new page load sees empty storage and falls back to the 2-API seed:
+> `Property 'gross_weight' at offset '355' has invalid value '100'`
 
-1. The Lovable preview iframe gets a new sandboxed origin (rebuild / refresh after publish).
-2. You open the published URL vs the preview URL (different origin → different storage).
-3. You open the app in another browser/device or in incognito.
-4. Browser cache/site-data cleanup runs.
-5. A code change here bumps `STORAGE_KEY` (we did this once: `v2 → v3`).
+Looking at the actual PATCH body the middleware sent:
 
-There is currently **no backup** anywhere — no file, no Lovable Cloud, no export. So once localStorage is empty, your custom APIs are gone for good.
+```json
+"gross_weight":"100", "tare_weight":"200", "net_weight":"100"
+```
 
-### Fix — three layers of protection
+Those weights are **JSON strings**. SAP's `Edm.Decimal` requires unquoted numbers (`100` or `100.000`), so it bails out with the generic `CX_SXML_PARSE_ERROR` wrapper.
 
-**Layer 1: Stop creating new "fresh fallback" moments**
-- `src/lib/sapApisStore.ts` — when `localStorage` is empty AND we have NO older-version key either, we still seed. But when we DO find any older-version key (`dmr.sapApis.v2`, `dmr.sapApis.v1`), migrate it forward to `v3` instead of seeding. This rescues anyone who upgraded across a key bump.
-- Never bump `STORAGE_KEY` again without a migration path. (Add a code comment that says so.)
+Why strings made it onto the wire:
+- Your "Update Header Data" API was set up with `gross_weight`/`tare_weight`/`net_weight` typed as `string` in `requestHeaderFields` (likely because you pasted a partial sample where the values weren't recognized as numbers, or because the API was created before auto-detect existed).
+- `EditHeaderDialog` renders all fields with type `string` as `<input type="text">`, so the user-typed "100" stays a string.
+- `sanitizeRow` in `useSapUpdate.ts` only coerces `string → number` when `field.type === "number"`. So `"100"` flows through unchanged.
 
-**Layer 2: Make the seed non-destructive**
-- Current behaviour merges seed only when storage is missing. Change to: on every load, if `state` lacks an API whose `name` matches a seed entry, **append** the seed entry (don't overwrite). This way the 2 default APIs (`ZMRB_Inward_Inspection`, `ZUI_Gate_Service`) are always available, but your custom ones are never wiped to make room for them.
+### The fix — three layers, additive
 
-**Layer 3: Manual export / import + auto-backup snapshot**
-- `src/lib/sapApisStore.ts` — add `exportApis(): string` (JSON) and `importApis(json: string): { added: number; replaced: number }`.
-- Whenever `emit()` runs (any add/edit/delete), also write a rolling timestamped snapshot to `localStorage["dmr.sapApis.backup.latest"]` (single slot, overwritten). On `load()`, if the main key is missing but the backup is present, restore from backup automatically and toast "Restored N APIs from backup".
-- `src/pages/SAPSettings.tsx` — add two small buttons next to **Add API Configuration**:
-  - **Export APIs** → downloads `sap-apis-YYYY-MM-DD.json` (calls `exportApis()`).
-  - **Import APIs** → file picker → calls `importApis(text)` → toast "Imported X new, updated Y".
-- This gives you a real off-browser copy you can re-import anytime the iframe storage resets.
+#### 1. `src/hooks/useSapUpdate.ts` — coerce against the original row's type as a safety net
+In `sanitizeRow`, accept a third argument: the **original row** (the live SAP record we got from GET). For each key being submitted:
+- If the live row's value at that key is a `number`, coerce the outgoing value to a number (parse it; skip on NaN).
+- If the live row's value is a `boolean`, coerce to boolean.
+- Else fall back to the existing `field.type` logic.
+
+This means even if `requestHeaderFields` types are wrong, the wire payload will be type-correct because we're trusting SAP's own GET response as the source of truth for shapes.
+
+Wire it through: `submit(row, body)` already passes `row`; just pass it into `sanitizeRow(body, headerFields, row)`.
+
+#### 2. `src/components/EditHeaderDialog.tsx` — render number inputs when the row says so
+When deriving fields, if a field's declared `type` is `string` but the live row's value is a `number`, treat that field as `number` for both the input element (`<input type="number">`) and the `coerce()` call. Same for `boolean`. No change to stored field config — purely a render-time hint.
+
+This means typing "100" produces `100` in the JSON, and even with no `requestHeaderFields` configured at all, the dialog still sends correctly-typed values.
+
+#### 3. `src/hooks/useSapUpdate.ts` — surface the real SAP detail message
+Today the toast/UI shows `details[0].message` (which is "The Data Services Request could not be understood due to malformed syntax"). Improve the picker:
+- Prefer the first detail whose `code` contains `PROPERTY_ERROR`, `BAD_REQUEST` with a property name, or whose message contains `Property '` (the actually useful one).
+- Else fall back to the first detail message.
+- Else fall back to `error.message`.
+
+Result: the toast will now say "Property 'gross_weight' at offset '355' has invalid value '100'" instead of the cryptic XML stream message.
 
 ### What stays the same
-- All other code: middleware, hooks, dialogs, edit page — untouched.
-- The 2 default seed APIs continue to appear out-of-the-box for new users.
-- Storage key `dmr.sapApis.v3` stays (no migration churn for existing users).
-- No new dependencies.
+- Middleware: zero changes. It already forces `Content-Type: application/json` and `transformRequest: [(d)=>d]`.
+- SAP backend: zero changes.
+- `requestHeaderFields` you've configured: untouched (we just stop trusting them as the only type source).
+- `null` filtering for `created_at` / `last_changed_at`: already in `sanitizeRow`, no change needed.
+- `SAP__Messages` filtering: already in `sanitizeRow`.
 
 ### Files to change
-- `src/lib/sapApisStore.ts` — non-destructive seed merge, backward migration from v1/v2, auto-backup slot, `exportApis`/`importApis` helpers (~50 added lines).
-- `src/pages/SAPSettings.tsx` — Export / Import buttons in the API Configurations toolbar (~25 added lines).
-
-### Recovery path right now
-After this change deploys, on first load the code will:
-1. Read `dmr.sapApis.v3` — if present, use it.
-2. Else read `dmr.sapApis.v2` or `v1` — if present, migrate forward (your APIs come back).
-3. Else read `dmr.sapApis.backup.latest` — if present, restore.
-4. Else fall back to the 2-API seed.
-
-If none of those have your three APIs (because the iframe origin truly never saw them — e.g. you created them only in the published URL but are now viewing preview), the cleanest fix is: open the page where they DO exist, click **Export APIs**, then come back here and click **Import APIs**.
+- `src/hooks/useSapUpdate.ts` — pass `row` into `sanitizeRow`; add row-based type coercion; smarter SAP detail-message extraction (~25 added lines).
+- `src/components/EditHeaderDialog.tsx` — derive effective input type from the live row when the field schema says `string` (~10 modified lines).
 
 ### Expected result
-Your custom APIs (`Get DMR List`, `Update Header Details`, `Update Selected Item Data`) will:
-- Survive every reload, rebuild, and the next storage-key migration automatically.
-- Coexist with the default seed instead of being replaced by it.
-- Be one-click exportable to a JSON file you keep, and one-click re-importable on any browser/device.
+Hit Save on the same `A123I00013` row with `gross_weight`/`tare_weight`/`net_weight` edited:
+- The PATCH body now contains `"gross_weight": 100, "tare_weight": 200, "net_weight": 100` (unquoted numbers).
+- SAP returns 200 with the updated entity.
+- If anything else is malformed in the future, the toast shows the actual offending property and value (e.g. "Property 'X' has invalid value 'Y'") instead of the misleading XML-stream wrapper.
 

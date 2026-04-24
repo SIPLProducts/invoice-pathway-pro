@@ -283,6 +283,46 @@ export default function SAPApiEdit() {
                   placeholder="/api/gate/headers"
                 />
               </Field>
+              <Field
+                label="Update Endpoint (proxy path)"
+                hint={
+                  <>
+                    Use <code className="rounded bg-muted px-1 font-mono">{"{gate_id}"}</code> (or any
+                    response field name) as a placeholder. Frontend substitutes it from the selected
+                    row at call time.
+                  </>
+                }
+              >
+                <Input
+                  value={api.updateEndpoint ?? ""}
+                  onChange={(e) => setApiField("updateEndpoint", e.target.value)}
+                  placeholder="/api/gate/headers/{gate_id}"
+                />
+              </Field>
+              <Field label="Update Method">
+                <Select
+                  value={api.updateMethod ?? "PATCH"}
+                  onValueChange={(v) => setApiField("updateMethod", v as SapMethod)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(["PATCH", "PUT", "POST"] as SapMethod[]).map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Key Field" hint="Response field used to fill the {placeholder}.">
+                <Input
+                  value={api.keyField ?? ""}
+                  onChange={(e) => setApiField("keyField", e.target.value)}
+                  placeholder="gate_id"
+                />
+              </Field>
 
               <div className="grid grid-cols-3 gap-3 md:col-span-2">
                 <Field label="HTTP Method">

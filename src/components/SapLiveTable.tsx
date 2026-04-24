@@ -179,6 +179,11 @@ export function SapLiveTable({ api, schema, onEdit }: Props) {
                     Items
                   </TableHead>
                 )}
+                {onEdit && (
+                  <TableHead className="whitespace-nowrap text-xs uppercase tracking-wider">
+                    Edit
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>

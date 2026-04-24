@@ -148,7 +148,31 @@ export default function DMRPage() {
           }
           return (
             <div className="space-y-3">
-              <SapLiveTable api={selectedApi} schema={buildSchemaFromApi(selectedApi)} />
+              <SapLiveTable
+                key={refreshKey}
+                api={selectedApi}
+                schema={buildSchemaFromApi(selectedApi)}
+                onEdit={updateApi ? (row) => setEditing({ row }) : undefined}
+              />
+              {!updateApi && (
+                <div className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  Tip: configure an Active API with an{" "}
+                  <code className="font-mono">Update Endpoint</code> (e.g.{" "}
+                  <code className="font-mono">/api/gate/headers/{"{gate_id}"}</code>) on{" "}
+                  <Link to="/sap/settings" className="font-semibold text-primary hover:underline">
+                    SAP Settings
+                  </Link>{" "}
+                  to enable per-row editing.
+                </div>
+              )}
+              {editing && updateApi && (
+                <EditHeaderDialog
+                  api={updateApi}
+                  row={editing.row}
+                  onClose={() => setEditing(null)}
+                  onSaved={() => setRefreshKey((k) => k + 1)}
+                />
+              )}
             </div>
           );
         })()

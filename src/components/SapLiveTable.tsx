@@ -20,12 +20,13 @@ import { useSapProxy } from "@/hooks/useSapProxy";
 import type { ColumnDef, SapApiSchema } from "@/lib/sapApiSchemas";
 import type { SapApi } from "@/lib/sapApisStore";
 import { getPath } from "@/lib/getPath";
-import { RefreshCw, AlertCircle, Wifi, WifiOff, Package, KeyRound } from "lucide-react";
+import { RefreshCw, AlertCircle, Wifi, WifiOff, Package, KeyRound, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
   api: SapApi;
   schema: SapApiSchema;
+  onEdit?: (row: Record<string, unknown>) => void;
 }
 
 function formatCell(value: unknown, col: ColumnDef): string {
@@ -41,7 +42,7 @@ function formatCell(value: unknown, col: ColumnDef): string {
   }
 }
 
-export function SapLiveTable({ api, schema }: Props) {
+export function SapLiveTable({ api, schema, onEdit }: Props) {
   const { rows, loading, error, lastFetched, proxyConfigured, refresh } = useSapProxy(api, schema);
 
   const [openRow, setOpenRow] = useState<{

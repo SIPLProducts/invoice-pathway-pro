@@ -63,7 +63,13 @@ export default function DMRPage() {
       a.updateEndpoint &&
       updateRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
   );
-  const anyWithTpl = apis.find((a) => a.status === "Active" && a.updateEndpoint);
+  const itemUpdateRePre = /update.*item|item.*update|line[ _-]?item/i;
+  const anyWithTpl = apis.find(
+    (a) =>
+      a.status === "Active" &&
+      a.updateEndpoint &&
+      !itemUpdateRePre.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
+  );
   const matchedNoTpl = apis.find(
     (a) => a.status === "Active" && updateRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
   );

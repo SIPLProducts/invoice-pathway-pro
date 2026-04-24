@@ -452,6 +452,44 @@ export default function SAPApiEdit() {
 
         {/* ============ REQUEST FIELDS ============ */}
         <TabsContent value="request" className="mt-5 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs text-muted-foreground">
+              These fields render as inputs on New DMR (header) and the Edit Header dialog on the
+              Gate Entries tab.
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setReqPasteOpen((o) => !o)}
+              className="gap-1.5"
+            >
+              <ClipboardPaste className="h-3.5 w-3.5" />
+              {reqPasteOpen ? "Cancel" : "Auto-detect from sample JSON"}
+            </Button>
+          </div>
+
+          {reqPasteOpen && (
+            <div className="rounded-xl border bg-card p-4 shadow-card">
+              <Label className="mb-2 block text-xs font-medium">
+                Paste a sample request payload (header object, optionally with _Item array)
+              </Label>
+              <Textarea
+                value={reqPasteText}
+                onChange={(e) => setReqPasteText(e.target.value)}
+                placeholder='{ "gate_id": "A123", "plant": "3801", "_Item": [ { ... } ] }'
+                className="min-h-32 font-mono text-xs"
+              />
+              <div className="mt-3 flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setReqPasteOpen(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={applyRequestPasteSample} className="gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5" /> Generate fields
+                </Button>
+              </div>
+            </div>
+          )}
+
           <FieldsEditor
             title="Request — Header Fields"
             description="These render as inputs on the New DMR screen and are sent as the top-level POST body."

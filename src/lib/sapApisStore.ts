@@ -99,7 +99,11 @@ export interface SapApi {
   middleware?: MiddlewareConfig;
 }
 
+// IMPORTANT: Never bump STORAGE_KEY without adding a forward migration in `load()`.
+// Bumping the key without migration wipes all user-created APIs from the previous key.
 const STORAGE_KEY = "dmr.sapApis.v3";
+const LEGACY_STORAGE_KEYS = ["dmr.sapApis.v2", "dmr.sapApis.v1"];
+const BACKUP_KEY = "dmr.sapApis.backup.latest";
 
 const GATE_HEADER_REQUEST: FieldDef[] = [
   { key: "gate_id", label: "Gate ID", type: "string", required: true, showInForm: true },
@@ -253,13 +257,65 @@ const seed: SapApi[] = [
   },
 ];
 
+function readRaw(key: string): SapApi[] | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as SapApi[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/** Append any seed entries whose name isn't already present. Never overwrites user data. */
+function mergeSeedNonDestructive(existing: SapApi[]): SapApi[] {
+  const names = new Set(existing.map((a) => a.name));
+  const additions = seed.filter((s) => !names.has(s.name));
+  return additions.length === 0 ? existing : [...existing, ...additions];
+}
+
 function load(): SapApi[] {
   if (typeof window === "undefined") return seed;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return seed;
-    const parsed = JSON.parse(raw) as SapApi[];
-    if (!Array.isArray(parsed) || parsed.length === 0) return seed;
+    let parsed = readRaw(STORAGE_KEY);
+    let restoredFromBackup = false;
+    let migratedFromLegacy: string | null = null;
+
+    // Layer 1: legacy key migration (recovers user data after a STORAGE_KEY bump).
+    if (!parsed) {
+      for (const legacy of LEGACY_STORAGE_KEYS) {
+        const legacyData = readRaw(legacy);
+        if (legacyData) {
+          parsed = legacyData;
+          migratedFromLegacy = legacy;
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+          } catch {
+            /* ignore quota */
+          }
+          break;
+        }
+      }
+    }
+
+    // Layer 3: auto-restore from rolling backup snapshot.
+    if (!parsed) {
+      const backup = readRaw(BACKUP_KEY);
+      if (backup) {
+        parsed = backup;
+        restoredFromBackup = true;
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        } catch {
+          /* ignore quota */
+        }
+      }
+    }
+
+    // Final fallback: fresh seed.
+    if (!parsed) return seed;
 
     // One-time cleanup: remove deprecated default APIs without resetting other edits.
     const CLEANUP_FLAG = "dmr.sapApis.cleanup.v1";
@@ -314,7 +370,35 @@ function load(): SapApi[] {
       }
     }
 
-    return migrated;
+    // Layer 2: ensure default seed APIs are always present, but never overwrite user data.
+    const merged = mergeSeedNonDestructive(migrated);
+    if (merged.length !== migrated.length) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      } catch {
+        /* ignore quota */
+      }
+    }
+
+    // Toast notifications (deferred so React/Sonner is mounted first).
+    if (restoredFromBackup || migratedFromLegacy) {
+      setTimeout(() => {
+        try {
+          // Lazy-load to avoid circular dependency at module init.
+          import("sonner").then(({ toast }) => {
+            if (restoredFromBackup) {
+              toast.success(`Restored ${merged.length} APIs from backup`);
+            } else if (migratedFromLegacy) {
+              toast.success(`Migrated ${merged.length} APIs from ${migratedFromLegacy}`);
+            }
+          });
+        } catch {
+          /* ignore */
+        }
+      }, 1200);
+    }
+
+    return merged;
   } catch {
     return seed;
   }
@@ -326,7 +410,10 @@ const listeners = new Set<() => void>();
 function emit() {
   if (typeof window !== "undefined") {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      const json = JSON.stringify(state);
+      localStorage.setItem(STORAGE_KEY, json);
+      // Layer 3: rolling backup snapshot (single slot, overwritten on every change).
+      localStorage.setItem(BACKUP_KEY, json);
     } catch {
       /* ignore quota */
     }
@@ -373,4 +460,47 @@ export function deleteApi(name: string) {
 export function resetApis() {
   state = seed;
   emit();
+}
+
+/** Returns a pretty-printed JSON string of all current APIs for download. */
+export function exportApis(): string {
+  return JSON.stringify(
+    {
+      version: STORAGE_KEY,
+      exportedAt: new Date().toISOString(),
+      apis: state,
+    },
+    null,
+    2,
+  );
+}
+
+/**
+ * Imports APIs from a JSON string. Accepts either:
+ *   - the full export envelope `{ version, exportedAt, apis: [...] }`, or
+ *   - a bare array `[ ...apis ]`.
+ * Names that already exist are replaced; new names are appended.
+ */
+export function importApis(json: string): { added: number; replaced: number } {
+  const parsed = JSON.parse(json);
+  const incoming: SapApi[] = Array.isArray(parsed) ? parsed : parsed?.apis;
+  if (!Array.isArray(incoming)) {
+    throw new Error("Invalid import file: expected an array of APIs or { apis: [...] }.");
+  }
+  const existingNames = new Set(state.map((a) => a.name));
+  let added = 0;
+  let replaced = 0;
+  const byName = new Map(state.map((a) => [a.name, a] as const));
+  for (const api of incoming) {
+    if (!api || typeof api.name !== "string") continue;
+    if (existingNames.has(api.name)) {
+      replaced += 1;
+    } else {
+      added += 1;
+    }
+    byName.set(api.name, api);
+  }
+  state = Array.from(byName.values());
+  emit();
+  return { added, replaced };
 }

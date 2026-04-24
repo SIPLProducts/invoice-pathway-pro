@@ -72,6 +72,24 @@ export default function DMRPage() {
   // Surface a banner only when a candidate exists by name but lacks the template.
   const updateNeedsConfig = !updateApi && matchedNoTpl ? matchedNoTpl : null;
 
+  // Item-level update API. Match anything that mentions item / line item update.
+  const itemUpdateRe = /update.*item|item.*update|line[ _-]?item/i;
+  const itemUpdateApi =
+    apis.find(
+      (a) =>
+        a.status === "Active" &&
+        a.updateEndpoint &&
+        itemUpdateRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
+    ) ?? null;
+  const itemUpdateNeedsConfig =
+    !itemUpdateApi
+      ? apis.find(
+          (a) =>
+            a.status === "Active" &&
+            itemUpdateRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
+        ) ?? null
+      : null;
+
   const filtered = dmrs.filter((d) => {
     const tab = tabMap[active];
     const matchTab = !tab || d.status === tab;

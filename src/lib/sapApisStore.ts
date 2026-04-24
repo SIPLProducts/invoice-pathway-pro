@@ -257,10 +257,6 @@ const seed: SapApi[] = [
   },
 ];
 
-function load(): SapApi[] {
-  if (typeof window === "undefined") return seed;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
 function readRaw(key: string): SapApi[] | null {
   try {
     const raw = localStorage.getItem(key);

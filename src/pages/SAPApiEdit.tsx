@@ -582,6 +582,8 @@ export default function SAPApiEdit() {
             onResetDefaults={
               isGate ? () => setApiField("requestHeaderFields", DEFAULT_GATE_REQUEST_HEADER) : undefined
             }
+            onAutoDetect={(text) => detectFields(text, "requestHeader")}
+            autoDetectPlaceholder='{ "gate_id": "A123", "plant": "3801", ... }'
           />
           <FieldsEditor
             title="Request — Item Fields (_Item)"
@@ -592,6 +594,8 @@ export default function SAPApiEdit() {
             onResetDefaults={
               isGate ? () => setApiField("requestItemFields", DEFAULT_GATE_REQUEST_ITEM) : undefined
             }
+            onAutoDetect={(text) => detectFields(text, "requestItem")}
+            autoDetectPlaceholder='[ { "item_no": "10", "material": "MAT-1", ... } ]  or  { "_Item": [ ... ] }'
           />
         </TabsContent>
 
@@ -639,6 +643,8 @@ export default function SAPApiEdit() {
             onResetDefaults={
               isGate ? () => setApiField("responseHeaderFields", DEFAULT_GATE_RESPONSE_HEADER) : undefined
             }
+            onAutoDetect={(text) => detectFields(text, "responseHeader")}
+            autoDetectPlaceholder='{ "value": [ { "gate_id": "...", ... } ] }  or  { "gate_id": "...", ... }'
           />
           <FieldsEditor
             title="Response — Item Columns (_Item)"
@@ -649,6 +655,8 @@ export default function SAPApiEdit() {
             onResetDefaults={
               isGate ? () => setApiField("responseItemFields", DEFAULT_GATE_RESPONSE_ITEM) : undefined
             }
+            onAutoDetect={(text) => detectFields(text, "responseItem")}
+            autoDetectPlaceholder='[ { "item_no": "10", ... } ]  or  { "_Item": [ ... ] }'
           />
         </TabsContent>
 

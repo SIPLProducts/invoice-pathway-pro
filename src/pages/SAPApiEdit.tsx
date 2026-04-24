@@ -217,6 +217,89 @@ export default function SAPApiEdit() {
     }
   };
 
+  /**
+   * Generic per-section auto-detect. Accepts any of:
+   *  - a single object: `{ key: val, ... }`
+   *  - an array of objects: `[ { ... } ]`
+   *  - an OData wrapper: `{ value: [ { ... } ] }`
+   *  - a wrapper with `_Item` array: `{ _Item: [ { ... } ] }`
+   * Generates fields ONLY for the targeted section.
+   */
+  const detectFields = (
+    text: string,
+    section: "requestHeader" | "requestItem" | "responseHeader" | "responseItem",
+  ) => {
+    try {
+      const parsed = JSON.parse(text);
+      const isItem = section === "requestItem" || section === "responseItem";
+      const isRequest = section === "requestHeader" || section === "requestItem";
+
+      // Resolve the single representative object we'll inspect.
+      let obj: Record<string, unknown> | undefined;
+      if (isItem) {
+        // For item sections, prefer arrays / _Item.
+        const arr =
+          (Array.isArray(parsed) && parsed) ||
+          (Array.isArray((parsed as { value?: unknown })?.value) &&
+            (parsed as { value: unknown[] }).value) ||
+          (Array.isArray((parsed as { _Item?: unknown })?._Item) &&
+            (parsed as { _Item: unknown[] })._Item) ||
+          null;
+        if (arr && arr.length) obj = arr[0] as Record<string, unknown>;
+        else if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+          obj = parsed as Record<string, unknown>;
+      } else {
+        // Header sections: prefer the first object from a `value` array, else the object itself.
+        if (Array.isArray((parsed as { value?: unknown })?.value)) {
+          obj = (parsed as { value: Record<string, unknown>[] }).value[0];
+        } else if (Array.isArray(parsed)) {
+          obj = parsed[0] as Record<string, unknown>;
+        } else if (parsed && typeof parsed === "object") {
+          obj = parsed as Record<string, unknown>;
+        }
+      }
+
+      if (!obj || typeof obj !== "object") {
+        toast.error("Couldn't read an object from the pasted JSON");
+        return;
+      }
+
+      const fields: FieldDef[] = Object.entries(obj)
+        .filter(
+          ([k, v]) =>
+            !k.startsWith("@") &&
+            !k.startsWith("SAP__") &&
+            k !== "_Item" &&
+            (v === null || typeof v !== "object"),
+        )
+        .map(([k, v]) => ({
+          key: k,
+          label: prettify(k),
+          type: inferType(v),
+          ...(isRequest ? { showInForm: true } : { showInTable: true }),
+        }));
+
+      if (!fields.length) {
+        toast.error("No scalar fields found in the pasted JSON");
+        return;
+      }
+
+      const sectionKey =
+        section === "requestHeader"
+          ? "requestHeaderFields"
+          : section === "requestItem"
+            ? "requestItemFields"
+            : section === "responseHeader"
+              ? "responseHeaderFields"
+              : "responseItemFields";
+
+      setApi((p) => ({ ...p, [sectionKey]: fields }));
+      toast.success(`Imported ${fields.length} ${section} fields`);
+    } catch (e) {
+      toast.error("Invalid JSON: " + (e instanceof Error ? e.message : String(e)));
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl">
       <div className="mb-5 flex items-center gap-3">

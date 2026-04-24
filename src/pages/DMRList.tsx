@@ -7,6 +7,7 @@ import { inr } from "@/lib/format";
 import { Plus, Search, Filter, Download, Eye, FileText, MapPin, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { SapLiveTable } from "@/components/SapLiveTable";
+import { EditHeaderDialog } from "@/components/EditHeaderDialog";
 import { buildSchemaFromApi } from "@/lib/sapApiSchemas";
 import { useSapApis } from "@/lib/sapApisStore";
 
@@ -36,20 +37,32 @@ const tabMap: Record<string, string | null> = {
 export default function DMRPage() {
   const [active, setActive] = useState<(typeof tabs)[number]>("All");
   const [q, setQ] = useState("");
+  const [editing, setEditing] = useState<{ row: Record<string, unknown> } | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const apis = useSapApis();
   // SAP Gate Entries tab shows any GET API that targets the gate service.
-  // Create_Gate_Service is a write API and lives on the New DMR page.
   const liveApis = apis.filter((a) => {
     if (a.method !== "GET") return false;
     if (a.status !== "Active") return false;
     const hay = `${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`.toLowerCase();
     return /get[ _-]?dmr|dmr[ _-]?list|gate(header|service)/.test(hay);
   });
-  // Prefer an explicit "GET DMR LIST" API when present
   const selectedApi =
     liveApis.find((a) => /get[ _-]?dmr[ _-]?list/i.test(a.name)) ??
     liveApis[0] ??
     null;
+
+  // Find an Active API with an updateEndpoint configured.
+  const updateApi =
+    apis.find(
+      (a) =>
+        a.status === "Active" &&
+        a.updateEndpoint &&
+        /update.*gate|gate.*update|update[ _-]?header/i.test(
+          `${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`,
+        ),
+    ) ??
+    (selectedApi?.updateEndpoint ? selectedApi : null);
 
   const filtered = dmrs.filter((d) => {
     const tab = tabMap[active];
@@ -135,7 +148,31 @@ export default function DMRPage() {
           }
           return (
             <div className="space-y-3">
-              <SapLiveTable api={selectedApi} schema={buildSchemaFromApi(selectedApi)} />
+              <SapLiveTable
+                key={refreshKey}
+                api={selectedApi}
+                schema={buildSchemaFromApi(selectedApi)}
+                onEdit={updateApi ? (row) => setEditing({ row }) : undefined}
+              />
+              {!updateApi && (
+                <div className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  Tip: configure an Active API with an{" "}
+                  <code className="font-mono">Update Endpoint</code> (e.g.{" "}
+                  <code className="font-mono">/api/gate/headers/{"{gate_id}"}</code>) on{" "}
+                  <Link to="/sap/settings" className="font-semibold text-primary hover:underline">
+                    SAP Settings
+                  </Link>{" "}
+                  to enable per-row editing.
+                </div>
+              )}
+              {editing && updateApi && (
+                <EditHeaderDialog
+                  api={updateApi}
+                  row={editing.row}
+                  onClose={() => setEditing(null)}
+                  onSaved={() => setRefreshKey((k) => k + 1)}
+                />
+              )}
             </div>
           );
         })()

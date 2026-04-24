@@ -60,6 +60,8 @@ export default function SAPApiEdit() {
   const [tab, setTab] = useState("details");
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
+  const [reqPasteOpen, setReqPasteOpen] = useState(false);
+  const [reqPasteText, setReqPasteText] = useState("");
 
   const existing = !isNew ? getSapApi(decodeURIComponent(id ?? "")) : undefined;
 
@@ -162,6 +164,59 @@ export default function SAPApiEdit() {
     }
   };
 
+  const applyRequestPasteSample = () => {
+    try {
+      const parsed = JSON.parse(reqPasteText);
+      const obj: Record<string, unknown> = Array.isArray(parsed?.value)
+        ? (parsed.value[0] as Record<string, unknown>)
+        : Array.isArray(parsed)
+          ? (parsed[0] as Record<string, unknown>)
+          : (parsed as Record<string, unknown>);
+      if (!obj || typeof obj !== "object") {
+        toast.error("Couldn't read an object from the pasted JSON");
+        return;
+      }
+      const headerFields: FieldDef[] = Object.entries(obj)
+        .filter(
+          ([k, v]) =>
+            !k.startsWith("@") &&
+            !k.startsWith("SAP__") &&
+            k !== "_Item" &&
+            (v === null || typeof v !== "object"),
+        )
+        .map(([k, v]) => ({
+          key: k,
+          label: prettify(k),
+          type: inferType(v),
+          showInForm: true,
+        }));
+      const itemArr = (obj._Item as Record<string, unknown>[] | undefined) ?? [];
+      const itemFields: FieldDef[] =
+        itemArr.length > 0
+          ? Object.entries(itemArr[0])
+              .filter(([k]) => !k.startsWith("@") && !k.startsWith("SAP__"))
+              .map(([k, v]) => ({
+                key: k,
+                label: prettify(k),
+                type: inferType(v),
+                showInForm: true,
+              }))
+          : [];
+      setApi((p) => ({
+        ...p,
+        requestHeaderFields: headerFields,
+        requestItemFields: itemFields.length ? itemFields : p.requestItemFields,
+      }));
+      toast.success(
+        `Imported ${headerFields.length} header + ${itemFields.length} item request fields`,
+      );
+      setReqPasteOpen(false);
+      setReqPasteText("");
+    } catch (e) {
+      toast.error("Invalid JSON: " + (e instanceof Error ? e.message : String(e)));
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl">
       <div className="mb-5 flex items-center gap-3">
@@ -226,6 +281,46 @@ export default function SAPApiEdit() {
                   value={api.createEndpoint ?? ""}
                   onChange={(e) => setApiField("createEndpoint", e.target.value)}
                   placeholder="/api/gate/headers"
+                />
+              </Field>
+              <Field
+                label="Update Endpoint (proxy path)"
+                hint={
+                  <>
+                    Use <code className="rounded bg-muted px-1 font-mono">{"{gate_id}"}</code> (or any
+                    response field name) as a placeholder. Frontend substitutes it from the selected
+                    row at call time.
+                  </>
+                }
+              >
+                <Input
+                  value={api.updateEndpoint ?? ""}
+                  onChange={(e) => setApiField("updateEndpoint", e.target.value)}
+                  placeholder="/api/gate/headers/{gate_id}"
+                />
+              </Field>
+              <Field label="Update Method">
+                <Select
+                  value={api.updateMethod ?? "PATCH"}
+                  onValueChange={(v) => setApiField("updateMethod", v as SapMethod)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(["PATCH", "PUT", "POST"] as SapMethod[]).map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Key Field" hint="Response field used to fill the {placeholder}.">
+                <Input
+                  value={api.keyField ?? ""}
+                  onChange={(e) => setApiField("keyField", e.target.value)}
+                  placeholder="gate_id"
                 />
               </Field>
 
@@ -357,6 +452,44 @@ export default function SAPApiEdit() {
 
         {/* ============ REQUEST FIELDS ============ */}
         <TabsContent value="request" className="mt-5 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs text-muted-foreground">
+              These fields render as inputs on New DMR (header) and the Edit Header dialog on the
+              Gate Entries tab.
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setReqPasteOpen((o) => !o)}
+              className="gap-1.5"
+            >
+              <ClipboardPaste className="h-3.5 w-3.5" />
+              {reqPasteOpen ? "Cancel" : "Auto-detect from sample JSON"}
+            </Button>
+          </div>
+
+          {reqPasteOpen && (
+            <div className="rounded-xl border bg-card p-4 shadow-card">
+              <Label className="mb-2 block text-xs font-medium">
+                Paste a sample request payload (header object, optionally with _Item array)
+              </Label>
+              <Textarea
+                value={reqPasteText}
+                onChange={(e) => setReqPasteText(e.target.value)}
+                placeholder='{ "gate_id": "A123", "plant": "3801", "_Item": [ { ... } ] }'
+                className="min-h-32 font-mono text-xs"
+              />
+              <div className="mt-3 flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setReqPasteOpen(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={applyRequestPasteSample} className="gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5" /> Generate fields
+                </Button>
+              </div>
+            </div>
+          )}
+
           <FieldsEditor
             title="Request — Header Fields"
             description="These render as inputs on the New DMR screen and are sent as the top-level POST body."

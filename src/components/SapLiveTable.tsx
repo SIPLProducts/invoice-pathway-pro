@@ -20,12 +20,13 @@ import { useSapProxy } from "@/hooks/useSapProxy";
 import type { ColumnDef, SapApiSchema } from "@/lib/sapApiSchemas";
 import type { SapApi } from "@/lib/sapApisStore";
 import { getPath } from "@/lib/getPath";
-import { RefreshCw, AlertCircle, Wifi, WifiOff, Package, KeyRound } from "lucide-react";
+import { RefreshCw, AlertCircle, Wifi, WifiOff, Package, KeyRound, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
   api: SapApi;
   schema: SapApiSchema;
+  onEdit?: (row: Record<string, unknown>) => void;
 }
 
 function formatCell(value: unknown, col: ColumnDef): string {
@@ -41,7 +42,7 @@ function formatCell(value: unknown, col: ColumnDef): string {
   }
 }
 
-export function SapLiveTable({ api, schema }: Props) {
+export function SapLiveTable({ api, schema, onEdit }: Props) {
   const { rows, loading, error, lastFetched, proxyConfigured, refresh } = useSapProxy(api, schema);
 
   const [openRow, setOpenRow] = useState<{
@@ -178,13 +179,18 @@ export function SapLiveTable({ api, schema }: Props) {
                     Items
                   </TableHead>
                 )}
+                {onEdit && (
+                  <TableHead className="whitespace-nowrap text-xs uppercase tracking-wider">
+                    Edit
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && rows.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={schema.columns.length + (hasChildren ? 1 : 0)}
+                    colSpan={schema.columns.length + (hasChildren ? 1 : 0) + (onEdit ? 1 : 0)}
                     className="py-8 text-center text-sm text-muted-foreground"
                   >
                     Loading…
@@ -194,7 +200,7 @@ export function SapLiveTable({ api, schema }: Props) {
               {!loading && rows.length === 0 && !error && (
                 <TableRow>
                   <TableCell
-                    colSpan={schema.columns.length + (hasChildren ? 1 : 0)}
+                    colSpan={schema.columns.length + (hasChildren ? 1 : 0) + (onEdit ? 1 : 0)}
                     className="py-8 text-center text-sm text-muted-foreground"
                   >
                     No records returned by SAP.
@@ -206,6 +212,9 @@ export function SapLiveTable({ api, schema }: Props) {
                 const children = hasChildren
                   ? ((getPath(row, schema.childKey!) as Record<string, unknown>[]) ?? [])
                   : [];
+                const keyFieldName = api.keyField ?? api.rowKey ?? schema.rowKey;
+                const editKey = keyFieldName ? row[keyFieldName] : undefined;
+                const canEdit = editKey !== undefined && editKey !== null && editKey !== "";
                 return (
                   <TableRow key={key} className="hover:bg-muted/30">
                     {schema.columns.map((c) => (
@@ -230,6 +239,21 @@ export function SapLiveTable({ api, schema }: Props) {
                         >
                           <Package className="h-3 w-3" />
                           {children.length} item{children.length === 1 ? "" : "s"}
+                        </Button>
+                      </TableCell>
+                    )}
+                    {onEdit && (
+                      <TableCell className="whitespace-nowrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1.5 text-xs"
+                          disabled={!canEdit}
+                          onClick={() => onEdit(row)}
+                          title={canEdit ? "Edit header" : `Missing ${String(keyFieldName)}`}
+                        >
+                          <Pencil className="h-3 w-3" />
+                          Edit
                         </Button>
                       </TableCell>
                     )}

@@ -370,6 +370,32 @@ function load(): SapApi[] {
       }
     }
 
+    // One-time migration: auto-populate updateEndpoint/updateMethod/keyField for any
+    // pre-existing "Update * Item" API saved before line-item editing existed.
+    const UPDATE_ITEM_MIG_FLAG = "dmr.sapApis.updateItemMig.v1";
+    if (!localStorage.getItem(UPDATE_ITEM_MIG_FLAG)) {
+      let changed = false;
+      migrated = migrated.map((a) => {
+        const nameLooksLikeItemUpdate = /update.*item|item.*update|line[ _-]?item/i.test(a.name);
+        if (nameLooksLikeItemUpdate && !a.updateEndpoint) {
+          changed = true;
+          return {
+            ...a,
+            updateEndpoint: "/api/gate/items/{gate_id}/{item_no}",
+            updateMethod: a.updateMethod ?? "PATCH",
+            keyField: a.keyField ?? "item_no",
+          };
+        }
+        return a;
+      });
+      try {
+        if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+        localStorage.setItem(UPDATE_ITEM_MIG_FLAG, "1");
+      } catch {
+        /* ignore quota */
+      }
+    }
+
     // Layer 2: ensure default seed APIs are always present, but never overwrite user data.
     const merged = mergeSeedNonDestructive(migrated);
     if (merged.length !== migrated.length) {

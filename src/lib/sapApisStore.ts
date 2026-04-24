@@ -280,12 +280,41 @@ function load(): SapApi[] {
     }
 
     // Merge: ensure ZUI_Gate_Service has field schemas (in case older cached version)
-    return cleaned.map((a) => {
+    let migrated = cleaned.map((a) => {
       if (a.name === "ZUI_Gate_Service" && !a.requestHeaderFields) {
         return { ...seed.find((s) => s.name === "ZUI_Gate_Service")!, ...a, requestHeaderFields: GATE_HEADER_REQUEST, requestItemFields: GATE_ITEM_REQUEST, responseHeaderFields: GATE_HEADER_RESPONSE, responseItemFields: GATE_ITEM_RESPONSE };
       }
       return a;
     });
+
+    // One-time migration: auto-populate updateEndpoint/updateMethod/keyField for any
+    // pre-existing "Update Header" API saved before these fields existed.
+    const UPDATE_MIG_FLAG = "dmr.sapApis.updateMig.v1";
+    if (!localStorage.getItem(UPDATE_MIG_FLAG)) {
+      let changed = false;
+      migrated = migrated.map((a) => {
+        const nameLooksLikeUpdate = /update.*header|update.*gate|gate.*update/i.test(a.name);
+        const hasStaticKey = /\(\s*\w+\s*=\s*'[^']+'\s*\)/.test(a.endpoint ?? "");
+        if (nameLooksLikeUpdate && !a.updateEndpoint && hasStaticKey) {
+          changed = true;
+          return {
+            ...a,
+            updateEndpoint: "/api/gate/headers/{gate_id}",
+            updateMethod: a.updateMethod ?? "PATCH",
+            keyField: a.keyField ?? "gate_id",
+          };
+        }
+        return a;
+      });
+      try {
+        if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+        localStorage.setItem(UPDATE_MIG_FLAG, "1");
+      } catch {
+        /* ignore quota */
+      }
+    }
+
+    return migrated;
   } catch {
     return seed;
   }

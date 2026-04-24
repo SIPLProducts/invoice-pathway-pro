@@ -45,12 +45,13 @@ function formatCell(value: unknown, col: ColumnDef): string {
   }
 }
 
-export function SapLiveTable({ api, schema, onEdit }: Props) {
+export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }: Props) {
   const { rows, loading, error, lastFetched, proxyConfigured, refresh } = useSapProxy(api, schema);
 
   const [openRow, setOpenRow] = useState<{
     key: string;
     items: Record<string, unknown>[];
+    parent: Record<string, unknown>;
   } | null>(null);
 
   const hasChildren = Boolean(schema.childKey && schema.childColumns?.length);

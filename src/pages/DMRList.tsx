@@ -185,6 +185,8 @@ export default function DMRPage() {
                 api={selectedApi}
                 schema={buildSchemaFromApi(selectedApi)}
                 onEdit={updateApi ? (row) => setEditing({ row }) : undefined}
+                itemUpdateApi={itemUpdateApi ?? undefined}
+                onItemSaved={() => setRefreshKey((k) => k + 1)}
               />
               {updateNeedsConfig && (
                 <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-xs text-foreground">

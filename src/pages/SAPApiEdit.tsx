@@ -60,6 +60,8 @@ export default function SAPApiEdit() {
   const [tab, setTab] = useState("details");
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
+  const [reqPasteOpen, setReqPasteOpen] = useState(false);
+  const [reqPasteText, setReqPasteText] = useState("");
 
   const existing = !isNew ? getSapApi(decodeURIComponent(id ?? "")) : undefined;
 
@@ -157,6 +159,59 @@ export default function SAPApiEdit() {
       toast.success(`Imported ${headerFields.length} header + ${itemFields.length} item fields`);
       setPasteOpen(false);
       setPasteText("");
+    } catch (e) {
+      toast.error("Invalid JSON: " + (e instanceof Error ? e.message : String(e)));
+    }
+  };
+
+  const applyRequestPasteSample = () => {
+    try {
+      const parsed = JSON.parse(reqPasteText);
+      const obj: Record<string, unknown> = Array.isArray(parsed?.value)
+        ? (parsed.value[0] as Record<string, unknown>)
+        : Array.isArray(parsed)
+          ? (parsed[0] as Record<string, unknown>)
+          : (parsed as Record<string, unknown>);
+      if (!obj || typeof obj !== "object") {
+        toast.error("Couldn't read an object from the pasted JSON");
+        return;
+      }
+      const headerFields: FieldDef[] = Object.entries(obj)
+        .filter(
+          ([k, v]) =>
+            !k.startsWith("@") &&
+            !k.startsWith("SAP__") &&
+            k !== "_Item" &&
+            (v === null || typeof v !== "object"),
+        )
+        .map(([k, v]) => ({
+          key: k,
+          label: prettify(k),
+          type: inferType(v),
+          showInForm: true,
+        }));
+      const itemArr = (obj._Item as Record<string, unknown>[] | undefined) ?? [];
+      const itemFields: FieldDef[] =
+        itemArr.length > 0
+          ? Object.entries(itemArr[0])
+              .filter(([k]) => !k.startsWith("@") && !k.startsWith("SAP__"))
+              .map(([k, v]) => ({
+                key: k,
+                label: prettify(k),
+                type: inferType(v),
+                showInForm: true,
+              }))
+          : [];
+      setApi((p) => ({
+        ...p,
+        requestHeaderFields: headerFields,
+        requestItemFields: itemFields.length ? itemFields : p.requestItemFields,
+      }));
+      toast.success(
+        `Imported ${headerFields.length} header + ${itemFields.length} item request fields`,
+      );
+      setReqPasteOpen(false);
+      setReqPasteText("");
     } catch (e) {
       toast.error("Invalid JSON: " + (e instanceof Error ? e.message : String(e)));
     }

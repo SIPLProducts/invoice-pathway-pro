@@ -85,6 +85,12 @@ export interface SapApi {
   // Endpoints
   listEndpoint?: string;
   createEndpoint?: string;
+  /** Update endpoint template, supports `{placeholder}` tokens filled from selected row. e.g. "/api/gate/headers/{gate_id}" */
+  updateEndpoint?: string;
+  /** HTTP method for update calls. Defaults to PATCH. */
+  updateMethod?: SapMethod;
+  /** Field name in the response row that fills the {placeholder} in updateEndpoint. Defaults to `rowKey`. */
+  keyField?: string;
 
   /** Optional middleware path the proxy exposes. e.g. "/api/gate/headers" */
   proxyPath?: string;
@@ -233,6 +239,9 @@ const seed: SapApi[] = [
     },
     listEndpoint: "/api/gate/headers",
     createEndpoint: "/api/gate/headers",
+    updateEndpoint: "/api/gate/headers/{gate_id}",
+    updateMethod: "PATCH",
+    keyField: "gate_id",
     proxyPath: "/api/gate/headers",
     middleware: {
       url: "",

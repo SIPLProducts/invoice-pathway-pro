@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -8,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, RotateCcw } from "lucide-react";
+import { Plus, Trash2, RotateCcw, ClipboardPaste, Sparkles } from "lucide-react";
 import type { FieldDef, FieldType } from "@/lib/sapApisStore";
 
 interface Props {
@@ -19,6 +22,10 @@ interface Props {
   /** "request" shows Required + Show in Form + Default; "response" shows Show in Table + Align. */
   variant: "request" | "response";
   onResetDefaults?: () => void;
+  /** When provided, renders an "Auto-detect from sample JSON" button + paste box for this section. */
+  onAutoDetect?: (sampleJson: string) => void;
+  /** Placeholder shown in the auto-detect textarea. */
+  autoDetectPlaceholder?: string;
 }
 
 const TYPES: FieldType[] = ["string", "number", "date", "time", "boolean"];
@@ -30,7 +37,12 @@ export function FieldsEditor({
   onChange,
   variant,
   onResetDefaults,
+  onAutoDetect,
+  autoDetectPlaceholder,
 }: Props) {
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+
   const update = (idx: number, patch: Partial<FieldDef>) => {
     const next = fields.map((f, i) => (i === idx ? { ...f, ...patch } : f));
     onChange(next);
@@ -56,7 +68,18 @@ export function FieldsEditor({
           <h3 className="font-display text-base font-semibold">{title}</h3>
           {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {onAutoDetect && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPasteOpen((o) => !o)}
+              className="gap-1.5"
+            >
+              <ClipboardPaste className="h-3.5 w-3.5" />
+              {pasteOpen ? "Cancel paste" : "Auto-detect from sample JSON"}
+            </Button>
+          )}
           {onResetDefaults && (
             <Button variant="outline" size="sm" onClick={onResetDefaults} className="gap-1.5">
               <RotateCcw className="h-3.5 w-3.5" /> Reset to SAP defaults
@@ -67,6 +90,44 @@ export function FieldsEditor({
           </Button>
         </div>
       </div>
+
+      {onAutoDetect && pasteOpen && (
+        <div className="mb-4 rounded-lg border bg-muted/20 p-3">
+          <Label className="mb-2 block text-xs font-medium">
+            Paste a sample JSON for this section
+          </Label>
+          <Textarea
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            placeholder={autoDetectPlaceholder ?? '{ "key": "value", ... }'}
+            className="min-h-28 font-mono text-xs"
+          />
+          <div className="mt-2 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPasteOpen(false);
+                setPasteText("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                onAutoDetect(pasteText);
+                setPasteOpen(false);
+                setPasteText("");
+              }}
+              className="gap-1.5"
+              disabled={!pasteText.trim()}
+            >
+              <Sparkles className="h-3.5 w-3.5" /> Generate fields
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-sm">

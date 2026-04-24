@@ -660,7 +660,54 @@ export default function SAPSettings() {
               )}
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  try {
+                    const json = exportApis();
+                    const blob = new Blob([json], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    const date = new Date().toISOString().slice(0, 10);
+                    a.href = url;
+                    a.download = `sap-apis-${date}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    toast.success(`Exported ${apis.length} API${apis.length === 1 ? "" : "s"}`);
+                  } catch (e) {
+                    toast.error("Export failed", { description: String((e as Error).message ?? e) });
+                  }
+                }}
+              >
+                <Download className="mr-2 h-4 w-4" /> Export APIs
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "application/json,.json";
+                  input.onchange = async () => {
+                    const file = input.files?.[0];
+                    if (!file) return;
+                    try {
+                      const text = await file.text();
+                      const { added, replaced } = importApis(text);
+                      toast.success(`Imported ${added} new, updated ${replaced}`);
+                    } catch (e) {
+                      toast.error("Import failed", { description: String((e as Error).message ?? e) });
+                    }
+                  };
+                  input.click();
+                }}
+              >
+                <Upload className="mr-2 h-4 w-4" /> Import APIs
+              </Button>
               <AddApiDialog />
             </div>
 

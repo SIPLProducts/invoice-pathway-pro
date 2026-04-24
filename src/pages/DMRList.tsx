@@ -63,7 +63,13 @@ export default function DMRPage() {
       a.updateEndpoint &&
       updateRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
   );
-  const anyWithTpl = apis.find((a) => a.status === "Active" && a.updateEndpoint);
+  const itemUpdateRePre = /update.*item|item.*update|line[ _-]?item/i;
+  const anyWithTpl = apis.find(
+    (a) =>
+      a.status === "Active" &&
+      a.updateEndpoint &&
+      !itemUpdateRePre.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
+  );
   const matchedNoTpl = apis.find(
     (a) => a.status === "Active" && updateRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
   );
@@ -71,6 +77,24 @@ export default function DMRPage() {
     matchedWithTpl ?? anyWithTpl ?? (selectedApi?.updateEndpoint ? selectedApi : null);
   // Surface a banner only when a candidate exists by name but lacks the template.
   const updateNeedsConfig = !updateApi && matchedNoTpl ? matchedNoTpl : null;
+
+  // Item-level update API. Match anything that mentions item / line item update.
+  const itemUpdateRe = /update.*item|item.*update|line[ _-]?item/i;
+  const itemUpdateApi =
+    apis.find(
+      (a) =>
+        a.status === "Active" &&
+        a.updateEndpoint &&
+        itemUpdateRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
+    ) ?? null;
+  const itemUpdateNeedsConfig =
+    !itemUpdateApi
+      ? apis.find(
+          (a) =>
+            a.status === "Active" &&
+            itemUpdateRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
+        ) ?? null
+      : null;
 
   const filtered = dmrs.filter((d) => {
     const tab = tabMap[active];
@@ -161,6 +185,8 @@ export default function DMRPage() {
                 api={selectedApi}
                 schema={buildSchemaFromApi(selectedApi)}
                 onEdit={updateApi ? (row) => setEditing({ row }) : undefined}
+                itemUpdateApi={itemUpdateApi ?? undefined}
+                onItemSaved={() => setRefreshKey((k) => k + 1)}
               />
               {updateNeedsConfig && (
                 <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-xs text-foreground">
@@ -176,6 +202,28 @@ export default function DMRPage() {
                   <div className="mt-2">
                     <Link
                       to={`/sap/settings/edit/${encodeURIComponent(updateNeedsConfig.name)}`}
+                      className="inline-flex items-center rounded border border-warning/50 bg-background px-2 py-1 font-semibold text-warning hover:bg-warning/20"
+                    >
+                      Configure now
+                    </Link>
+                  </div>
+                </div>
+              )}
+              {itemUpdateNeedsConfig && (
+                <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-xs text-foreground">
+                  <div className="font-semibold">
+                    Item-update API found ("{itemUpdateNeedsConfig.name}") but the{" "}
+                    <span className="font-mono">Update Endpoint</span> template is empty.
+                  </div>
+                  <div className="mt-1 text-muted-foreground">
+                    Open API Settings → {itemUpdateNeedsConfig.name} → API Details and set{" "}
+                    <span className="font-mono">Update Endpoint</span> to{" "}
+                    <code className="font-mono">/api/gate/items/{"{gate_id}"}/{"{item_no}"}</code>{" "}
+                    to enable per-line-item editing inside the Items popup.
+                  </div>
+                  <div className="mt-2">
+                    <Link
+                      to={`/sap/settings/edit/${encodeURIComponent(itemUpdateNeedsConfig.name)}`}
                       className="inline-flex items-center rounded border border-warning/50 bg-background px-2 py-1 font-semibold text-warning hover:bg-warning/20"
                     >
                       Configure now

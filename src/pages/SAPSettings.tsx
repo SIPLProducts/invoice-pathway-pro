@@ -26,6 +26,7 @@ import {
   Play,
   Trash2,
   Download,
+  Upload,
   Cloud,
   Monitor,
   Activity,

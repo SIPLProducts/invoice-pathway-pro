@@ -18,25 +18,40 @@ export interface UpdateSubmitOptions {
   headerFields?: FieldDef[];
 }
 
-function sanitizeRow(row: Record<string, unknown>, fields: FieldDef[]): Record<string, unknown> {
+function sanitizeRow(
+  body: Record<string, unknown>,
+  fields: FieldDef[],
+  liveRow: Record<string, unknown> = {},
+): Record<string, unknown> {
   const typeByKey = new Map(fields.map((f) => [f.key, f.type] as const));
   const allowed = fields.length > 0 ? new Set(fields.map((f) => f.key)) : null;
   const out: Record<string, unknown> = {};
-  for (const [k, raw] of Object.entries(row)) {
+  for (const [k, raw] of Object.entries(body)) {
     if (allowed && !allowed.has(k)) continue;
     if (raw === null || raw === undefined) continue;
     if (k.startsWith("@") || k === "SAP__Messages") continue;
-    const t = typeByKey.get(k);
+
+    // Effective type: trust the live SAP row's actual type first (source of truth),
+    // then fall back to the configured field type.
+    const liveVal = liveRow[k];
+    let effectiveType: FieldDef["type"] | undefined = typeByKey.get(k);
+    if (typeof liveVal === "number") effectiveType = "number";
+    else if (typeof liveVal === "boolean") effectiveType = "boolean";
+
     if (typeof raw === "string") {
       const v = raw.trim();
       if (v === "") continue;
-      if (t === "number") {
+      if (effectiveType === "number") {
         const n = Number(v);
         if (Number.isNaN(n)) continue;
         out[k] = n;
         continue;
       }
-      if (t === "time") {
+      if (effectiveType === "boolean") {
+        out[k] = v === "true" || v === "1";
+        continue;
+      }
+      if (effectiveType === "time") {
         out[k] = /^\d{2}:\d{2}$/.test(v) ? `${v}:00` : v;
         continue;
       }
@@ -51,6 +66,34 @@ function sanitizeRow(row: Record<string, unknown>, fields: FieldDef[]): Record<s
     out[k] = raw;
   }
   return out;
+}
+
+function pickSapDetailMessage(sapErr: unknown): string | null {
+  if (!sapErr || typeof sapErr !== "object") return null;
+  const details = (sapErr as { details?: unknown }).details;
+  if (!Array.isArray(details) || details.length === 0) return null;
+  // Prefer the most actionable detail: anything mentioning a Property name,
+  // or a code containing PROPERTY/BAD_REQUEST.
+  const scored = details
+    .map((d) => {
+      if (!d || typeof d !== "object") return null;
+      const message = typeof (d as { message?: unknown }).message === "string"
+        ? ((d as { message: string }).message)
+        : "";
+      const code = typeof (d as { code?: unknown }).code === "string"
+        ? ((d as { code: string }).code)
+        : "";
+      let score = 0;
+      if (/Property\s+'/i.test(message)) score += 10;
+      if (/invalid value/i.test(message)) score += 5;
+      if (/PROPERTY/i.test(code)) score += 4;
+      if (/BAD_REQUEST/i.test(code)) score += 2;
+      return { message, score };
+    })
+    .filter((x): x is { message: string; score: number } => !!x && !!x.message);
+  if (scored.length === 0) return null;
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0].message;
 }
 
 /**
@@ -114,7 +157,7 @@ export function useSapUpdate(api: SapApi | null | undefined) {
     setLoading(true);
     try {
       const headerFields = options.headerFields ?? api?.requestHeaderFields ?? [];
-      const payload = sanitizeRow(body, headerFields);
+      const payload = sanitizeRow(body, headerFields, row);
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -135,13 +178,10 @@ export function useSapUpdate(api: SapApi | null | undefined) {
         if (res.status === 401 || res.status === 403) markSapSessionExpired();
         const sapErr = data?.error;
         if (sapErr?.code === "sap_auth_redirect") markSapSessionExpired();
-        const detail =
-          Array.isArray(sapErr?.details) && sapErr.details[0]?.message
-            ? sapErr.details[0].message
-            : null;
+        const bestDetail = pickSapDetailMessage(sapErr);
         return {
           ok: false,
-          error: detail || sapErr?.message || sapErr?.code || `HTTP ${res.status}`,
+          error: bestDetail || sapErr?.message || sapErr?.code || `HTTP ${res.status}`,
           sapBody: data,
         };
       }

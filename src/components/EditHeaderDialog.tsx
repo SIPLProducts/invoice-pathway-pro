@@ -61,13 +61,25 @@ function coerce(v: string, type: FieldDef["type"]): string | number | boolean {
   return v;
 }
 
+/**
+ * Trust the live SAP row as the source of truth for primitive types.
+ * If the schema says "string" but the live row's value is a number/boolean,
+ * render and coerce as that real type — this prevents sending quoted numbers
+ * to SAP (which fails with CX_SXML_PARSE_ERROR on Edm.Decimal fields).
+ */
+function effectiveType(field: FieldDef, liveValue: unknown): FieldDef["type"] {
+  if (typeof liveValue === "number") return "number";
+  if (typeof liveValue === "boolean") return "boolean";
+  return field.type;
+}
+
 export function EditHeaderDialog({ api, row, onClose, onSaved }: Props) {
   const fields = useMemo(() => deriveFields(api, row), [api, row]);
   const { submit, loading, proxyConfigured, updateConfigured } = useSapUpdate(api);
 
   const initial = useMemo(() => {
     const o: Record<string, string> = {};
-    fields.forEach((f) => (o[f.key] = toInputValue(row[f.key], f.type)));
+    fields.forEach((f) => (o[f.key] = toInputValue(row[f.key], effectiveType(f, row[f.key]))));
     return o;
   }, [fields, row]);
 
@@ -82,7 +94,7 @@ export function EditHeaderDialog({ api, row, onClose, onSaved }: Props) {
     fields.forEach((f) => {
       const raw = values[f.key];
       if (raw === undefined || raw === "") return;
-      body[f.key] = coerce(raw, f.type);
+      body[f.key] = coerce(raw, effectiveType(f, row[f.key]));
     });
 
     const result = await submit(row, body);
@@ -140,6 +152,7 @@ export function EditHeaderDialog({ api, row, onClose, onSaved }: Props) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {fields.map((f) => {
             const isKey = f.key === keyField;
+            const t = effectiveType(f, row[f.key]);
             return (
               <div key={f.key} className="space-y-1.5">
                 <Label className="text-xs">
@@ -152,7 +165,8 @@ export function EditHeaderDialog({ api, row, onClose, onSaved }: Props) {
                   )}
                 </Label>
                 <Input
-                  type={f.type === "number" ? "number" : f.type === "date" ? "date" : f.type === "time" ? "time" : "text"}
+                  type={t === "number" ? "number" : t === "date" ? "date" : t === "time" ? "time" : "text"}
+                  step={t === "number" ? "any" : undefined}
                   value={values[f.key] ?? ""}
                   onChange={(e) => setValues((p) => ({ ...p, [f.key]: e.target.value }))}
                   disabled={isKey}

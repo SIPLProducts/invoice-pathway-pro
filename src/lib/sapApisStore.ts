@@ -99,7 +99,11 @@ export interface SapApi {
   middleware?: MiddlewareConfig;
 }
 
+// IMPORTANT: Never bump STORAGE_KEY without adding a forward migration in `load()`.
+// Bumping the key without migration wipes all user-created APIs from the previous key.
 const STORAGE_KEY = "dmr.sapApis.v3";
+const LEGACY_STORAGE_KEYS = ["dmr.sapApis.v2", "dmr.sapApis.v1"];
+const BACKUP_KEY = "dmr.sapApis.backup.latest";
 
 const GATE_HEADER_REQUEST: FieldDef[] = [
   { key: "gate_id", label: "Gate ID", type: "string", required: true, showInForm: true },

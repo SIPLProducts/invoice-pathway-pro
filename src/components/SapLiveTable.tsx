@@ -279,42 +279,21 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
             </DialogDescription>
           </DialogHeader>
           {schema.childColumns && openRow && (
-            <div className="overflow-x-auto rounded border bg-background">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/40">
-                    {schema.childColumns.map((c) => (
-                      <TableHead
-                        key={c.path}
-                        className={cn(
-                          "whitespace-nowrap text-[10px] uppercase",
-                          c.align === "right" && "text-right",
-                        )}
-                      >
-                        {c.header}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {openRow.items.map((child, i) => (
-                    <TableRow key={i}>
-                      {schema.childColumns!.map((c) => (
-                        <TableCell
-                          key={c.path}
-                          className={cn(
-                            "whitespace-nowrap text-xs",
-                            c.align === "right" && "text-right font-mono",
-                          )}
-                        >
-                          {formatCell(getPath(child, c.path), c)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <EditableItemsTable
+              schema={schema}
+              parentRow={openRow.parent}
+              items={openRow.items}
+              itemUpdateApi={itemUpdateApi}
+              onSaved={(updated, idx) => {
+                setOpenRow((prev) => {
+                  if (!prev) return prev;
+                  const nextItems = prev.items.slice();
+                  nextItems[idx] = { ...nextItems[idx], ...updated };
+                  return { ...prev, items: nextItems };
+                });
+                onItemSaved?.();
+              }}
+            />
           )}
         </DialogContent>
       </Dialog>

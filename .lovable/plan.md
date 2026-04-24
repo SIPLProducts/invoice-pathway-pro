@@ -1,58 +1,114 @@
 
 
-## Plan: Persist Manual JSESSIONID across reloads + show expiry status
+## Plan: Add "Edit" action on SAP Gate Entries with dynamic `gate_id` substitution + auto-detect for the Update API
 
-### Current behaviour
-Manual cookies are already persisted in `localStorage` under `sap.session.v1` via `src/lib/sapSession.ts`. They survive page reloads. What's missing:
-1. No visible "expiry" concept on the client — user can't tell when SAP rejected the saved cookies vs. when they're still valid.
-2. When SAP returns 401/403 (cookies expired), the UI still shows the old cookies as if they're fine.
-3. After expiry, the user has to manually click **Clear** before pasting fresh cookies — friction.
+### The two problems
+
+1. **Static `gate_id` in API config.** On the **Update Header Data** API (screenshot 1), the *Endpoint Path* contains a hard-coded `GateHeader(gate_id='A123I00005')`. That value should change per row at runtime.
+2. **No edit affordance on the Gate Entries table.** The DMR → SAP Gate Entries tab today is read-only. You want a new **Edit** column → click → header form opens pre-filled → save → middleware PATCH → SAP updates.
+3. **Bonus:** the *Auto-detect from sample JSON* button (screenshot 2) currently lives on the **Response Fields** tab only. The Update API also needs **Request → Header / Item** auto-detection from a pasted sample.
+
+### How dynamic `gate_id` will work (no SAP-side change, no middleware change)
+
+The middleware already exposes the dynamic route:
+
+```
+PATCH /api/gate/headers/:gateId   →   PATCH /GateHeader(gate_id='<gateId>')
+```
+
+So the SAP API config just needs to store an **update endpoint template** that contains a `{gate_id}` placeholder. At click time, the frontend substitutes the selected row's `gate_id` and calls the resolved proxy path.
+
+```
+Update Endpoint (proxy path):  /api/gate/headers/{gate_id}
+Update Method:                 PATCH
+```
+
+For the Edit button row with `gate_id = "A123I00012"`, the frontend hits:
+```
+PATCH https://<middleware>/api/gate/headers/A123I00012
+```
+Body = sanitized header payload (matching the payload you pasted).
+
+The static SAP path `GateHeader(gate_id='A123I00005')?sap-client=100` shown in the *Endpoint Path* field stays as a **reference / documentation** value (it's just metadata). What actually drives the call is the new **Update Endpoint** + **Update Method** fields with `{gate_id}` placeholder support.
 
 ### Changes
 
-**1. `src/lib/sapSession.ts` — add expiry tracking**
-- Add `expiresAt: string` (ISO) and `status: "active" | "expired" | "unknown"` to the `SapSession` shape.
-- New helper `markSapSessionExpired()` — sets `status: "expired"` without wiping the cookie values (so user can see what was there and decide to re-paste).
-- New helper `markSapSessionActive()` — sets `status: "active"` and refreshes `savedAt` whenever a SAP call succeeds with manual cookies.
-- On `setSapSession(...)`: default `status: "active"`, compute `expiresAt = savedAt + SAP_MANUAL_TTL_HOURS` (default 4h, mirroring middleware `SAP_SESSION_TTL_HOURS`).
-- `getSapSessionHeaders()` keeps returning headers even when `status === "expired"` (so the user's next test call goes through and we learn the real state from SAP's response).
+#### 1. `src/lib/sapApisStore.ts` — add update endpoint metadata
+Add three optional fields to `SapApi`:
+- `updateEndpoint?: string` — proxy path template, e.g. `/api/gate/headers/{gate_id}`
+- `updateMethod?: SapMethod` — defaults to `"PATCH"`
+- `keyField?: string` — which response field provides the placeholder value (defaults to `rowKey`, i.e. `gate_id`)
 
-**2. `src/pages/SAPSettings.tsx` — surface saved cookies + expiry on load**
-- On mount, the Manual tab already pre-fills inputs from `useSapSession()`. Confirm masked previews (`JSESSIO…abc123`) render whenever cookies exist, even before the user types.
-- Add a status row under the inputs:
-  - `status === "active"` → green dot + "Active. Saved 12m ago. Expires in 3h 48m."
-  - `status === "expired"` → amber dot + "Expired. Paste fresh cookies and click Save."
-  - `status === "unknown"` → muted dot + "Saved 2d ago. Click Test connection to verify."
-- After `testSapConnection()` finishes:
-  - On HTTP 200 → call `markSapSessionActive()`.
-  - On `sap_auth_redirect` / 401 / 403 → call `markSapSessionExpired()`.
-- The **Save** button now also resets `status: "active"` and `expiresAt` automatically.
-- Inputs are NOT cleared when status flips to expired — user sees the old cookies, can compare, and overwrite directly.
+Seed `ZUI_Gate_Service` with `updateEndpoint: "/api/gate/headers/{gate_id}"`, `updateMethod: "PATCH"`, `keyField: "gate_id"`.
 
-**3. `src/hooks/useSapProxy.ts` and `src/hooks/useSapCreate.ts` — auto-flag expiry on real SAP calls**
-- After every fetch, if response is 401/403 OR error code is `sap_auth_redirect`, call `markSapSessionExpired()` so the SAP Settings badge updates even if user never clicked Test.
-- On 2xx response in manual mode, call `markSapSessionActive()`.
+#### 2. `src/pages/SAPApiEdit.tsx` — surface the new fields
+Under the **API Details** tab, next to *List Endpoint* and *Create Endpoint*, add:
+- **Update Endpoint (proxy path)** input — placeholder `/api/gate/headers/{gate_id}`, with helper text *"Use `{gate_id}` (or any response field name) as a placeholder. The frontend substitutes it from the selected row at call time."*
+- **Update Method** select — default `PATCH`.
+- **Key Field** input — placeholder `gate_id`, helper *"Response field used to fill the placeholder."*
 
-### Behaviour matrix
+#### 3. `src/pages/SAPApiEdit.tsx` — auto-detect for Request fields too
+Move the *Auto-detect from sample JSON* control so it appears on **both** the Request Fields tab and the Response Fields tab. Pasting the request-payload JSON you provided will:
+- Populate `requestHeaderFields` with each top-level scalar key (skipping `@odata.*`, `SAP__Messages`, `_Item`).
+- Populate `requestItemFields` from the first `_Item` entry (when present).
+- Infer types (`number`, `date` `YYYY-MM-DD`, `time` `HH:MM:SS`, `boolean`, else `string`).
+- Mark all detected request fields with `showInForm: true`.
 
-| Scenario | What user sees on /sap/settings (Manual tab) |
-|---|---|
-| Fresh visit, never saved | Empty inputs, "Manual — not set" badge |
-| Saved 10 min ago, working | Pre-filled masked cookies, green "Active. Expires in 3h 50m" |
-| Saved yesterday, SAP just rejected | Pre-filled masked cookies, amber "Expired. Paste fresh cookies" |
-| Saved 2h ago, never tested | Pre-filled masked cookies, muted "Saved 2h ago. Click Test connection to verify" |
+Reuses the same `inferType` / `prettify` helpers already in this file — the only additions are a second `applyPasteSample` variant for request fields and a paste UI block on the Request tab.
+
+#### 4. `src/components/SapLiveTable.tsx` — add the Edit column
+- New prop `onEdit?: (row: Record<string, unknown>) => void`. When provided, the table renders an **Edit** column header (right of the existing Items column) and an `Edit` icon button in each row.
+- Button is disabled when the row's key field is missing.
+
+#### 5. New component `src/components/EditHeaderDialog.tsx`
+- Props: `api`, `row` (the selected gate entry), `onClose`, `onSaved`.
+- Pre-fills inputs from `row` using `requestHeaderFields` (falls back to `responseHeaderFields` filtered to scalar keys when request fields are empty — covers the case where the Update API has only response fields configured).
+- On Save: builds the dynamic URL from `api.updateEndpoint` by replacing every `{xxx}` token with `row[xxx]` (URL-encoded). If the placeholder value is missing, shows a clear error and aborts.
+- Calls a small new helper (see #6) that PATCHes the resolved URL, sanitizes the body using `requestHeaderFields` (same `sanitizeForSap` pattern), forwards `getSapSessionHeaders()`, and updates session active/expired status.
+- Uses `Dialog` + `Input` + the same `coercion()` style as `DMRNew`.
+
+#### 6. `src/hooks/useSapUpdate.ts` — new hook (mirror of `useSapCreate`)
+- Same shape as `useSapCreate`, but:
+  - Method comes from `api.updateMethod ?? "PATCH"`.
+  - URL = `proxyUrl + resolvedTemplate(api.updateEndpoint, row)`.
+  - Body = sanitized header (no `_Item` array).
+- Returns `{ submit(row, body), loading, proxyConfigured, proxyUrl }`.
+
+#### 7. `src/pages/DMRList.tsx` — wire the Edit action
+- Find the Update API the same way the GET API is found today: an Active API whose name/endpoint/proxyPath matches `update.*gate|gate.*update|update[ _-]?header` AND whose `updateEndpoint` is set. Falls back to the same `selectedApi` if its `updateEndpoint` is set.
+- Pass `onEdit={(row) => setEditing({ row })}` to `<SapLiveTable>` and render `<EditHeaderDialog api={updateApi} row={editing.row} ...>` when `editing` is set.
+- After a successful save, call the table's `refresh()` so the row reflects new values.
 
 ### What stays the same
-- `localStorage` key (`sap.session.v1`) and the existing Auto/Manual toggle.
-- Middleware code, all hooks' fetch logic — only adding two function calls (`markSapSessionActive`/`markSapSessionExpired`) at response-handling points.
-- `getSapSessionHeaders()` continues to return headers whenever cookies exist; the middleware decides validity.
+- Middleware: zero changes. `PATCH /api/gate/headers/:gateId` already exists.
+- SAP backend: zero changes.
+- Existing GET / POST flows, session handling, error UI — untouched.
+- Existing `SAPApiEdit` tabs and `FieldsEditor` — only additive new fields/buttons.
 
-### Files to change
-- `src/lib/sapSession.ts` — add `expiresAt`, `status`, helpers (~30 added lines).
-- `src/pages/SAPSettings.tsx` — render status row, wire test-result into mark helpers (~25 added lines).
-- `src/hooks/useSapProxy.ts` — call mark helpers after fetch (~6 lines).
-- `src/hooks/useSapCreate.ts` — call mark helpers after fetch (~6 lines).
+### How a user will use it end-to-end
+1. **One-time setup** in SAP Settings → *Update Header Data* API:
+   - Update Endpoint (proxy path): `/api/gate/headers/{gate_id}`
+   - Update Method: `PATCH`
+   - Key Field: `gate_id`
+   - Open **Request Fields** tab → click **Auto-detect from sample JSON** → paste the request payload you provided → header fields get generated with correct types.
+   - (Optional) Same on **Response Fields** tab using the response body you provided.
+   - Save.
+
+2. **Daily use** on DMR → SAP Gate Entries:
+   - Each row gets an **Edit** icon. Click it.
+   - Dialog opens pre-filled with that row's header values.
+   - Edit any field → **Save**.
+   - Frontend hits `PATCH https://<middleware>/api/gate/headers/A123I00012` with the cleaned body.
+   - On success: toast, dialog closes, table refreshes. On error: inline error with the SAP detail message (same pattern as `useSapCreate`).
+
+### Files to change / create
+- `src/lib/sapApisStore.ts` — add `updateEndpoint`, `updateMethod`, `keyField` to `SapApi` + seed.
+- `src/pages/SAPApiEdit.tsx` — three new inputs in API Details; replicate the paste UI on the Request tab.
+- `src/components/SapLiveTable.tsx` — optional Edit column + button.
+- `src/components/EditHeaderDialog.tsx` — new file (~120 lines).
+- `src/hooks/useSapUpdate.ts` — new file (~90 lines, mirrors `useSapCreate`).
+- `src/pages/DMRList.tsx` — discover update API + render the dialog.
 
 ### Expected result
-Reload the page after saving Manual cookies → inputs are pre-filled and a green "Active, expires in N h" badge shows. When SAP eventually rejects them (4 h later, or after a logout), the badge flips to amber "Expired" and the inputs stay populated so you can paste the new JSESSIONID/__VCAP_ID__ directly over the old ones and click Save again.
+On the SAP Gate Entries tab, every row shows an **Edit** button. Clicking it opens a header form pre-filled with that row's data. Saving sends a PATCH to the dynamically-built URL `…/api/gate/headers/<that row's gate_id>`, and the table refreshes with the new values. The static `gate_id` in the API config no longer matters — it's just documentation.
 

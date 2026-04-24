@@ -37,20 +37,32 @@ const tabMap: Record<string, string | null> = {
 export default function DMRPage() {
   const [active, setActive] = useState<(typeof tabs)[number]>("All");
   const [q, setQ] = useState("");
+  const [editing, setEditing] = useState<{ row: Record<string, unknown> } | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const apis = useSapApis();
   // SAP Gate Entries tab shows any GET API that targets the gate service.
-  // Create_Gate_Service is a write API and lives on the New DMR page.
   const liveApis = apis.filter((a) => {
     if (a.method !== "GET") return false;
     if (a.status !== "Active") return false;
     const hay = `${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`.toLowerCase();
     return /get[ _-]?dmr|dmr[ _-]?list|gate(header|service)/.test(hay);
   });
-  // Prefer an explicit "GET DMR LIST" API when present
   const selectedApi =
     liveApis.find((a) => /get[ _-]?dmr[ _-]?list/i.test(a.name)) ??
     liveApis[0] ??
     null;
+
+  // Find an Active API with an updateEndpoint configured.
+  const updateApi =
+    apis.find(
+      (a) =>
+        a.status === "Active" &&
+        a.updateEndpoint &&
+        /update.*gate|gate.*update|update[ _-]?header/i.test(
+          `${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`,
+        ),
+    ) ??
+    (selectedApi?.updateEndpoint ? selectedApi : null);
 
   const filtered = dmrs.filter((d) => {
     const tab = tabMap[active];

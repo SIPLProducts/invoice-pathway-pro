@@ -7,6 +7,7 @@ import { inr } from "@/lib/format";
 import { Plus, Search, Filter, Download, Eye, FileText, MapPin, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { SapLiveTable } from "@/components/SapLiveTable";
+import { EditHeaderDialog } from "@/components/EditHeaderDialog";
 import { buildSchemaFromApi } from "@/lib/sapApiSchemas";
 import { useSapApis } from "@/lib/sapApisStore";
 

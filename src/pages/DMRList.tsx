@@ -52,17 +52,25 @@ export default function DMRPage() {
     liveApis[0] ??
     null;
 
-  // Find an Active API with an updateEndpoint configured.
+  // Find an update-capable API. Preference order:
+  //   1. Name matches update regex AND has updateEndpoint template
+  //   2. Any active API with updateEndpoint template
+  //   3. Name matches update regex but template missing (so we can show a "configure me" banner)
+  const updateRe = /update.*gate|gate.*update|update[ _-]?header/i;
+  const matchedWithTpl = apis.find(
+    (a) =>
+      a.status === "Active" &&
+      a.updateEndpoint &&
+      updateRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
+  );
+  const anyWithTpl = apis.find((a) => a.status === "Active" && a.updateEndpoint);
+  const matchedNoTpl = apis.find(
+    (a) => a.status === "Active" && updateRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
+  );
   const updateApi =
-    apis.find(
-      (a) =>
-        a.status === "Active" &&
-        a.updateEndpoint &&
-        /update.*gate|gate.*update|update[ _-]?header/i.test(
-          `${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`,
-        ),
-    ) ??
-    (selectedApi?.updateEndpoint ? selectedApi : null);
+    matchedWithTpl ?? anyWithTpl ?? (selectedApi?.updateEndpoint ? selectedApi : null);
+  // Surface a banner only when a candidate exists by name but lacks the template.
+  const updateNeedsConfig = !updateApi && matchedNoTpl ? matchedNoTpl : null;
 
   const filtered = dmrs.filter((d) => {
     const tab = tabMap[active];
@@ -154,7 +162,28 @@ export default function DMRPage() {
                 schema={buildSchemaFromApi(selectedApi)}
                 onEdit={updateApi ? (row) => setEditing({ row }) : undefined}
               />
-              {!updateApi && (
+              {updateNeedsConfig && (
+                <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-xs text-foreground">
+                  <div className="font-semibold">
+                    Update API found ("{updateNeedsConfig.name}") but the{" "}
+                    <span className="font-mono">Update Endpoint</span> template is empty.
+                  </div>
+                  <div className="mt-1 text-muted-foreground">
+                    Open API Settings → {updateNeedsConfig.name} → API Details and set{" "}
+                    <span className="font-mono">Update Endpoint</span> to{" "}
+                    <code className="font-mono">/api/gate/headers/{"{gate_id}"}</code> to enable per-row editing.
+                  </div>
+                  <div className="mt-2">
+                    <Link
+                      to={`/sap/settings/edit/${encodeURIComponent(updateNeedsConfig.name)}`}
+                      className="inline-flex items-center rounded border border-warning/50 bg-background px-2 py-1 font-semibold text-warning hover:bg-warning/20"
+                    >
+                      Configure now
+                    </Link>
+                  </div>
+                </div>
+              )}
+              {!updateApi && !updateNeedsConfig && (
                 <div className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                   Tip: configure an Active API with an{" "}
                   <code className="font-mono">Update Endpoint</code> (e.g.{" "}

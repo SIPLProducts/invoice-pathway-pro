@@ -22,11 +22,14 @@ import type { SapApi } from "@/lib/sapApisStore";
 import { getPath } from "@/lib/getPath";
 import { RefreshCw, AlertCircle, Wifi, WifiOff, Package, KeyRound, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EditableItemsTable } from "@/components/EditableItemsTable";
 
 interface Props {
   api: SapApi;
   schema: SapApiSchema;
   onEdit?: (row: Record<string, unknown>) => void;
+  itemUpdateApi?: SapApi;
+  onItemSaved?: () => void;
 }
 
 function formatCell(value: unknown, col: ColumnDef): string {

@@ -239,7 +239,7 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
                           size="sm"
                           className="h-7 gap-1.5 text-xs"
                           disabled={children.length === 0}
-                          onClick={() => setOpenRow({ key, items: children })}
+                          onClick={() => setOpenRow({ key, items: children, parent: row })}
                         >
                           <Package className="h-3 w-3" />
                           {children.length} item{children.length === 1 ? "" : "s"}

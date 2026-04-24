@@ -209,6 +209,28 @@ export default function DMRPage() {
                   </div>
                 </div>
               )}
+              {itemUpdateNeedsConfig && (
+                <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-xs text-foreground">
+                  <div className="font-semibold">
+                    Item-update API found ("{itemUpdateNeedsConfig.name}") but the{" "}
+                    <span className="font-mono">Update Endpoint</span> template is empty.
+                  </div>
+                  <div className="mt-1 text-muted-foreground">
+                    Open API Settings → {itemUpdateNeedsConfig.name} → API Details and set{" "}
+                    <span className="font-mono">Update Endpoint</span> to{" "}
+                    <code className="font-mono">/api/gate/items/{"{gate_id}"}/{"{item_no}"}</code>{" "}
+                    to enable per-line-item editing inside the Items popup.
+                  </div>
+                  <div className="mt-2">
+                    <Link
+                      to={`/sap/settings/edit/${encodeURIComponent(itemUpdateNeedsConfig.name)}`}
+                      className="inline-flex items-center rounded border border-warning/50 bg-background px-2 py-1 font-semibold text-warning hover:bg-warning/20"
+                    >
+                      Configure now
+                    </Link>
+                  </div>
+                </div>
+              )}
               {!updateApi && !updateNeedsConfig && (
                 <div className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                   Tip: configure an Active API with an{" "}

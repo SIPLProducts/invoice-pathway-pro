@@ -344,7 +344,21 @@ const seed: SapApi[] = [
   },
 ];
 
-function readRaw(key: string): SapApi[] | null {
+// =============================================================================
+// Cloud-backed store. SAP API configs live in Lovable Cloud (Supabase table
+// `sap_api_configs`), so they are shared across all devices, browsers, and the
+// preview <-> published deployments. localStorage is used only as an offline
+// read-cache for first paint and as the source for a one-time migration from
+// the previous (browser-local) version of this app.
+// =============================================================================
+
+const LOCAL_CACHE_KEY = "dmr.sapApis.cloudCache.v1";
+const LEGACY_LOCAL_KEYS = ["dmr.sapApis.v3", "dmr.sapApis.v2", "dmr.sapApis.v1"];
+const LEGACY_BACKUP_KEY = "dmr.sapApis.backup.latest";
+const MIGRATION_FLAG = "dmr.sapApis.cloudMigration.v1";
+
+function readLocalArray(key: string): SapApi[] | null {
+  if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
@@ -356,6 +370,15 @@ function readRaw(key: string): SapApi[] | null {
   }
 }
 
+function writeLocalCache(apis: SapApi[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(apis));
+  } catch {
+    /* ignore quota */
+  }
+}
+
 /** Append any seed entries whose name isn't already present. Never overwrites user data. */
 function mergeSeedNonDestructive(existing: SapApi[]): SapApi[] {
   const names = new Set(existing.map((a) => a.name));
@@ -363,174 +386,22 @@ function mergeSeedNonDestructive(existing: SapApi[]): SapApi[] {
   return additions.length === 0 ? existing : [...existing, ...additions];
 }
 
-function load(): SapApi[] {
-  if (typeof window === "undefined") return seed;
-  try {
-    let parsed = readRaw(STORAGE_KEY);
-    let restoredFromBackup = false;
-    let migratedFromLegacy: string | null = null;
-
-    // Layer 1: legacy key migration (recovers user data after a STORAGE_KEY bump).
-    if (!parsed) {
-      for (const legacy of LEGACY_STORAGE_KEYS) {
-        const legacyData = readRaw(legacy);
-        if (legacyData) {
-          parsed = legacyData;
-          migratedFromLegacy = legacy;
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-          } catch {
-            /* ignore quota */
-          }
-          break;
-        }
-      }
-    }
-
-    // Layer 3: auto-restore from rolling backup snapshot.
-    if (!parsed) {
-      const backup = readRaw(BACKUP_KEY);
-      if (backup) {
-        parsed = backup;
-        restoredFromBackup = true;
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-        } catch {
-          /* ignore quota */
-        }
-      }
-    }
-
-    // Final fallback: fresh seed.
-    if (!parsed) return seed;
-
-    // One-time cleanup: remove deprecated default APIs without resetting other edits.
-    const CLEANUP_FLAG = "dmr.sapApis.cleanup.v1";
-    const REMOVED_NAMES = new Set([
-      "SAP_343_Blocked_To_Unrestricted",
-      "SAP_344_Unrestricted_To_Blocked",
-      "MB52_Stock_Report",
-    ]);
-    let cleaned = parsed;
-    if (!localStorage.getItem(CLEANUP_FLAG)) {
-      cleaned = parsed.filter((a) => !REMOVED_NAMES.has(a.name));
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-        localStorage.setItem(CLEANUP_FLAG, "1");
-      } catch {
-        /* ignore quota */
-      }
-    }
-
-    // Merge: ensure ZUI_Gate_Service has field schemas (in case older cached version)
-    let migrated = cleaned.map((a) => {
-      if (a.name === "ZUI_Gate_Service" && !a.requestHeaderFields) {
-        return { ...seed.find((s) => s.name === "ZUI_Gate_Service")!, ...a, requestHeaderFields: GATE_HEADER_REQUEST, requestItemFields: GATE_ITEM_REQUEST, responseHeaderFields: GATE_HEADER_RESPONSE, responseItemFields: GATE_ITEM_RESPONSE };
-      }
-      return a;
-    });
-
-    // One-time migration: auto-populate updateEndpoint/updateMethod/keyField for any
-    // pre-existing "Update Header" API saved before these fields existed.
-    const UPDATE_MIG_FLAG = "dmr.sapApis.updateMig.v1";
-    if (!localStorage.getItem(UPDATE_MIG_FLAG)) {
-      let changed = false;
-      migrated = migrated.map((a) => {
-        const nameLooksLikeUpdate = /update.*header|update.*gate|gate.*update/i.test(a.name);
-        const hasStaticKey = /\(\s*\w+\s*=\s*'[^']+'\s*\)/.test(a.endpoint ?? "");
-        if (nameLooksLikeUpdate && !a.updateEndpoint && hasStaticKey) {
-          changed = true;
-          return {
-            ...a,
-            updateEndpoint: "/api/gate/headers/{gate_id}",
-            updateMethod: a.updateMethod ?? "PATCH",
-            keyField: a.keyField ?? "gate_id",
-          };
-        }
-        return a;
-      });
-      try {
-        if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
-        localStorage.setItem(UPDATE_MIG_FLAG, "1");
-      } catch {
-        /* ignore quota */
-      }
-    }
-
-    // One-time migration: auto-populate updateEndpoint/updateMethod/keyField for any
-    // pre-existing "Update * Item" API saved before line-item editing existed.
-    const UPDATE_ITEM_MIG_FLAG = "dmr.sapApis.updateItemMig.v1";
-    if (!localStorage.getItem(UPDATE_ITEM_MIG_FLAG)) {
-      let changed = false;
-      migrated = migrated.map((a) => {
-        const nameLooksLikeItemUpdate = /update.*item|item.*update|line[ _-]?item/i.test(a.name);
-        if (nameLooksLikeItemUpdate && !a.updateEndpoint) {
-          changed = true;
-          return {
-            ...a,
-            updateEndpoint: "/api/gate/items/{gate_id}/{item_no}",
-            updateMethod: a.updateMethod ?? "PATCH",
-            keyField: a.keyField ?? "item_no",
-          };
-        }
-        return a;
-      });
-      try {
-        if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
-        localStorage.setItem(UPDATE_ITEM_MIG_FLAG, "1");
-      } catch {
-        /* ignore quota */
-      }
-    }
-
-    // Layer 2: ensure default seed APIs are always present, but never overwrite user data.
-    const merged = mergeSeedNonDestructive(migrated);
-    if (merged.length !== migrated.length) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-      } catch {
-        /* ignore quota */
-      }
-    }
-
-    // Toast notifications (deferred so React/Sonner is mounted first).
-    if (restoredFromBackup || migratedFromLegacy) {
-      setTimeout(() => {
-        try {
-          // Lazy-load to avoid circular dependency at module init.
-          import("sonner").then(({ toast }) => {
-            if (restoredFromBackup) {
-              toast.success(`Restored ${merged.length} APIs from backup`);
-            } else if (migratedFromLegacy) {
-              toast.success(`Migrated ${merged.length} APIs from ${migratedFromLegacy}`);
-            }
-          });
-        } catch {
-          /* ignore */
-        }
-      }, 1200);
-    }
-
-    return merged;
-  } catch {
-    return seed;
-  }
+/** First-paint state: prefer the local cache; otherwise show seed defaults so the
+ *  UI is never empty. The real Cloud data overwrites this as soon as it loads. */
+function bootstrapState(): SapApi[] {
+  const cached = readLocalArray(LOCAL_CACHE_KEY);
+  if (cached && cached.length > 0) return cached;
+  return seed;
 }
 
-let state: SapApi[] = load();
+let state: SapApi[] = bootstrapState();
 const listeners = new Set<() => void>();
+let cloudReady = false;
+let cloudReadyPromise: Promise<void> | null = null;
 
-function emit() {
-  if (typeof window !== "undefined") {
-    try {
-      const json = JSON.stringify(state);
-      localStorage.setItem(STORAGE_KEY, json);
-      // Layer 3: rolling backup snapshot (single slot, overwritten on every change).
-      localStorage.setItem(BACKUP_KEY, json);
-    } catch {
-      /* ignore quota */
-    }
-  }
+function setState(next: SapApi[], persistCache = true) {
+  state = next;
+  if (persistCache) writeLocalCache(next);
   listeners.forEach((l) => l());
 }
 
@@ -542,6 +413,158 @@ function subscribe(cb: () => void) {
 function getSnapshot() {
   return state;
 }
+
+// ---------------------------------------------------------------------------
+// Cloud sync
+// ---------------------------------------------------------------------------
+
+interface CloudRow {
+  name: string;
+  config: SapApi;
+}
+
+async function fetchAllFromCloud(): Promise<SapApi[]> {
+  const { data, error } = await supabase
+    .from("sap_api_configs")
+    .select("name, config")
+    .order("name", { ascending: true });
+  if (error) throw error;
+  const rows = (data ?? []) as CloudRow[];
+  // Re-hydrate using the stored name as the canonical key.
+  return rows.map((r) => ({ ...(r.config ?? ({} as SapApi)), name: r.name }));
+}
+
+async function upsertOne(api: SapApi) {
+  const { error } = await supabase
+    .from("sap_api_configs")
+    .upsert({ name: api.name, config: api as unknown as Record<string, unknown> }, { onConflict: "name" });
+  if (error) throw error;
+}
+
+async function deleteOne(name: string) {
+  const { error } = await supabase.from("sap_api_configs").delete().eq("name", name);
+  if (error) throw error;
+}
+
+async function bulkUpsert(apis: SapApi[]) {
+  if (apis.length === 0) return;
+  const payload = apis.map((api) => ({ name: api.name, config: api as unknown as Record<string, unknown> }));
+  const { error } = await supabase.from("sap_api_configs").upsert(payload, { onConflict: "name" });
+  if (error) throw error;
+}
+
+/** Migrate any pre-Cloud localStorage entries into Cloud the first time we run. */
+async function migrateLegacyLocalToCloud(cloudCount: number): Promise<number> {
+  if (typeof window === "undefined") return 0;
+  if (localStorage.getItem(MIGRATION_FLAG)) return 0;
+  if (cloudCount > 0) {
+    // Cloud already has data — don't overwrite it from this device's old localStorage.
+    localStorage.setItem(MIGRATION_FLAG, "1");
+    return 0;
+  }
+  let legacy: SapApi[] | null = null;
+  for (const key of LEGACY_LOCAL_KEYS) {
+    const data = readLocalArray(key);
+    if (data) {
+      legacy = data;
+      break;
+    }
+  }
+  if (!legacy) {
+    legacy = readLocalArray(LEGACY_BACKUP_KEY);
+  }
+  if (!legacy || legacy.length === 0) {
+    localStorage.setItem(MIGRATION_FLAG, "1");
+    return 0;
+  }
+  await bulkUpsert(legacy);
+  localStorage.setItem(MIGRATION_FLAG, "1");
+  return legacy.length;
+}
+
+/** Ensure default seed APIs exist in Cloud (insert-only, never overwrite user edits). */
+async function ensureSeedInCloud(currentNames: Set<string>) {
+  const missing = seed.filter((s) => !currentNames.has(s.name));
+  if (missing.length === 0) return;
+  await bulkUpsert(missing);
+}
+
+async function bootstrapCloud(): Promise<void> {
+  try {
+    let cloud = await fetchAllFromCloud();
+
+    // One-time migration of legacy per-browser data into Cloud.
+    const migratedCount = await migrateLegacyLocalToCloud(cloud.length);
+    if (migratedCount > 0) {
+      cloud = await fetchAllFromCloud();
+      setTimeout(() => {
+        import("sonner").then(({ toast }) => {
+          toast.success(`Migrated ${migratedCount} SAP API configurations to Cloud`);
+        }).catch(() => {});
+      }, 1200);
+    }
+
+    // Make sure default APIs exist (insert-only).
+    const names = new Set(cloud.map((a) => a.name));
+    const seedNeedsInsert = seed.some((s) => !names.has(s.name));
+    if (seedNeedsInsert) {
+      await ensureSeedInCloud(names);
+      cloud = await fetchAllFromCloud();
+    }
+
+    cloudReady = true;
+    setState(cloud);
+  } catch (err) {
+    console.error("[sapApisStore] Cloud bootstrap failed, using local cache only.", err);
+    // Keep local cache state; mark ready so writes don't block forever.
+    cloudReady = true;
+    // Still merge seeds into local view so the UI isn't empty.
+    setState(mergeSeedNonDestructive(state), false);
+  }
+}
+
+function ensureCloudReady(): Promise<void> {
+  if (cloudReady) return Promise.resolve();
+  if (!cloudReadyPromise) cloudReadyPromise = bootstrapCloud();
+  return cloudReadyPromise;
+}
+
+function subscribeRealtime() {
+  if (typeof window === "undefined") return;
+  const channel = supabase
+    .channel("sap_api_configs_changes")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "sap_api_configs" },
+      async () => {
+        try {
+          const fresh = await fetchAllFromCloud();
+          setState(fresh);
+        } catch (e) {
+          console.warn("[sapApisStore] realtime refresh failed", e);
+        }
+      },
+    )
+    .subscribe();
+  // Best-effort cleanup on tab unload.
+  window.addEventListener("beforeunload", () => {
+    try {
+      supabase.removeChannel(channel);
+    } catch {
+      /* noop */
+    }
+  });
+}
+
+// Kick off Cloud sync at module load (browser only).
+if (typeof window !== "undefined") {
+  ensureCloudReady().then(() => subscribeRealtime());
+}
+
+// ---------------------------------------------------------------------------
+// Public API (unchanged surface — sync helpers stay sync, mutations are now
+// fire-and-forget to Cloud with optimistic local update + cache write).
+// ---------------------------------------------------------------------------
 
 export function useSapApis(): SapApi[] {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
@@ -556,30 +579,70 @@ export function getSapApi(name: string): SapApi | undefined {
 }
 
 export function addApi(api: SapApi) {
-  state = [...state, api];
-  emit();
+  // Optimistic update.
+  setState([...state, api]);
+  ensureCloudReady()
+    .then(() => upsertOne(api))
+    .catch((e) => {
+      console.error("[sapApisStore] addApi -> cloud failed", e);
+      import("sonner").then(({ toast }) => {
+        toast.error(`Couldn't save "${api.name}" to Cloud — change is local only.`);
+      }).catch(() => {});
+    });
 }
 
 export function updateApi(originalName: string, api: SapApi) {
-  state = state.map((a) => (a.name === originalName ? api : a));
-  emit();
+  setState(state.map((a) => (a.name === originalName ? api : a)));
+  ensureCloudReady()
+    .then(async () => {
+      // If the name changed, delete the old row first.
+      if (originalName !== api.name) {
+        await deleteOne(originalName).catch(() => {});
+      }
+      await upsertOne(api);
+    })
+    .catch((e) => {
+      console.error("[sapApisStore] updateApi -> cloud failed", e);
+      import("sonner").then(({ toast }) => {
+        toast.error(`Couldn't update "${api.name}" in Cloud — change is local only.`);
+      }).catch(() => {});
+    });
 }
 
 export function deleteApi(name: string) {
-  state = state.filter((a) => a.name !== name);
-  emit();
+  setState(state.filter((a) => a.name !== name));
+  ensureCloudReady()
+    .then(() => deleteOne(name))
+    .catch((e) => {
+      console.error("[sapApisStore] deleteApi -> cloud failed", e);
+      import("sonner").then(({ toast }) => {
+        toast.error(`Couldn't delete "${name}" from Cloud — change is local only.`);
+      }).catch(() => {});
+    });
 }
 
 export function resetApis() {
-  state = seed;
-  emit();
+  setState(seed);
+  ensureCloudReady()
+    .then(async () => {
+      // Wipe and reseed Cloud.
+      const { error: delErr } = await supabase.from("sap_api_configs").delete().neq("name", "__never__");
+      if (delErr) throw delErr;
+      await bulkUpsert(seed);
+    })
+    .catch((e) => {
+      console.error("[sapApisStore] resetApis -> cloud failed", e);
+      import("sonner").then(({ toast }) => {
+        toast.error("Couldn't reset APIs in Cloud — change is local only.");
+      }).catch(() => {});
+    });
 }
 
 /** Returns a pretty-printed JSON string of all current APIs for download. */
 export function exportApis(): string {
   return JSON.stringify(
     {
-      version: STORAGE_KEY,
+      version: "cloud.v1",
       exportedAt: new Date().toISOString(),
       apis: state,
     },
@@ -604,6 +667,7 @@ export function importApis(json: string): { added: number; replaced: number } {
   let added = 0;
   let replaced = 0;
   const byName = new Map(state.map((a) => [a.name, a] as const));
+  const valid: SapApi[] = [];
   for (const api of incoming) {
     if (!api || typeof api.name !== "string") continue;
     if (existingNames.has(api.name)) {
@@ -612,8 +676,16 @@ export function importApis(json: string): { added: number; replaced: number } {
       added += 1;
     }
     byName.set(api.name, api);
+    valid.push(api);
   }
-  state = Array.from(byName.values());
-  emit();
+  setState(Array.from(byName.values()));
+  ensureCloudReady()
+    .then(() => bulkUpsert(valid))
+    .catch((e) => {
+      console.error("[sapApisStore] importApis -> cloud failed", e);
+      import("sonner").then(({ toast }) => {
+        toast.error("Imported locally, but Cloud sync failed.");
+      }).catch(() => {});
+    });
   return { added, replaced };
 }

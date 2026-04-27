@@ -197,6 +197,7 @@ export function useSapItemUpdate(api: SapApi | null | undefined) {
           "Item update template is missing {item_no} — open SAP Settings → Update Selected Line Item Data → API Details and set Update Endpoint to /api/gate/items/{gate_id}/{item_no}.",
       };
     }
+    setLoading(true);
     try {
       const itemFields = api?.requestItemFields ?? [];
       const payload = sanitizeItemRow(body, itemFields, childRow);

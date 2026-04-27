@@ -513,6 +513,41 @@ async function bootstrapCloud(): Promise<void> {
       cloud = await fetchAllFromCloud();
     }
 
+    // One-time self-heal: previously-saved item-update configs may have lost
+    // the `{item_no}` token from `updateEndpoint` / `proxyPath`, which makes
+    // the middleware return 404 (route is `/api/gate/items/:gateId/:itemNo`).
+    // Re-write any such row to include `{item_no}` without touching other fields.
+    const isItemPath = (s?: string) =>
+      !!s && /\/items?(\/|$|\?)/i.test(s);
+    const hasItemToken = (s?: string) =>
+      !!s && /\{item_no\}|\{item[_-]?id\}/i.test(s);
+    const fixItemPath = (s?: string) => {
+      if (!s) return s;
+      if (!isItemPath(s) || hasItemToken(s)) return s;
+      const base = s.replace(/\/+$/, "");
+      const hasAnyToken = /\{[a-zA-Z0-9_]+\}/.test(s);
+      return hasAnyToken ? `${base}/{item_no}` : `${base}/{gate_id}/{item_no}`;
+    };
+    const heal: SapApi[] = [];
+    for (const a of cloud) {
+      const nextUpdate = fixItemPath(a.updateEndpoint);
+      const nextProxy = fixItemPath(a.proxyPath);
+      if (nextUpdate !== a.updateEndpoint || nextProxy !== a.proxyPath) {
+        heal.push({ ...a, updateEndpoint: nextUpdate, proxyPath: nextProxy });
+      }
+    }
+    if (heal.length > 0) {
+      try {
+        await bulkUpsert(heal);
+        cloud = await fetchAllFromCloud();
+        console.info(
+          `[sapApisStore] Self-healed ${heal.length} item-update API config(s) by appending {item_no}.`,
+        );
+      } catch (e) {
+        console.warn("[sapApisStore] Item-template self-heal failed (non-fatal).", e);
+      }
+    }
+
     cloudReady = true;
     setState(cloud);
   } catch (err) {

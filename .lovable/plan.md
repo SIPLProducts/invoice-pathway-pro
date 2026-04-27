@@ -1,71 +1,36 @@
-## Issues you're hitting
+## Root cause
 
-Looking at your screenshot and the runtime logs, there are **two separate bugs**, both introduced by recent changes:
+The line-item PATCH is going to `/api/gate/items/A123I00016` (no `item_no`), and the middleware route is `/api/gate/items/:gateId/:itemNo`, so it returns 404 with `No route for PATCH /api/gate/items/A123I00016`.
 
-### 1. ❌ "Edit" on a gate header opens with the **item** endpoint and "(no key)"
+Why: the "Update Selected Line Item Data" API config that drives item updates currently has an `updateEndpoint` template missing the `{item_no}` token. It probably got saved/edited at some point as `/api/gate/items/{gate_id}` (the seed shipped `/api/gate/items/{gate_id}/{item_no}` but Cloud has a stale row).
 
-Your screenshot shows:
-- Dialog title: `Edit header — (no key)` (should be `Edit header — A123I00005`)
-- Endpoint: `PATCH /api/gate/items/{gate_id}/{item_no}` (should be `PATCH /api/gate/headers/{gate_id}`)
-- Warning: `Cannot resolve placeholder {item_no}` (correct — a header row has no `item_no`)
+The hook in `src/hooks/useSapItemUpdate.ts` faithfully fills only the tokens that exist in the template, so without `{item_no}` the URL never includes the item number.
 
-**Root cause** — in `src/pages/DMRList.tsx` (lines 59–77), the API selector for header updates is too loose:
+## Fix
 
-```ts
-const matchedWithTpl = apis.find(a => updateRe.test(... a.name ...));   // requires "update gate" / "update header" in name
-const anyWithTpl     = apis.find(a => a.updateEndpoint && !itemUpdateRePre.test(...));
-const updateApi      = matchedWithTpl ?? anyWithTpl ?? (selectedApi?.updateEndpoint ? selectedApi : null);
-```
+1. Self-heal the item-update template at runtime (no manual settings change needed):
+   - In `src/hooks/useSapItemUpdate.ts` (or in `DMRList.tsx` where `itemUpdateApi` is selected), normalize a template that targets `/items/...` but is missing `{item_no}`.
+   - If template ends with `/{gate_id}` (or any single token) and points at `/items/`, append `/{item_no}` automatically.
+   - If template has no token at all but matches `/items`, append `/{gate_id}/{item_no}`.
+   - This guarantees the resolved URL includes both keys regardless of what's stored in Cloud.
 
-If your header-update API isn't named exactly `Update Gate Header` (or similar), `matchedWithTpl` is `null`. The code then falls back to `anyWithTpl` — which scans **all** APIs that have *any* `updateEndpoint` and the wrong one wins (e.g. an item-update API whose name doesn't contain the word "item"). The dialog then receives an API whose `updateEndpoint` template is `/api/gate/items/{gate_id}/{item_no}` and whose `keyField` isn't `gate_id` — hence the "(no key)" title.
+2. Defensive guard so we never call an item endpoint without `item_no`:
+   - After token resolution, if the API was selected as the item-update API but the resolved URL still doesn't contain the item key value, return a clear error toast: "Item update template is missing `{item_no}` — fix it in SAP Settings → Update Selected Line Item Data → API Details."
 
-### 2. ❌ Runtime error: `cannot add postgres_changes callbacks ... after subscribe()`
+3. Re-seed the correct template in Cloud (one-time, idempotent):
+   - In `src/lib/sapApisStore.ts`, during `bootstrapCloud`, detect any existing row whose name matches the item-update API but whose `updateEndpoint` doesn't include `{item_no}`. Upsert it back to the seed template `/api/gate/items/{gate_id}/{item_no}`. This corrects all already-saved Cloud configs across devices.
+   - Same fix for `proxyPath` if it's also missing `{item_no}`.
 
-In `src/lib/sapApisStore.ts` (line 533), `subscribeRealtime()` is called every time the module is imported. Vite's HMR re-runs the module on hot reload but the previous Supabase channel object lingers — the second call tries to `.on(...)` on an already-subscribed channel, which the Supabase client rejects with that exact error message. This crashes the page during dev.
-
----
-
-## Fix plan
-
-### A. `src/lib/sapApisStore.ts` — make realtime subscription idempotent
-- Track the channel in a module-level `let realtimeChannel: RealtimeChannel | null = null`.
-- In `subscribeRealtime()`, if `realtimeChannel` already exists, `removeChannel` it first before creating a new one.
-- Wrap the bootstrap call in a guard so HMR re-imports don't double-subscribe.
-
-This kills the runtime error during development and on every published build.
-
-### B. `src/pages/DMRList.tsx` — pick the **right** header-update API, every time
-Tighten the selection logic so we never accidentally pass an item-update API to `EditHeaderDialog`:
-
-1. **Header update API**: must
-   - have `updateEndpoint` set
-   - NOT match the item regex (`/item|line[ _-]?item/i`)
-   - prefer endpoints containing `/headers/` over anything else
-   - prefer name matching `update.*gate|gate.*update|update.*header`
-
-2. **Item update API** (unchanged): must match item regex AND have `updateEndpoint` containing `/items/`.
-
-3. Add a defensive check: if the chosen `updateApi.updateEndpoint` contains `{item_no}` or the substring `/items/`, treat it as **not configured** and show the warning banner instead of opening a broken dialog.
-
-### C. (Small UX guard) `src/components/EditHeaderDialog.tsx`
-- If `api.updateEndpoint` references `{item_no}` (an item-only placeholder), refuse to render the form and show a clear "This is an item-update API, not a header-update API — please configure a separate header-update API in SAP Settings" message. Defense-in-depth so a misconfiguration can never silently PATCH the wrong endpoint.
-
----
+4. Verify with the existing live SAP gate data after the fix:
+   - PATCH should go to `/api/gate/items/A123I00016/1` (or whichever `item_no`) and return 200/204.
 
 ## Files to change
-| File | Change |
-|------|--------|
-| `src/lib/sapApisStore.ts` | Idempotent realtime subscription (track + remove existing channel) |
-| `src/pages/DMRList.tsx` | Stricter header-update API selector; never fall through to item-update API |
-| `src/components/EditHeaderDialog.tsx` | Defensive guard against item-only templates |
 
-No DB migration, no schema changes. Pure front-end fix.
+- `src/hooks/useSapItemUpdate.ts` — auto-append `{item_no}` when target is `/items/` and template lacks the token; add the guard error.
+- `src/lib/sapApisStore.ts` — one-time Cloud self-heal of the item-update API's `updateEndpoint` and `proxyPath`.
 
----
+## Out of scope
 
-## After the fix
-- The "Edit" button on a gate header row will open with title `Edit header — A123I00005` and endpoint `PATCH /api/gate/headers/{gate_id}`.
-- The Supabase realtime crash on hot reload will stop.
-- If your header-update API is genuinely missing/misconfigured, you'll see the existing "Update Endpoint not configured" banner with a "Configure now" link instead of a broken dialog.
-
-Approve and I'll apply the changes.
+- No middleware or DB schema changes.
+- No UI/layout changes.
+- No changes to header update flow.

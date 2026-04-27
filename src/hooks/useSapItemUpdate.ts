@@ -93,6 +93,31 @@ function pickSapDetailMessage(sapErr: unknown): string | null {
 }
 
 /**
+ * Self-heal an item-update template that targets `/items/...` but is missing
+ * the `{item_no}` token. Older Cloud rows or hand-edited configs sometimes
+ * drop `{item_no}`, which makes the proxy URL `/api/gate/items/<gate_id>` and
+ * the middleware returns 404 (route is `/api/gate/items/:gateId/:itemNo`).
+ *
+ * Rules:
+ * - If template targets an `/items` path and has no `{item_no}` / `{item_id}`
+ *   token, append `/{item_no}`.
+ * - If template targets `/items` but has no tokens at all, append
+ *   `/{gate_id}/{item_no}`.
+ */
+function normalizeItemTemplate(template: string): string {
+  if (!template) return template;
+  const isItemPath = /\/items?(\/|$|\?)/i.test(template);
+  if (!isItemPath) return template;
+  const hasItemToken = /\{item_no\}|\{item[_-]?id\}/i.test(template);
+  if (hasItemToken) return template;
+  const hasAnyToken = /\{[a-zA-Z0-9_]+\}/.test(template);
+  // Strip trailing slash before appending so we don't end up with `//`.
+  const base = template.replace(/\/+$/, "");
+  if (!hasAnyToken) return `${base}/{gate_id}/{item_no}`;
+  return `${base}/{item_no}`;
+}
+
+/**
  * Resolve template tokens like `{gate_id}` and `{item_no}` using values from
  * the parent header row first, then falling back to the child item row.
  */
@@ -145,11 +170,31 @@ export function useSapItemUpdate(api: SapApi | null | undefined) {
           "Update Endpoint not configured. Open SAP Settings → API Details and set the Update Endpoint (e.g. /api/gate/items/{gate_id}/{item_no}).",
       };
     }
-    const { url: resolvedPath, missing } = resolveItemUrl(template, parentRow, childRow);
+    const effectiveTemplate = normalizeItemTemplate(template);
+    const { url: resolvedPath, missing } = resolveItemUrl(effectiveTemplate, parentRow, childRow);
     if (!resolvedPath) {
       return {
         ok: false,
         error: `Cannot build update URL — missing value for "{${missing}}" in the selected item.`,
+      };
+    }
+    // Defensive guard: if this is an /items endpoint, the resolved path must
+    // include the line item number; otherwise the middleware returns 404.
+    const itemNoStr =
+      childRow.item_no != null && String(childRow.item_no).trim() !== ""
+        ? String(childRow.item_no).trim()
+        : parentRow.item_no != null
+          ? String(parentRow.item_no).trim()
+          : "";
+    if (
+      /\/items?(\/|$|\?)/i.test(effectiveTemplate) &&
+      itemNoStr &&
+      !resolvedPath.includes(encodeURIComponent(itemNoStr))
+    ) {
+      return {
+        ok: false,
+        error:
+          "Item update template is missing {item_no} — open SAP Settings → Update Selected Line Item Data → API Details and set Update Endpoint to /api/gate/items/{gate_id}/{item_no}.",
       };
     }
     setLoading(true);

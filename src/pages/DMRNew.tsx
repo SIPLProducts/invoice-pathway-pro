@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Camera, Save, Send, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Send, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useSapApis, type FieldDef, type SapApi } from "@/lib/sapApisStore";
 import { useSapCreate } from "@/hooks/useSapCreate";
+import { OcrCaptureCard } from "@/components/OcrCaptureCard";
 
 
 
@@ -190,16 +191,33 @@ export default function DMRNew() {
         }
       />
 
-      <div className="mb-5 rounded-xl border-2 border-dashed border-primary/30 bg-gradient-surface p-6 text-center">
-        <Camera className="mx-auto h-10 w-10 text-primary" />
-        <h3 className="mt-3 font-display text-base font-semibold">Start with OCR Capture</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Auto-extract vendor, invoice, PO, and line items in seconds
-        </p>
-        <Button className="mt-4 bg-gradient-primary" asChild>
-          <Link to="/ocr">Open Capture →</Link>
-        </Button>
-      </div>
+      <OcrCaptureCard
+        headerFields={headerFields}
+        itemFields={itemFields}
+        onExtracted={({ header: extractedHeader, items: extractedItems }) => {
+          // Merge extracted header values, never overwriting with empty/undefined
+          setHeader((prev) => {
+            const next = { ...prev };
+            for (const [k, v] of Object.entries(extractedHeader)) {
+              if (v !== "" && v !== undefined && v !== null) next[k] = v;
+            }
+            return next;
+          });
+          // Replace line items if any were detected
+          if (extractedItems.length) {
+            setItems(
+              extractedItems.map((row) => ({
+                ...emptyRowFromFields(itemFields),
+                ...row,
+              })),
+            );
+          }
+          // Scroll the form into view
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: 200, behavior: "smooth" });
+          });
+        }}
+      />
 
       {!api ? (
         <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">

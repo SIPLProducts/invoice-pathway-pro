@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Camera, Save, Send, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Send, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useSapApis, type FieldDef, type SapApi } from "@/lib/sapApisStore";
 import { useSapCreate } from "@/hooks/useSapCreate";
+import { OcrCaptureCard } from "@/components/OcrCaptureCard";
 
 
 

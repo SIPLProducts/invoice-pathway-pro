@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* PWA / installed-app polish: avoid pull-to-refresh hijacking the app */
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
 /* DMR & GRN Portal - Enterprise Design System
    Inspired by modern SAP Fiori, Linear, and enterprise control rooms.
    All colors MUST be HSL.

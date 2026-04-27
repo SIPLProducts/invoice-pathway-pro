@@ -429,15 +429,16 @@ async function fetchAllFromCloud(): Promise<SapApi[]> {
     .select("name, config")
     .order("name", { ascending: true });
   if (error) throw error;
-  const rows = (data ?? []) as CloudRow[];
+  const rows = (data ?? []) as unknown as CloudRow[];
   // Re-hydrate using the stored name as the canonical key.
   return rows.map((r) => ({ ...(r.config ?? ({} as SapApi)), name: r.name }));
 }
 
 async function upsertOne(api: SapApi) {
+  const row = { name: api.name, config: api as unknown as never };
   const { error } = await supabase
     .from("sap_api_configs")
-    .upsert({ name: api.name, config: api as unknown as Record<string, unknown> }, { onConflict: "name" });
+    .upsert(row as never, { onConflict: "name" });
   if (error) throw error;
 }
 
@@ -448,8 +449,8 @@ async function deleteOne(name: string) {
 
 async function bulkUpsert(apis: SapApi[]) {
   if (apis.length === 0) return;
-  const payload = apis.map((api) => ({ name: api.name, config: api as unknown as Record<string, unknown> }));
-  const { error } = await supabase.from("sap_api_configs").upsert(payload, { onConflict: "name" });
+  const payload = apis.map((api) => ({ name: api.name, config: api as unknown as never }));
+  const { error } = await supabase.from("sap_api_configs").upsert(payload as never, { onConflict: "name" });
   if (error) throw error;
 }
 

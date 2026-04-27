@@ -60,12 +60,20 @@ const EVENT = "dmr-auth-changed";
 
 export type StoredUser = Omit<DemoUser, "password">;
 
+let cachedRaw: string | null = null;
+let cachedUser: StoredUser | null = null;
+
 function read(): StoredUser | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as StoredUser) : null;
+    if (raw === cachedRaw) return cachedUser;
+    cachedRaw = raw;
+    cachedUser = raw ? (JSON.parse(raw) as StoredUser) : null;
+    return cachedUser;
   } catch {
+    cachedRaw = null;
+    cachedUser = null;
     return null;
   }
 }

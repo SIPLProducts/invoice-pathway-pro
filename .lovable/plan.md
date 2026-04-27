@@ -1,40 +1,70 @@
-## Goal
-Turn the existing cosmetic `/login` page into a working demo-only login with one-click demo user sign-in. No backend — session lives in `localStorage`.
+## Why your settings "disappear" after publishing
 
-## 1. Demo auth utility — `src/lib/demoAuth.ts` (new)
-- Define 4 demo users matching the existing role model (`site`, `accounts`, `management`, `admin`):
-  - **Anil Kumar** — Site Engineer — `anil.kumar@rithwik.com` / `site@123` — initials `AK`, site `BLR-01`
-  - **Priya Sharma** — Accounts (HO) — `priya.sharma@rithwik.com` / `accounts@123` — initials `PS`, dept `Finance`
-  - **Rajesh Menon** — Management — `rajesh.menon@rithwik.com` / `mgmt@123` — initials `RM`, dept `Operations`
-  - **System Admin** — Admin — `admin@rithwik.com` / `admin@123` — initials `SA`, dept `IT`
-- Export `DEMO_USERS`, `getCurrentUser()`, `signIn(email, password)`, `signOut()`, and a `useCurrentUser()` hook (via `useSyncExternalStore`) so the AppShell re-renders on login/logout.
-- Storage key: `dmr.auth.user` (JSON of the matched user, no password stored).
+Your SAP API configurations (middleware URL, credentials, endpoints, fields, scheduler, etc.) are **not actually missing** on the published site — they're just stored in the **wrong place**.
 
-## 2. Login page — `src/pages/Login.tsx` (edit)
-- Keep current premium left/right layout & styling.
-- Wire `onSubmit` to `signIn(email, password)`; on success `navigate("/", { replace: true })`, on failure show toast.
-- Add a **"Demo accounts"** panel under the form (collapsible on mobile) listing the 4 users as clickable cards:
-  - Each card shows name, role chip, email, and a small "Use" button.
-  - Click → auto-fills email + password fields and immediately signs in.
-- Show passwords inline (this is a demo) with a small "Click to copy" affordance.
-- If already signed in on mount, redirect to `/`.
+Looking at `src/lib/sapApisStore.ts`:
 
-## 3. Route protection — `src/App.tsx` (edit)
-- Add a tiny `RequireAuth` wrapper component (in `src/components/RequireAuth.tsx`, new) that reads `getCurrentUser()` and `<Navigate to="/login" replace />` if absent.
-- Wrap the `<AppShell />` route element with `RequireAuth` so every protected page requires login. `/login` and `*` (NotFound) stay public.
+```
+const STORAGE_KEY = "dmr.sapApis.v3";
+localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+```
 
-## 4. AppShell integration — `src/components/AppShell.tsx` (edit)
-- Replace the hard-coded "AK / Anil Kumar / Site Engineer · BLR-01" header block with values from `useCurrentUser()` (initials, name, role label, location/dept).
-- Wire the **"Sign out"** dropdown item to call `signOut()` then `navigate("/login", { replace: true })`.
-- The "Switch role (demo)" items become functional shortcuts: clicking one signs in as that role's demo user without leaving the app (handy for testing flows).
+Everything you configure on the **SAP Settings → API Configurations** screen is saved to **`localStorage` in your browser**. That means:
 
-## 5. Small polish
-- Add a `roleLabel` map for nice display strings ("Site Engineer", "Accounts (HO)", "Management", "System Admin").
-- Toast on successful sign-in / sign-out using the existing `sonner` toaster.
+- Configs saved in the **Lovable preview** (`id-preview--…lovable.app`) live only in that origin's localStorage.
+- The **published site** (`invoice-pathway-pro.lovable.app` / `dmr2grn.siplproducts.com`) is a *different origin* with an empty localStorage → it shows only the seed defaults.
+- Other devices / browsers / incognito windows also see empty configs.
+- Clearing browser data wipes everything.
 
-## Files touched
-- **New:** `src/lib/demoAuth.ts`, `src/components/RequireAuth.tsx`
-- **Edit:** `src/pages/Login.tsx`, `src/App.tsx`, `src/components/AppShell.tsx`
+Publishing pushes only **code**, never browser storage — so the configs were never "lost", they simply never existed on that origin.
 
-## Out of scope (call out)
-- No real backend, no password hashing, no email verification — purely a front-end demo gate. If you later want real accounts (with Supabase auth, password reset, Google sign-in, RLS-protected data), say the word and we'll upgrade in a follow-up.
+## Proposed fix: persist SAP API configs in Lovable Cloud
+
+Move the store from `localStorage` to a Cloud (Supabase) table so configs are shared across all devices, browsers, and the preview ↔ published builds.
+
+### 1. Database (new migration)
+Create one table:
+
+- `sap_api_configs`
+  - `id uuid pk default gen_random_uuid()`
+  - `name text unique not null`              ← matches today's `SapApi.name` key
+  - `config jsonb not null`                  ← the full `SapApi` object (endpoint, auth, fields, scheduler, credentials, middleware, advanced…)
+  - `updated_by uuid references auth.users` (nullable for now since auth is demo-only)
+  - `created_at`, `updated_at` timestamps + trigger
+
+**RLS**: enable RLS. For now (demo-only auth, no real Supabase users yet) use permissive policies so the app keeps working:
+- `select`: allow anon + authenticated
+- `insert / update / delete`: allow anon + authenticated
+
+We'll tighten this to admin-only once real auth is wired up (see "Future hardening" below).
+
+### 2. Refactor `src/lib/sapApisStore.ts`
+- Replace the `localStorage` read/write layer with Supabase calls (`supabase.from('sap_api_configs').select/insert/update/delete`).
+- Keep the existing `useSyncExternalStore` API (`useSapApis`, `getSapApi`, `addApi`, `updateApi`, `deleteApi`, `exportApis`, `importApis`, `resetApis`) so **no callers need to change**.
+- On first load, fetch all rows once and cache in memory; subscribe to Supabase realtime on `sap_api_configs` so changes from one device propagate to others.
+- Keep a **read-only `localStorage` fallback** purely for offline/PWA use — writes always go to Cloud.
+
+### 3. One-time migration of existing localStorage configs
+On first load after the update, if Cloud has zero rows AND localStorage has entries under `dmr.sapApis.v3`, automatically upload them to Cloud (and keep a local backup). This means **the configs you've already set up in preview will be uploaded the first time you open the app after this change**, so you won't have to re-enter them.
+
+After successful upload, show a one-time toast: *"Migrated N SAP API configurations to Cloud."*
+
+### 4. Seed behavior
+Today `mergeSeedNonDestructive()` injects defaults from `src/lib/seed.ts`. Keep this, but run it as a Cloud upsert (only inserts missing names, never overwrites existing rows).
+
+### 5. No UI changes required
+`SAPSettings.tsx`, `SAPApiEdit.tsx`, `AddApiDialog.tsx`, `useSapProxy`, `useSapCreate`, `useSapUpdate`, `useSapItemUpdate`, `SapLiveTable`, `DMRList`, `DMRNew` all consume the same hook surface — they keep working unchanged.
+
+### 6. Future hardening (not in this change, just noting)
+Once you switch from demo-only auth to real Lovable Cloud auth + a roles table, we'll tighten RLS so only `admin` can `insert/update/delete` SAP API configs, while everyone authenticated can `select`.
+
+## What you'll see after this ships
+1. Configure an API in preview → it's saved in Cloud.
+2. Click **Publish → Update**.
+3. Open the published URL on any device → the same configurations (middleware URL, credentials, fields, scheduler) are already there.
+4. Edits made on production sync back to preview and vice versa in real time.
+
+## Out of scope (intentionally)
+- Storing the SAP **password** more securely than `jsonb`. Today it's already in plaintext localStorage; moving to Cloud `jsonb` is at least no worse and gated by RLS. Proper secret handling belongs in the middleware's env vars (which is already where the *real* SAP credentials live — the ones in the UI are only used for display/manual override).
+- Changing the middleware itself.
+- Changing demo auth.

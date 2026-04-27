@@ -1,130 +1,132 @@
 ## Goal
-Replace the current "Open Capture →" link on **New DMR Entry** with an inline OCR widget that:
-- Lets the user **take a photo** with the device camera (works on mobile via `<input type="file" accept="image/*" capture="environment">`).
-- Lets the user **upload a PDF or image** (drag-and-drop or browse, up to ~20 MB).
-- Sends the file to a backend edge function that calls **Lovable AI** (Google Gemini vision model) to extract invoice fields.
-- Auto-fills the existing header form and line items table with the extracted data — leaving the user free to review/edit before submitting to SAP.
+Turn the existing responsive React app into an **installable Progressive Web App** with offline support, so it works as a real app on mobile, tablet, and desktop. The current UI is already responsive (Tailwind breakpoints in `AppShell`, tables collapse to cards on mobile, OCR uses `capture="environment"`), so this plan focuses on PWA wiring + a few mobile polish items.
 
-This does **not** remove the standalone `/ocr` page; it brings its functionality inline so the user never has to leave the New DMR screen.
+> ⚠️ **About the Lovable preview**: PWA install + offline behavior only works on the **published/deployed** site (`*.lovable.app` or your custom domain `dmr2grn.siplproducts.com`), **not** in the in-editor preview iframe. The service worker is intentionally disabled in dev/iframe contexts to avoid cache issues.
 
 ---
 
-## 1. Enable Lovable Cloud + edge function
+## 1. Add PWA tooling
 
-Lovable Cloud is required to run an edge function that holds the `LOVABLE_API_KEY` secret (already provisioned). I'll:
+**Install dependency**
+- `vite-plugin-pwa` (devDependency) — handles manifest + Workbox service worker generation.
 
-1. Enable Lovable Cloud (one-click) so the project gets a Supabase backend with edge function hosting.
-2. Create **`supabase/functions/ocr-invoice/index.ts`**:
-   - Accepts `POST` with JSON `{ fileBase64: string, mimeType: string, headerKeys: string[], itemKeys: string[] }`.
-   - For PDFs: forwards the base64 directly as an `image_url` data URL — Gemini accepts PDFs natively.
-   - For images: same data-URL pattern.
-   - Calls `https://ai.gateway.lovable.dev/v1/chat/completions` with model `google/gemini-2.5-flash` (fast + multimodal + cheap; Pro can be swapped later if accuracy needs it).
-   - Uses **tool calling** to force structured output. The tool schema is built dynamically from `headerKeys` / `itemKeys` so the model returns exactly the field keys the form expects:
-     ```json
-     {
-       "header": { "<headerKey>": "string|number", ... },
-       "items":  [{ "<itemKey>": "string|number", ... }],
-       "confidence": { "<key>": 0.0-1.0 }
-     }
-     ```
-   - Handles `429` (rate limit) and `402` (out of credits) and surfaces them as JSON errors.
-   - CORS headers + `OPTIONS` preflight.
-3. Add the function to `supabase/config.toml` with `verify_jwt = false` so the form can call it without auth (the form itself is already behind app login).
+**Update `vite.config.ts`**
+- Register `VitePWA` plugin with:
+  - `registerType: "autoUpdate"` so users auto-get new versions.
+  - `devOptions: { enabled: false }` — never run SW in Lovable preview.
+  - `workbox.navigateFallbackDenylist: [/^\/~oauth/, /^\/api/]` — never cache the SAP middleware proxy or OAuth.
+  - `workbox.runtimeCaching` rules:
+    - Google Fonts → `CacheFirst`.
+    - Supabase REST/Edge functions → `NetworkFirst` with short timeout.
+    - App shell + assets → precached automatically.
+  - Inline manifest (see step 2).
 
 ---
 
-## 2. New component: `src/components/OcrCaptureCard.tsx`
+## 2. Web app manifest (configured inside the plugin)
 
-A self-contained inline widget that replaces the existing "Start with OCR Capture" banner on `DMRNew.tsx`. It will render:
-
-- Three action buttons in one row:
-  - **Take Photo** — `<input type="file" accept="image/*" capture="environment">` (mobile opens rear camera; desktop opens file picker).
-  - **Upload PDF / Image** — `<input type="file" accept="application/pdf,image/*">` plus a drag-and-drop zone wrapping the whole card.
-  - **Clear** — appears once a file is staged.
-- A small thumbnail preview (image) or filename chip (PDF) once a file is selected.
-- An **Extract with AI** primary button that:
-  1. Reads the file as base64.
-  2. Calls the `ocr-invoice` edge function with `headerKeys` + `itemKeys` derived from the current form schema.
-  3. Shows an inline progress state ("Extracting… ~3s").
-  4. On success, calls `props.onExtracted({ header, items, confidence })`.
-  5. On failure, surfaces the error via `toast.error` with specific messaging for 402/429.
-- A small confidence summary ("8 of 10 fields detected · avg 87%") after a successful extraction.
-
-Props:
-```ts
-{
-  headerFields: FieldDef[];
-  itemFields: FieldDef[];
-  onExtracted: (data: {
-    header: Record<string, string|number|boolean>;
-    items: Record<string, string|number|boolean>[];
-    confidence: Record<string, number>;
-  }) => void;
-}
 ```
-
----
-
-## 3. Wire into `src/pages/DMRNew.tsx`
-
-- Replace the existing `<div className="mb-5 rounded-xl border-2 border-dashed …">` block (lines ~193-202, the "Start with OCR Capture" banner that links out to `/ocr`) with the new `<OcrCaptureCard …/>`.
-- In the parent, when `onExtracted` fires:
-  - Merge `extracted.header` into the current `header` state (only setting keys that exist in `headerFields` and that came back non-empty — never overwriting with blanks).
-  - Replace `items` with `extracted.items` if any rows were returned; otherwise keep the existing single empty row.
-  - Toast a success message with the field count.
-  - Auto-scroll to the header form so the user sees the populated fields.
-- Keep the existing **Submit to SAP** flow untouched — OCR only fills the form; the user still reviews and clicks Submit.
-
----
-
-## 4. Field-key hinting for better accuracy
-
-Since SAP field keys (e.g. `vendor_code`, `gross_weight`, `_Item.material_code`) aren't human-readable, the edge function's system prompt will include the `label` for each `FieldDef` (already on the schema) so Gemini can map invoice content → field correctly. Example prompt fragment built server-side:
+name: "DMR & GRN Portal"
+short_name: "DMR Portal"
+description: "Daily Material Receipt & GRN management with OCR + SAP"
+theme_color: "#0F172A"
+background_color: "#ffffff"
+display: "standalone"
+orientation: "any"
+start_url: "/"
+scope: "/"
+categories: ["business", "productivity"]
 ```
-Header fields to extract:
-- vendor_name (Vendor Name) — string
-- gross_weight (Gross Weight, kg) — number
-- invoice_no (Invoice No) — string
-...
-Line item fields (one row per material/service line):
-- material_code (Material Code) — string
-- qty (Quantity) — number
-- rate (Rate) — number
-```
-
-This is sent on every call so it works for whatever SAP API the user has configured (no hard-coded SAP fields in the edge function).
+Icons (step 3) referenced for 192, 512 + maskable.
 
 ---
 
-## 5. Files touched
+## 3. Generate PWA icons
+
+Create in `public/`:
+- `pwa-192x192.png`
+- `pwa-512x512.png`
+- `pwa-maskable-512x512.png` (with safe-zone padding for Android adaptive icons)
+- `apple-touch-icon.png` (180×180, for iOS home-screen install)
+
+Generated from `src/assets/rithwik-logo.png` so the installed app uses your brand.
+
+---
+
+## 4. Mobile-friendly meta tags in `index.html`
+
+Add inside `<head>`:
+- `<meta name="theme-color" content="#0F172A" />`
+- `<meta name="apple-mobile-web-app-capable" content="yes" />`
+- `<meta name="apple-mobile-web-app-status-bar-style" content="default" />`
+- `<meta name="apple-mobile-web-app-title" content="DMR Portal" />`
+- `<link rel="apple-touch-icon" href="/apple-touch-icon.png" />`
+- Tighten viewport: `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />`
+
+---
+
+## 5. Iframe / preview safety guard in `src/main.tsx`
+
+Before any SW registration, add a guard that:
+- Detects iframe (`window.self !== window.top`).
+- Detects Lovable preview hosts (`id-preview--`, `lovableproject.com`).
+- In those contexts, **unregisters any existing service workers** so the editor preview is never stuck on cached content.
+- Production (`dmr2grn.siplproducts.com` and the published `*.lovable.app`) registers normally via the plugin's auto-injected `registerSW`.
+
+---
+
+## 6. Install prompt UX
+
+- New `src/components/InstallPwaButton.tsx`:
+  - Listens for `beforeinstallprompt`, stashes the event, shows a button only when installable and not already installed (`display-mode: standalone` check).
+  - On iOS Safari (no `beforeinstallprompt`), shows a brief tooltip: *“Tap Share → Add to Home Screen”*.
+- Mount it in the top bar of `src/components/AppShell.tsx` next to the bell icon (icon-only on mobile, icon + label on ≥md).
+
+---
+
+## 7. Mobile / tablet polish (small, targeted)
+
+App is already responsive; these tighten the installed experience:
+- **`AppShell.tsx`**: iOS safe areas — `pt-[env(safe-area-inset-top)]` on header, `pb-[env(safe-area-inset-bottom)]` on main.
+- **`DMRNew.tsx` / `OcrCaptureCard.tsx`**: confirm camera input works on mobile (already uses `capture="environment"`); enlarge “Take Photo / Upload” touch targets to `min-h-11` on `<sm`.
+- **`SapLiveTable.tsx`**: wrap table with `-mx-4 sm:mx-0` so it goes edge-to-edge on phones for readable columns.
+- **`index.css`**: `html, body { overscroll-behavior-y: none; }` to avoid pull-to-refresh hijacking the installed app.
+
+---
+
+## 8. Verification checklist (after deploy)
+
+I'll instruct you to:
+1. **Publish** the app (frontend changes require clicking Update in the Publish dialog).
+2. Open the published URL in Chrome desktop → DevTools → *Application* → *Manifest* → confirm icons + name.
+3. On Android Chrome: visit site → menu → *Install app*.
+4. On iPhone Safari: Share → *Add to Home Screen*.
+5. Confirm app launches standalone, routes work after refresh, and offline mode loads the shell.
+
+---
+
+## Files to be created / edited
 
 **Created**
-- `supabase/functions/ocr-invoice/index.ts` — Lovable AI Gateway call with dynamic tool schema.
-- `src/components/OcrCaptureCard.tsx` — inline camera/upload/extract UI.
+- `public/pwa-192x192.png`
+- `public/pwa-512x512.png`
+- `public/pwa-maskable-512x512.png`
+- `public/apple-touch-icon.png`
+- `src/components/InstallPwaButton.tsx`
 
-**Modified**
-- `src/pages/DMRNew.tsx` — swap the static OCR banner for `<OcrCaptureCard>`, handle `onExtracted` to merge into header/items state.
-- `supabase/config.toml` — register the new function with `verify_jwt = false`.
-
-**Untouched**
-- `src/pages/OCRCapture.tsx` (the standalone `/ocr` mock page) — left as-is.
-- All SAP submit/middleware logic in `useSapCreate.ts` and `sapApisStore.ts`.
-
----
-
-## 6. What the user will see after this lands
-
-On `/dmr/new`, the OCR banner becomes a working widget:
-1. Tap **Take Photo** on mobile → camera opens → snap invoice → tap **Extract with AI**.
-2. Or drag a PDF onto the card on desktop → tap **Extract with AI**.
-3. ~2-4 seconds later, the **Header** form and **Line Items** table fill in automatically.
-4. Review/correct any field, then tap **Submit to SAP** as before.
+**Edited**
+- `package.json` (add `vite-plugin-pwa`)
+- `vite.config.ts` (register plugin + manifest + workbox config)
+- `index.html` (PWA meta tags, viewport-fit)
+- `src/main.tsx` (iframe/preview SW guard)
+- `src/components/AppShell.tsx` (mount install button, safe-area padding)
+- `src/components/SapLiveTable.tsx` (edge-to-edge table on mobile)
+- `src/components/OcrCaptureCard.tsx` (touch-target sizing)
+- `src/index.css` (overscroll-behavior)
 
 ---
 
-## 7. Notes / non-goals
-
-- **Cost**: Each extraction is one Gemini Flash call with one image/PDF. Free tier allotment covers light testing; heavier use will draw from workspace credits (the 402 error path tells the user when this happens).
-- **Confidence indicators on individual fields** (like the `/ocr` mock shows) can be added later — for v1 we surface only the aggregate.
-- **Multi-page PDFs**: Gemini reads all pages of a PDF in a single call, so multi-page invoices work.
-- **No data sync between users** is added by this change — OCR runs per-session, results land in the form and only persist once the user submits to SAP.
+## Out of scope (ask if you want these next)
+- True native iOS/Android app via Capacitor (App Store / Play Store).
+- Offline **data** sync / queueing of DMR submissions made while offline (current plan caches the **shell**, not writes against SAP).
+- Push notifications.

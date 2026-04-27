@@ -92,10 +92,29 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
       </div>
 
       {!proxyConfigured && (
-        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-          Set the <strong>Node.js Middleware URL</strong> on{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">SAP Settings → {api.name} → API Details</code>{" "}
-          (or define <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">VITE_SAP_PROXY_URL</code>).
+        <div className="space-y-3 px-4 py-8 text-center text-sm text-muted-foreground">
+          <div>
+            Records can't load yet — the <strong>Node.js Middleware URL</strong> isn't set
+            for <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{api.name}</code>.
+          </div>
+          <div className="text-xs">
+            Each browser stores its own SAP API settings, so every user opening this shared
+            project must set the middleware URL once.
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Link
+              to={`/sap/settings/edit/${encodeURIComponent(api.name)}`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20"
+            >
+              Configure middleware URL
+            </Link>
+            <Link
+              to="/sap/settings"
+              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+            >
+              Open SAP Settings
+            </Link>
+          </div>
         </div>
       )}
 

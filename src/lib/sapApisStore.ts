@@ -530,9 +530,25 @@ function ensureCloudReady(): Promise<void> {
   return cloudReadyPromise;
 }
 
+// Track the active realtime channel so HMR re-imports don't try to re-attach
+// `postgres_changes` callbacks to an already-subscribed channel (Supabase
+// rejects this with: "cannot add postgres_changes callbacks ... after subscribe()").
+let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+let realtimeBootstrapped = false;
+let beforeUnloadBound = false;
+
 function subscribeRealtime() {
   if (typeof window === "undefined") return;
-  const channel = supabase
+  // Tear down any prior channel from a previous module instance (HMR).
+  if (realtimeChannel) {
+    try {
+      supabase.removeChannel(realtimeChannel);
+    } catch {
+      /* noop */
+    }
+    realtimeChannel = null;
+  }
+  realtimeChannel = supabase
     .channel("sap_api_configs_changes")
     .on(
       "postgres_changes",
@@ -547,18 +563,22 @@ function subscribeRealtime() {
       },
     )
     .subscribe();
-  // Best-effort cleanup on tab unload.
-  window.addEventListener("beforeunload", () => {
-    try {
-      supabase.removeChannel(channel);
-    } catch {
-      /* noop */
-    }
-  });
+  // Best-effort cleanup on tab unload (bind once).
+  if (!beforeUnloadBound) {
+    beforeUnloadBound = true;
+    window.addEventListener("beforeunload", () => {
+      try {
+        if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+      } catch {
+        /* noop */
+      }
+    });
+  }
 }
 
-// Kick off Cloud sync at module load (browser only).
-if (typeof window !== "undefined") {
+// Kick off Cloud sync at module load (browser only). Guard against HMR double-init.
+if (typeof window !== "undefined" && !realtimeBootstrapped) {
+  realtimeBootstrapped = true;
   ensureCloudReady().then(() => subscribeRealtime());
 }
 

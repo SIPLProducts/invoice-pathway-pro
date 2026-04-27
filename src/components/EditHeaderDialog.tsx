@@ -89,6 +89,39 @@ export function EditHeaderDialog({ api, row, onClose, onSaved }: Props) {
   const previewKey = String(row[keyField] ?? "");
   const { url: resolvedPath, missing } = resolveUrlTemplate(api.updateEndpoint ?? "", row);
 
+  // Defense-in-depth: if the configured template is an ITEM template (has
+  // {item_no} or /items/), refuse to render the header form so we never
+  // silently PATCH the wrong endpoint with header data.
+  const tpl = api.updateEndpoint ?? "";
+  const isItemTemplate = /\{item_no\}|\{item[_-]?id\}/i.test(tpl) || /\/items?\//i.test(tpl);
+  if (isItemTemplate) {
+    return (
+      <Dialog open onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Wrong API selected for header edit</DialogTitle>
+            <DialogDescription>
+              The chosen API "{api.name}" points at an <strong>item</strong> endpoint
+              (<code className="rounded bg-muted px-1 font-mono text-[11px]">{tpl}</code>),
+              not a header endpoint.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+            Open <strong>SAP Settings</strong> and configure a separate header-update API with
+            an Update Endpoint like{" "}
+            <code className="rounded bg-background px-1 font-mono text-[11px]">
+              /api/gate/headers/{"{gate_id}"}
+            </code>
+            . The current API will continue to be used for per-line-item edits inside the Items popup.
+          </div>
+          <DialogFooter>
+            <Button onClick={onClose}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   const onSubmit = async () => {
     const body: Record<string, string | number | boolean> = {};
     fields.forEach((f) => {

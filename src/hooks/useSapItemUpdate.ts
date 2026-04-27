@@ -170,14 +170,33 @@ export function useSapItemUpdate(api: SapApi | null | undefined) {
           "Update Endpoint not configured. Open SAP Settings → API Details and set the Update Endpoint (e.g. /api/gate/items/{gate_id}/{item_no}).",
       };
     }
-    const { url: resolvedPath, missing } = resolveItemUrl(template, parentRow, childRow);
+    const effectiveTemplate = normalizeItemTemplate(template);
+    const { url: resolvedPath, missing } = resolveItemUrl(effectiveTemplate, parentRow, childRow);
     if (!resolvedPath) {
       return {
         ok: false,
         error: `Cannot build update URL — missing value for "{${missing}}" in the selected item.`,
       };
     }
-    setLoading(true);
+    // Defensive guard: if this is an /items endpoint, the resolved path must
+    // include the line item number; otherwise the middleware returns 404.
+    const itemNoStr =
+      childRow.item_no != null && String(childRow.item_no).trim() !== ""
+        ? String(childRow.item_no).trim()
+        : parentRow.item_no != null
+          ? String(parentRow.item_no).trim()
+          : "";
+    if (
+      /\/items?(\/|$|\?)/i.test(effectiveTemplate) &&
+      itemNoStr &&
+      !resolvedPath.includes(encodeURIComponent(itemNoStr))
+    ) {
+      return {
+        ok: false,
+        error:
+          "Item update template is missing {item_no} — open SAP Settings → Update Selected Line Item Data → API Details and set Update Endpoint to /api/gate/items/{gate_id}/{item_no}.",
+      };
+    }
     try {
       const itemFields = api?.requestItemFields ?? [];
       const payload = sanitizeItemRow(body, itemFields, childRow);

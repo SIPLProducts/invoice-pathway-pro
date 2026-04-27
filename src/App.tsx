@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/AppShell";
+import { RequireAuth } from "@/components/RequireAuth";
 import Dashboard from "./pages/Dashboard";
 import DMRList from "./pages/DMRList";
 import DMRDetail from "./pages/DMRDetail";
@@ -31,7 +32,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route element={<AppShell />}>
+          <Route element={<RequireAuth><AppShell /></RequireAuth>}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/dmr" element={<DMRList />} />
             <Route path="/dmr/new" element={<DMRNew />} />

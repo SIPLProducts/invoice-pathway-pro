@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export type SapMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 export type SapAuth = "Basic" | "OAuth" | "Bearer" | "API Key";

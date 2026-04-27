@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   FileText,
@@ -32,6 +32,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DEMO_USERS, signInAs, signOut, useCurrentUser } from "@/lib/demoAuth";
+import { toast } from "sonner";
 
 type NavChild = { to: string; label: string; icon: typeof LayoutDashboard };
 type NavItem = {
@@ -66,10 +68,23 @@ const nav: NavItem[] = [
 export function AppShell() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const user = useCurrentUser();
   const [sapOpen, setSapOpen] = useState(location.pathname.startsWith("/sap"));
   const current = nav.find((n) =>
     n.to ? (n.end ? location.pathname === n.to : location.pathname.startsWith(n.to)) : false,
   );
+
+  const handleSwitch = (userId: string) => {
+    const u = signInAs(userId);
+    if (u) toast.success(`Switched to ${u.name}`);
+  };
+
+  const handleSignOut = () => {
+    signOut();
+    toast.success("Signed out");
+    navigate("/login", { replace: true });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -230,11 +245,13 @@ export function AppShell() {
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-2 rounded-md p-1.5 text-left transition-colors hover:bg-muted">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-primary text-xs font-semibold text-primary-foreground">
-                    AK
+                    {user?.initials ?? "??"}
                   </div>
                   <div className="hidden text-xs leading-tight md:block">
-                    <div className="font-semibold">Anil Kumar</div>
-                    <div className="text-muted-foreground">Site Engineer · BLR-01</div>
+                    <div className="font-semibold">{user?.name ?? "Guest"}</div>
+                    <div className="text-muted-foreground">
+                      {user ? `${user.roleLabel} · ${user.location}` : "Not signed in"}
+                    </div>
                   </div>
                   <ChevronDown className="hidden h-3.5 w-3.5 text-muted-foreground md:block" />
                 </button>
@@ -242,13 +259,18 @@ export function AppShell() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>Switch role (demo)</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Site Engineer</DropdownMenuItem>
-                <DropdownMenuItem>Accounts (HO)</DropdownMenuItem>
-                <DropdownMenuItem>Management</DropdownMenuItem>
-                <DropdownMenuItem>System Admin</DropdownMenuItem>
+                {DEMO_USERS.map((u) => (
+                  <DropdownMenuItem
+                    key={u.id}
+                    onClick={() => handleSwitch(u.id)}
+                    className={user?.id === u.id ? "bg-muted" : ""}
+                  >
+                    {u.roleLabel}
+                  </DropdownMenuItem>
+                ))}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>Profile & Settings</DropdownMenuItem>
-                <DropdownMenuItem>Sign out</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>Sign out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

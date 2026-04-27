@@ -52,48 +52,56 @@ export default function DMRPage() {
     liveApis[0] ??
     null;
 
-  // Find an update-capable API. Preference order:
-  //   1. Name matches update regex AND has updateEndpoint template
-  //   2. Any active API with updateEndpoint template
-  //   3. Name matches update regex but template missing (so we can show a "configure me" banner)
-  const updateRe = /update.*gate|gate.*update|update[ _-]?header/i;
-  const matchedWithTpl = apis.find(
-    (a) =>
-      a.status === "Active" &&
-      a.updateEndpoint &&
-      updateRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
-  );
-  const itemUpdateRePre = /update.*item|item.*update|line[ _-]?item/i;
-  const anyWithTpl = apis.find(
-    (a) =>
-      a.status === "Active" &&
-      a.updateEndpoint &&
-      !itemUpdateRePre.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
-  );
-  const matchedNoTpl = apis.find(
-    (a) => a.status === "Active" && updateRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
-  );
-  const updateApi =
-    matchedWithTpl ?? anyWithTpl ?? (selectedApi?.updateEndpoint ? selectedApi : null);
-  // Surface a banner only when a candidate exists by name but lacks the template.
-  const updateNeedsConfig = !updateApi && matchedNoTpl ? matchedNoTpl : null;
+  // ---- API selection ------------------------------------------------------
+  // Strict separation between HEADER updates and ITEM (line-item) updates so a
+  // misnamed API can never silently PATCH the wrong endpoint.
+  const itemRe = /item|line[ _-]?item/i;
+  const headerNameRe = /update.*gate|gate.*update|update.*header|header.*update/i;
+  const isItemApi = (a: typeof apis[number]) => {
+    const hay = `${a.name} ${a.endpoint} ${a.proxyPath ?? ""} ${a.updateEndpoint ?? ""}`;
+    if (itemRe.test(hay)) return true;
+    const tpl = a.updateEndpoint ?? "";
+    if (/\{item_no\}|\{item[_-]?id\}/i.test(tpl)) return true;
+    if (/\/items?\//i.test(tpl)) return true;
+    return false;
+  };
+  const isHeaderTpl = (tpl: string | undefined) =>
+    !!tpl && !/\{item_no\}|\{item[_-]?id\}/i.test(tpl) && !/\/items?\//i.test(tpl);
 
-  // Item-level update API. Match anything that mentions item / line item update.
-  const itemUpdateRe = /update.*item|item.*update|line[ _-]?item/i;
+  // 1) Best match: configured template AND looks like a header API by name AND template is header-shaped.
+  const headerByName = apis.find(
+    (a) =>
+      a.status === "Active" &&
+      isHeaderTpl(a.updateEndpoint) &&
+      !isItemApi(a) &&
+      headerNameRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
+  );
+  // 2) Fallback: any active API with a header-shaped template that is NOT an item API.
+  const headerByTpl = apis.find(
+    (a) => a.status === "Active" && isHeaderTpl(a.updateEndpoint) && !isItemApi(a),
+  );
+  // 3) Surface a "configure me" banner if we found something by name but the template is empty/wrong.
+  const headerNeedsConfig = apis.find(
+    (a) =>
+      a.status === "Active" &&
+      !isItemApi(a) &&
+      headerNameRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`) &&
+      !isHeaderTpl(a.updateEndpoint),
+  );
+
+  const updateApi = headerByName ?? headerByTpl ?? null;
+  const updateNeedsConfig = !updateApi && headerNeedsConfig ? headerNeedsConfig : null;
+
+  // Item-level update API. Must be an item API AND have an item-shaped template.
+  const isItemTpl = (tpl: string | undefined) =>
+    !!tpl && (/\{item_no\}|\{item[_-]?id\}/i.test(tpl) || /\/items?\//i.test(tpl));
   const itemUpdateApi =
     apis.find(
-      (a) =>
-        a.status === "Active" &&
-        a.updateEndpoint &&
-        itemUpdateRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
+      (a) => a.status === "Active" && isItemApi(a) && isItemTpl(a.updateEndpoint),
     ) ?? null;
   const itemUpdateNeedsConfig =
     !itemUpdateApi
-      ? apis.find(
-          (a) =>
-            a.status === "Active" &&
-            itemUpdateRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
-        ) ?? null
+      ? apis.find((a) => a.status === "Active" && isItemApi(a)) ?? null
       : null;
 
   const filtered = dmrs.filter((d) => {

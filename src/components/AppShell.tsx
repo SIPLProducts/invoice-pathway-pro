@@ -23,6 +23,7 @@ import { useState } from "react";
 import logo from "@/assets/rithwik-logo.png";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { InstallPwaButton } from "@/components/InstallPwaButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -194,7 +195,10 @@ export function AppShell() {
       {/* Main */}
       <div className="lg:pl-64">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-card/80 px-4 backdrop-blur-md lg:px-8">
+        <header
+          className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-card/80 px-4 backdrop-blur-md lg:px-8"
+          style={{ paddingTop: "env(safe-area-inset-top)" }}
+        >
           <button className="lg:hidden" onClick={() => setOpen(true)}>
             <Menu className="h-5 w-5" />
           </button>
@@ -214,6 +218,8 @@ export function AppShell() {
               />
               <span className="kbd absolute right-2 top-1/2 -translate-y-1/2">⌘K</span>
             </div>
+
+            <InstallPwaButton />
 
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="h-4 w-4" />
@@ -248,7 +254,10 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="px-4 py-6 lg:px-8 lg:py-8 animate-fade-in">
+        <main
+          className="px-4 py-6 lg:px-8 lg:py-8 animate-fade-in"
+          style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+        >
           <Outlet />
         </main>
       </div>

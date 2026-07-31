@@ -1,50 +1,50 @@
-
 ## Deliverable
 
-Excel workbook `/mnt/documents/DMR_GRN_Project_Plan_v1.xlsx` — DMR & GRN portal implementation for Rithwik by Sharvi Infotech.
+A Business Process Design (BPD) document for the **DMR & GRN Portal — SAP Public Cloud integration**, branded with Rithwik and Sharvi Infotech logos.
 
-- **Kickoff:** Mon 27-Jul-2026
-- **Go-Live:** Thu 01-Oct-2026
-- **Duration:** 10 calendar weeks (W1–W10), backward-scheduled — W1 now folds kickoff into the As-Is / requirements work (previous standalone W1 removed)
-- **Streams:** Web Portal + SAP Public Cloud integration tracked every week
+Outputs to `/mnt/documents`:
+1. `DMR_GRN_BPD_v1.docx` — the main BPD document
+2. `DMR_GRN_BPD_v1.pdf` — same document as PDF
+3. `DMR_GRN_Flows.drawio` — editable draw.io file containing all process flow diagrams (one page per process), so Rithwik can edit diagrams later
 
-## Workbook structure
+## Document structure
 
-**Sheet 1 — `Cover`** — Project name, client (Rithwik), implementer (Sharvi Infotech), kickoff, go-live, hypercare window, version. Teal `#217F76` header band matching portal theme.
+**1. Title Page**
+Rithwik logo (left) + Sharvi Infotech logo (right), title "Business Process Design — Daily Material Receipt (DMR) & GRN Portal with SAP Public Cloud", client Rithwik Projects Pvt. Ltd., implementation partner Sharvi Infotech, document version/date, prepared-by / reviewed-by / approved-by signature block.
 
-**Sheet 2 — `Weekly Plan`** (main sheet)
-Columns: Week | Start (Mon) | End (Fri) | Phase | Stream (Web / SAP / Both) | Workstream | Activity | Scope Area (DMR-PO / DMR-WithoutPO-GL / DMR-PR / MIGO / GRN2MIRO / Cross) | Owner | Deliverable | Dependency | Status.
+**2. Index Page**
+Numbered table of contents with section names and page numbers, plus a document control table (version, date, author, change description).
 
-Revised backward-scheduled weeks (kickoff week dropped, everything shifted one week earlier):
+**3. Process Documents (with flow diagrams)**
 
-- **W1 27-Jul → 31-Jul** — Kickoff + BPD walkthrough on Day 1; As-Is study across DMR (PO / Without-PO GL / PR), MIGO, GRN→MIRO; requirements freeze; API contract sign-off (Gate / MM / FI on SAP Public Cloud); environment & tenant access
-- **W2 03-Aug → 07-Aug** — Portal config: DMR-with-PO flow + OCR tuning; SAP: Gate Entry create/update API integration
-- **W3 10-Aug → 14-Aug** — Portal: DMR-without-PO (GL account posting) flow; SAP: MIGO (goods receipt) API integration for PO-based DMR
-- **W4 17-Aug → 21-Aug** — Portal: DMR-with-PR flow; SAP: MIGO for PR-based DMR; GRN2MIRO tracker skeleton (list + status pipeline)
-- **W5 24-Aug → 28-Aug** — GRN2MIRO tracker: MIRO/FB50 posting APIs, invoice matching, exception queue; end-to-end dev complete
-- **W6 31-Aug → 04-Sep** — SIT cycle 1: DMR (all 3 variants) + MIGO + GRN2MIRO; defect fix
-- **W7 07-Sep → 11-Sep** — SIT cycle 2 + UAT prep; performance & security pass; training material draft
-- **W8 14-Sep → 18-Sep** — UAT with Rithwik business users; defect fix cycle 2; training material finalisation
-- **W9 21-Sep → 25-Sep** — Training (site engineers, store, accounts HO); cutover rehearsal; master-data & open-PO migration dry-run
-- **W10 28-Sep → 01-Oct** — Cutover, production data load, smoke test, **Go-Live Thu 01-Oct-2026**; hypercare kickoff
+Each process gets: purpose, scope, roles involved, step table (Step / Activity / Actor / System / Input / Output), a draw.io swimlane flow diagram image, and business rules / validations.
 
-~4–7 rows per week so both Web and SAP Public Cloud tasks stay visible, each tagged to the correct scope area.
+- **3.1 Gate Entry & Material Receipt at Site** — security gate register digitisation, vehicle/DC/weighment capture, feeding the DMR
+- **3.2 DMR with PO Reference** — 10 steps from the draft: material received → OCR/manual capture → data extraction (invoice no, date, value, GST) → PO header validation with SAP → line-item validation against PO → unique project-specific DMR No → GRN (MIGO) with reference to DMR + PO → site accounts three-way match → quantity/value variance check → GRN2MIRO tracker update
+- **3.3 DMR with PR Reference** — DMR created first, PR entered manually if available, PO entered and validated once PR is converted, then GRN against DMR + PO
+- **3.4 DMR without PO (Non-PO / GL)** — OCR capture, no PO validation, DMR generated, site accounts select GL code, direct FI posting (FB50) route, tracker update
+- **3.5 MIGO / GRN Posting** — GRN strictly with reference to DMR number; short quantity, excess quantity, FOC-at-zero-value and quality-hold handling carried over from the current SOP
+- **3.6 Exceptions** — short receipt & debit note, excess receipt tracker, quality rejection / material return
 
-**Sheet 3 — `Gantt`** — Activities pivoted into a W1–W10 grid with teal-filled bars, phase colour legend (Discover / Build / Test / Deploy / Hypercare), and Go-Live marker on W10.
+**3.1 (as requested) AS-IS vs TO-BE**
+A dedicated section comparing the current SOP in `Store_inward_digitilaization.pdf` against the portal design, as a side-by-side table across these dimensions: gate entry register, weighment, document handover, invoice data capture, PO/line-item validation, GRN creation, three-way match, variance handling, tracker maintenance, visibility/audit trail. Each row states AS-IS (manual register, physical document flow, manual SAP entry, Excel tracker) vs TO-BE (mobile OCR capture, portal-validated PO/line items, unique DMR No, GRN via API to SAP Public Cloud, auto-populated GRN2MIRO tracker) plus the resulting benefit. Closes with a gap-and-improvement list drawn from the SOP's own improvement notes (PO short-closure, indent-not-received tracker, digitised inward/returnable register, automated GRN creation, discount on PO price).
 
-**Sheet 4 — `Milestones`** — Kickoff & Requirements Freeze (W1), Dev Complete (W5), SIT Exit (W7), UAT Sign-off (W8), Cutover Start (W10-Mon), **Go-Live 01-Oct-2026**, Hypercare End (01-Jan-2027).
+**4. GRN2MIRO Tracker**
+Purpose and ownership, then the full field dictionary taken from the draft workbook's SAP Entries Tracker: SAP Posting Date, SAP Doc No, MIRO, Bills Status, Type of Bill, Bills/Mail Received Date, Days, Sl. No., Site Document No, GRN No./Non-PO, PO No., Project Name, Profit Center, GL Code (Non-PO), Vendor Code, Vendor Name, Invoice No., Invoice Date, Basic Amount, SGST, CGST, IGST, Others, Total Invoice Amount, TDS, RM, Other Deductions, Net Amount, Requester, Remarks, Vendor PAN, Vendor GST, Vendor State, Vendor Bill Period. Each field gets source (portal / SAP / manual), type and mandatory flag. Includes the tracker status lifecycle (Pending → GRN Done → Three-way matched → MIRO Posted → Payment Released), a variance/exception queue definition, a sample populated extract, and the tracker flow diagram.
 
-**Sheet 5 — `RACI`** — Activities × roles (Sharvi PM / Tech Lead / Dev, Rithwik SPOC / Stores / Accounts / IT-SAP Basis) with R/A/C/I.
+**Appendix** — DMR numbering convention, integration end-point summary (Gate Entry, PO read, MIGO, MIRO/FB50 on SAP Public Cloud), glossary.
+
+## Diagrams
+
+Built as draw.io XML (mxGraph) swimlane flowcharts — lanes: Site Engineer / Security, Store Team, Site Accounts, Accounts HO, DMR & GRN Portal, SAP Public Cloud. One diagram page per process (3.1–3.6) plus the GRN2MIRO tracker flow and an AS-IS vs TO-BE comparison diagram. Rendered to PNG via the draw.io CLI and embedded into the document; the `.drawio` source is shipped alongside so diagrams stay editable.
 
 ## Styling
 
-Calibri 10 body / 12 bold headers. Header fill teal `#217F76` white text; borders `#DCE5E4`; alternating band `#F5F8F7`. Frozen top row + first 3 columns on Weekly Plan and Gantt. Wrap on Activity/Deliverable.
+Portal theme carried over from the kickoff deck: teal `#217F76` headings and diagram accents, navy `#142B33` text, white background, thin `#DCE5E4` table borders, Calibri/Arial body. Logos in the header of every page.
 
-## Build & QA
+## Technical notes
 
-- `openpyxl` script at `/tmp/xlsx/build_plan.py` (xlsx skill).
-- Run `recalculate_formulas.py` (week-end = start+4; otherwise static dates).
-- Render each sheet to image via LibreOffice → inspect for overflow, wrong dates, missing weeks, wrong Go-Live. Fix and re-run until clean.
-- Deliver with `<presentation-artifact path="DMR_GRN_Project_Plan_v1.xlsx" mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></presentation-artifact>`.
-
-No app code changes — Excel artifact only.
+- Document generated with `docx` (docx-js) from a Node build script in `/tmp/bpd/`; PDF via LibreOffice.
+- Logos from `user-uploads://image-46.png` (Rithwik) and `user-uploads://Sharvi_Logo-2.jpg`; Rithwik mark rasterised at high density as done for the kickoff deck.
+- QA: every page rendered to JPG and visually inspected for clipped text, table overflow, missing diagrams and logo distortion; fixed and re-rendered until clean.
+- No application code changes — document artifacts only.

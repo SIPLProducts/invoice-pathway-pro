@@ -10,8 +10,8 @@ SAP Posting Date · SAP DOC NO · MIRO · Bills Status · Type of Bill · Bills/
 **Site Fields (23)**
 SI.No · Site Document Nos · GRN No./Non PO · PO No. · Project Name · Profit Center · GL Code Non PO Bills · Vendor Code · Vendor Name · Invoice No. · Invoice Date · Basic Amount · SGST · CGST · IGST · Others · Total Invoice Amount · TDS · RM · Other deductions · Net Amount · Requester · Remarks
 
-**All (31)**
-The 7 Accounts/HO columns, then the 23 Site columns, then DMS Attachment Status.
+**All (34)**
+The 7 Accounts/HO columns, then the 23 Site columns, then DMS Attachment Status, then the three existing AS-IS columns kept as they are today: Checklist, Delay (d), Bill Status.
 
 ## Data
 

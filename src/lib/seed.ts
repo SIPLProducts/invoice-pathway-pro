@@ -126,6 +126,8 @@ export const sapEntries: SAPEntry[] = dmrs.map((d, i) => ({
     grns.find((g) => g.dmrNo === d.dmrNo)?.grnNo ?? (d.flow === "NON_PO" ? "Non PO" : "—"),
   projectName: d.project,
   profitCenter: `PC-${1000 + (i % 5) * 10}`,
+  materialGroupDesc: ["Cement & Binders", "Steel & TMT Bars", "Electrical Fittings", "Paints & Coatings", "Civil Consumables"][i % 5],
+  plantCode: ["1100", "1200", "1300", "1400", "1500"][i % 5],
   basicAmount: d.subtotal,
   others: i % 4 === 0 ? 2500 : 0,
   otherDeductions: i % 3 === 0 ? 1500 : 0,

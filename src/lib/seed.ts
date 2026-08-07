@@ -118,9 +118,32 @@ export const sapEntries: SAPEntry[] = dmrs.map((d, i) => ({
   glCode: d.glCode,
   billStatus:
     d.status === "grn_posted" ? "posted" : d.status === "approved" ? "approved" : d.status === "rejected" ? "rejected" : "pending",
-  delayDays: Math.floor(Math.random() * 18),
+  delayDays: (i * 5) % 18,
   checklistComplete: i % 3 !== 0,
+  slNo: i + 1,
+  siteDocNo: d.dmrNo,
+  grnOrNonPo:
+    grns.find((g) => g.dmrNo === d.dmrNo)?.grnNo ?? (d.flow === "NON_PO" ? "Non PO" : "—"),
+  projectName: d.project,
+  profitCenter: `PC-${1000 + (i % 5) * 10}`,
+  basicAmount: d.subtotal,
+  others: i % 4 === 0 ? 2500 : 0,
+  otherDeductions: i % 3 === 0 ? 1500 : 0,
+  rmAmount: Math.round(d.subtotal * 0.05),
+  sapPostingDate: d.status === "grn_posted" ? d.date : undefined,
+  billsMailReceivedDate: d.invoiceDate,
+  ageingDays: (i * 5) % 18,
+  typeOfBill: d.flow === "NON_PO" ? "Non-PO" : d.prNo ? "PR" : "PO",
+  requester: d.createdBy,
+  remarks:
+    d.status === "rejected"
+      ? "Returned to site for correction"
+      : d.status === "grn_posted"
+        ? "Posted in SAP"
+        : "Awaiting HO verification",
+  dmsAttachmentStatus: i % 4 === 0 ? "Pending" : "Attached",
 }));
+
 
 export const approvals: ApprovalItem[] = dmrs
   .filter((d) => d.status === "submitted" || d.status === "validated")

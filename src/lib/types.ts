@@ -105,7 +105,25 @@ export interface SAPEntry {
   billStatus: BillStatus;
   delayDays: number;
   checklistComplete: boolean;
+  // Sheet-aligned tracker fields
+  slNo: number;
+  siteDocNo: string;
+  grnOrNonPo: string;
+  projectName: string;
+  profitCenter: string;
+  basicAmount: number;
+  others: number;
+  otherDeductions: number;
+  rmAmount: number;
+  sapPostingDate?: string;
+  billsMailReceivedDate?: string;
+  ageingDays: number;
+  typeOfBill: "PO" | "Non-PO" | "PR";
+  requester: string;
+  remarks: string;
+  dmsAttachmentStatus: "Attached" | "Pending";
 }
+
 
 export interface ApprovalItem {
   id: string;

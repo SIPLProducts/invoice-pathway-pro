@@ -111,6 +111,8 @@ export interface SAPEntry {
   grnOrNonPo: string;
   projectName: string;
   profitCenter: string;
+  materialGroupDesc: string;
+  plantCode: string;
   basicAmount: number;
   others: number;
   otherDeductions: number;

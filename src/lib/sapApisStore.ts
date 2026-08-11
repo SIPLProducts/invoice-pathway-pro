@@ -557,6 +557,33 @@ async function bootstrapCloud(): Promise<void> {
       }
     }
 
+    // One-time (per version) refresh of the gate-header request form fields so
+    // configs already saved in Cloud pick up the current header field set/order.
+    try {
+      const VERSION_FLAG = "dmr.gateHeaderFieldsVersion";
+      const applied =
+        typeof window !== "undefined" ? localStorage.getItem(VERSION_FLAG) : GATE_HEADER_FIELDS_VERSION;
+      if (applied !== GATE_HEADER_FIELDS_VERSION) {
+        const isGateHeaderApi = (a: SapApi) =>
+          /gate/i.test(a.name) && !/item|line[ _-]?item/i.test(a.name);
+        const updates = cloud
+          .filter(isGateHeaderApi)
+          .map((a) => ({ ...a, requestHeaderFields: GATE_HEADER_REQUEST.map((f) => ({ ...f })) }));
+        if (updates.length > 0) {
+          await bulkUpsert(updates);
+          cloud = await fetchAllFromCloud();
+          console.info(
+            `[sapApisStore] Refreshed gate header request fields on ${updates.length} config(s).`,
+          );
+        }
+        if (typeof window !== "undefined") localStorage.setItem(VERSION_FLAG, GATE_HEADER_FIELDS_VERSION);
+      }
+    } catch (e) {
+      console.warn("[sapApisStore] Gate header field refresh failed (non-fatal).", e);
+    }
+
+
+
     cloudReady = true;
     setState(cloud);
   } catch (err) {

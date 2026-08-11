@@ -107,28 +107,37 @@ const LEGACY_STORAGE_KEYS = ["dmr.sapApis.v2", "dmr.sapApis.v1"];
 const BACKUP_KEY = "dmr.sapApis.backup.latest";
 
 const GATE_HEADER_REQUEST: FieldDef[] = [
-  { key: "gate_id", label: "Gate ID", type: "string", required: true, showInForm: true },
-  { key: "plant", label: "Plant", type: "string", required: true, showInForm: true, defaultValue: "3801" },
-  { key: "gate_date", label: "Gate Date", type: "date", required: true, showInForm: true },
-  { key: "gate_time", label: "Gate Time", type: "time", required: true, showInForm: true },
-  { key: "vendor", label: "Vendor Code", type: "string", required: true, showInForm: true },
+  { key: "gate_id", label: "Gate Entry No", type: "string", required: true, showInForm: true },
+  { key: "gate_date", label: "Gate Entry Date", type: "date", showInForm: true },
+  { key: "gate_time", label: "Gate Entry Time", type: "time", showInForm: true },
+  { key: "vendor", label: "Vendor Code", type: "string", showInForm: true },
   { key: "vendor_name", label: "Vendor Name", type: "string", showInForm: true },
-  { key: "vehicle_no", label: "Vehicle No", type: "string", required: true, showInForm: true },
-  { key: "vehicle_type", label: "Vehicle Type", type: "string", showInForm: true },
-  { key: "driver_name", label: "Driver Name", type: "string", showInForm: true },
-  { key: "driver_mobile", label: "Driver Mobile", type: "string", showInForm: true },
-  { key: "license_no", label: "License No", type: "string", showInForm: true },
-  { key: "transport_type", label: "Transport Type", type: "string", required: true, showInForm: true, defaultValue: "INBOUND" },
-  { key: "purpose", label: "Purpose", type: "string", required: true, showInForm: true },
-  { key: "document_type", label: "Document Type", type: "string", required: true, showInForm: true, defaultValue: "PO" },
-  { key: "reference_doc", label: "Reference Doc", type: "string", showInForm: true },
-  { key: "gross_weight", label: "Gross Weight", type: "number", showInForm: true },
-  { key: "tare_weight", label: "Tare Weight", type: "number", showInForm: true },
-  { key: "net_weight", label: "Net Weight", type: "number", showInForm: true },
-  { key: "entry_type", label: "Entry Type", type: "string", required: true, showInForm: true, defaultValue: "IN" },
-  { key: "gate_status", label: "Gate Status", type: "string", required: true, showInForm: true, defaultValue: "OPEN" },
-  { key: "remarks", label: "Remarks", type: "string", showInForm: true },
+  { key: "dc_oblig", label: "DC OBLIG", type: "string", showInForm: true },
+  { key: "invoice_no", label: "Invoice Number", type: "string", showInForm: true },
+  { key: "invoice_date", label: "Invoice Date", type: "date", showInForm: true },
+  { key: "mode_of_transport", label: "Mode of Transport", type: "string", showInForm: true },
+  { key: "transporter_name", label: "Transporter Name", type: "string", showInForm: true },
+  { key: "lr_date", label: "LR Date", type: "date", showInForm: true },
+  { key: "lr_no", label: "LR Number", type: "string", showInForm: true },
+  { key: "vehicle_no", label: "Vehicle Number", type: "string", showInForm: true },
+  { key: "vehicle_report_date", label: "Vehicle Report Date", type: "date", showInForm: true },
+  { key: "vehicle_report_time", label: "Vehicle Report Time", type: "time", showInForm: true },
+  { key: "vehicle_release_date", label: "Vehicle Release Date", type: "date", showInForm: true },
+  { key: "vehicle_release_time", label: "Vehicle Release Time", type: "time", showInForm: true },
+  { key: "eway_bill_no", label: "E-Way Bill Number", type: "string", showInForm: true },
+  { key: "eway_bill_date", label: "E-Way Bill Date", type: "date", showInForm: true },
+  { key: "weighment_ticket_no", label: "Weighment Ticket Number", type: "string", showInForm: true },
+  { key: "gross_weight", label: "Gross Weight", type: "number", showInForm: true, align: "right" },
+  { key: "tare_weight", label: "Tare Weight", type: "number", showInForm: true, align: "right" },
+  { key: "net_weight", label: "Net Weight", type: "number", showInForm: true, align: "right" },
+  { key: "received_date", label: "Received Date", type: "date", showInForm: true },
+  { key: "received_by", label: "Received By", type: "string", showInForm: true },
+  { key: "unloading_location", label: "Unloading Location", type: "string", showInForm: true },
 ];
+
+/** Bump when GATE_HEADER_REQUEST changes so saved cloud configs are refreshed. */
+const GATE_HEADER_FIELDS_VERSION = "2026-08-11-gate-header-v2";
+
 
 const GATE_ITEM_REQUEST: FieldDef[] = [
   { key: "item_no", label: "Item No", type: "string", required: true, showInForm: true },
@@ -547,6 +556,33 @@ async function bootstrapCloud(): Promise<void> {
         console.warn("[sapApisStore] Item-template self-heal failed (non-fatal).", e);
       }
     }
+
+    // One-time (per version) refresh of the gate-header request form fields so
+    // configs already saved in Cloud pick up the current header field set/order.
+    try {
+      const VERSION_FLAG = "dmr.gateHeaderFieldsVersion";
+      const applied =
+        typeof window !== "undefined" ? localStorage.getItem(VERSION_FLAG) : GATE_HEADER_FIELDS_VERSION;
+      if (applied !== GATE_HEADER_FIELDS_VERSION) {
+        const isGateHeaderApi = (a: SapApi) =>
+          /gate/i.test(a.name) && !/item|line[ _-]?item/i.test(a.name);
+        const updates = cloud
+          .filter(isGateHeaderApi)
+          .map((a) => ({ ...a, requestHeaderFields: GATE_HEADER_REQUEST.map((f) => ({ ...f })) }));
+        if (updates.length > 0) {
+          await bulkUpsert(updates);
+          cloud = await fetchAllFromCloud();
+          console.info(
+            `[sapApisStore] Refreshed gate header request fields on ${updates.length} config(s).`,
+          );
+        }
+        if (typeof window !== "undefined") localStorage.setItem(VERSION_FLAG, GATE_HEADER_FIELDS_VERSION);
+      }
+    } catch (e) {
+      console.warn("[sapApisStore] Gate header field refresh failed (non-fatal).", e);
+    }
+
+
 
     cloudReady = true;
     setState(cloud);

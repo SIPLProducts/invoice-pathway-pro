@@ -68,8 +68,11 @@ export default function DMRNew() {
   );
 
   const amountKeys = new Set<string>(GATE_AMOUNT_KEYS as readonly string[]);
-  const gridFields = headerFields.filter((f) => !amountKeys.has(f.key));
+  const plantField = headerFields.find((f) => f.key === "plant");
+  const gridFields = headerFields.filter((f) => !amountKeys.has(f.key) && f.key !== "plant");
   const amountFields = headerFields.filter((f) => amountKeys.has(f.key));
+  const plantOptions = (api?.scheduler?.plants ?? []).filter((p) => p.code);
+
 
   const num = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);
   const totalInvoiceValue = items.reduce((sum, row) => {

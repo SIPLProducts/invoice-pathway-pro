@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Send, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Send, Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useSapApis, GATE_AMOUNT_KEYS, type FieldDef, type SapApi } from "@/lib/sapApisStore";
+import { useSapApis, GATE_AMOUNT_KEYS, PO_LINE_FIELDS, type FieldDef, type SapApi } from "@/lib/sapApisStore";
 import { useSapCreate } from "@/hooks/useSapCreate";
+import { useSapPoLookup } from "@/hooks/useSapPoLookup";
 import { OcrCaptureCard } from "@/components/OcrCaptureCard";
 import { inr } from "@/lib/format";
+
 
 
 
@@ -155,6 +157,8 @@ export default function DMRNew() {
   }, [api?.name]);
 
   const { submit, loading, proxyConfigured } = useSapCreate(api ?? null);
+  const poLookup = useSapPoLookup();
+
 
   const onSubmit = async () => {
     if (!api) return;
@@ -358,13 +362,41 @@ export default function DMRNew() {
             <Section title="Purchase Order Details">
               <Grid>
                 <Field label={PO_NUMBER_FIELD.label}>
-                  <FieldInput
-                    field={PO_NUMBER_FIELD}
-                    value={header[PO_NUMBER_FIELD.key] as string}
-                    onChange={(v) =>
-                      setHeader((h) => ({ ...h, [PO_NUMBER_FIELD.key]: v }))
-                    }
-                  />
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <input
+                        type="text"
+                        className="h-9 w-full rounded-md border bg-background px-2.5 text-sm outline-none focus:shadow-glow"
+                        value={String(header[PO_NUMBER_FIELD.key] ?? "")}
+                        onChange={(e) => {
+                          poLookup.reset();
+                          setHeader((h) => ({ ...h, [PO_NUMBER_FIELD.key]: e.target.value }));
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void poLookup.lookup(String(header[PO_NUMBER_FIELD.key] ?? ""));
+                          }
+                        }}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-9 shrink-0 px-3"
+                      disabled={poLookup.loading}
+                      onClick={() =>
+                        void poLookup.lookup(String(header[PO_NUMBER_FIELD.key] ?? ""))
+                      }
+                    >
+                      {poLookup.loading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        "Enter"
+                      )}
+                    </Button>
+                  </div>
                 </Field>
                 <Field label={OBD_FIELD.label}>
                   <FieldInput
@@ -376,7 +408,59 @@ export default function DMRNew() {
                   />
                 </Field>
               </Grid>
+
+              {poLookup.loading && (
+                <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching PO details…
+                </div>
+              )}
+              {!poLookup.loading && poLookup.notFound && (
+                <div className="mt-3 text-xs font-medium text-destructive">PO Number not found</div>
+              )}
+              {!poLookup.loading && poLookup.error && (
+                <div className="mt-3 text-xs font-medium text-destructive">{poLookup.error}</div>
+              )}
+              {!poLookup.loading && poLookup.lines.length > 0 && (
+                <div className="mt-4">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    PO Line Items
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                          {PO_LINE_FIELDS.map((f) => (
+                            <th
+                              key={f.key}
+                              className={`whitespace-nowrap py-2 pr-3 font-medium ${f.align === "right" ? "text-right" : ""}`}
+                            >
+                              {f.label || f.key}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {poLookup.lines.map((row, idx) => (
+                          <tr key={idx} className="border-b last:border-0">
+                            {PO_LINE_FIELDS.map((f) => (
+                              <td
+                                key={f.key}
+                                className={`whitespace-nowrap py-1.5 pr-3 ${f.align === "right" ? "text-right font-mono" : ""}`}
+                              >
+                                {row[f.key] === null || row[f.key] === undefined
+                                  ? "—"
+                                  : String(row[f.key])}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </Section>
+
 
             {itemFields.length > 0 && (
               <Section title="Line Items (_Item)">

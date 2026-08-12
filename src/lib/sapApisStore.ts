@@ -207,7 +207,22 @@ const GATE_ITEM_RESPONSE: FieldDef[] = [
   { key: "remarks", label: "Remarks", type: "string", showInTable: true },
 ];
 
+export const PO_LINE_FIELDS: FieldDef[] = [
+  { key: "line_id", label: "Line ID", type: "string", showInTable: true },
+  { key: "material_code", label: "Material Code", type: "string", showInTable: true },
+  { key: "material_description", label: "Material Description", type: "string", showInTable: true },
+  { key: "po_quantity", label: "PO Quantity", type: "number", showInTable: true, align: "right" },
+  { key: "uom", label: "UOM", type: "string", showInTable: true },
+  { key: "unit_rate", label: "Unit Rate", type: "number", showInTable: true, align: "right" },
+  { key: "tax_code", label: "Tax Code", type: "string", showInTable: true },
+  { key: "plant", label: "Plant", type: "string", showInTable: true },
+  { key: "storage_location", label: "Storage Location", type: "string", showInTable: true },
+  { key: "open_quantity", label: "Open Quantity", type: "number", showInTable: true, align: "right" },
+  { key: "received_quantity", label: "Received Quantity", type: "number", showInTable: true, align: "right" },
+];
+
 export const DEFAULT_GATE_REQUEST_HEADER = GATE_HEADER_REQUEST;
+
 export const DEFAULT_GATE_REQUEST_ITEM = GATE_ITEM_REQUEST;
 export const DEFAULT_GATE_RESPONSE_HEADER = GATE_HEADER_RESPONSE;
 export const DEFAULT_GATE_RESPONSE_ITEM = GATE_ITEM_RESPONSE;
@@ -361,7 +376,34 @@ const seed: SapApi[] = [
       deploymentMode: "Self-Hosted (Client Server)",
     },
   },
+  {
+    name: "Get PO Details",
+    description:
+      "Fetches Purchase Order line items for a PO number via the Node middleware. Used by the Enter button on the DMR → New Entry → Purchase Order Details box.",
+    baseUrl: "https://fa530628-e5cb-4817-8c70-9991654babd5.abap-web.us10.hana.ondemand.com",
+    endpoint:
+      "/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/api_purchaseorder/0001/PurchaseOrderItem?$filter=PurchaseOrder eq '{po_number}'&sap-client=100",
+    method: "GET",
+    auth: "Basic",
+    status: "Active",
+    tag: "Proxy",
+    type: "live",
+    autoSync: { enabled: false, frequencyMinutes: 5 },
+    rowsPath: "value",
+    rowKey: "line_id",
+    responseItemFields: PO_LINE_FIELDS,
+    listEndpoint: "/api/po/{po_number}",
+    proxyPath: "/api/po/{po_number}",
+    middleware: {
+      url: "",
+      port: "3202",
+      secret: "",
+      connectionMode: "Via Proxy Server",
+      deploymentMode: "Self-Hosted (Client Server)",
+    },
+  },
 ];
+
 
 // =============================================================================
 // Cloud-backed store. SAP API configs live in Lovable Cloud (Supabase table

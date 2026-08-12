@@ -68,8 +68,11 @@ export default function DMRNew() {
   );
 
   const amountKeys = new Set<string>(GATE_AMOUNT_KEYS as readonly string[]);
-  const gridFields = headerFields.filter((f) => !amountKeys.has(f.key));
+  const plantField = headerFields.find((f) => f.key === "plant");
+  const gridFields = headerFields.filter((f) => !amountKeys.has(f.key) && f.key !== "plant");
   const amountFields = headerFields.filter((f) => amountKeys.has(f.key));
+  const plantOptions = (api?.scheduler?.plants ?? []).filter((p) => p.code);
+
 
   const num = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);
   const totalInvoiceValue = items.reduce((sum, row) => {
@@ -245,9 +248,39 @@ export default function DMRNew() {
           <div className="space-y-5">
             <Section title={`${api.name} — Header`}>
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-                <Grid>
-                  {gridFields.map((f) => (
-                    <Field key={f.key} label={`${f.label || f.key}${f.required ? " *" : ""}`}>
+                <div className="space-y-4">
+                  {plantField && (
+                    <div className="max-w-xs">
+                      <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                        {plantField.label || "Plant"}
+                        {plantField.required ? " *" : ""}
+                      </label>
+                      {plantOptions.length > 0 ? (
+                        <select
+                          className="h-9 w-full rounded-md border bg-background px-2.5 text-sm outline-none focus:shadow-glow"
+                          value={String(header["plant"] ?? "")}
+                          onChange={(e) => setHeader((h) => ({ ...h, plant: e.target.value }))}
+                        >
+                          <option value="">Select Plant</option>
+                          {plantOptions.map((p) => (
+                            <option key={p.code} value={p.code}>
+                              {p.name ? `${p.code} — ${p.name}` : p.code}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <FieldInput
+                          field={plantField}
+                          value={header["plant"] as string}
+                          onChange={(v) => setHeader((h) => ({ ...h, plant: v }))}
+                        />
+                      )}
+                    </div>
+                  )}
+                  <Grid>
+                    {gridFields.map((f) => (
+                      <Field key={f.key} label={`${f.label || f.key}${f.required ? " *" : ""}`}>
+
                       <FieldInput
                         field={f}
                         value={header[f.key] as string | number | boolean}
@@ -270,7 +303,9 @@ export default function DMRNew() {
                       </div>
                     </div>
                   )}
-                </Grid>
+                  </Grid>
+                </div>
+
 
                 {amountFields.length > 0 && (
                   <div className="space-y-3">

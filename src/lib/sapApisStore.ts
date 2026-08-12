@@ -107,14 +107,14 @@ const LEGACY_STORAGE_KEYS = ["dmr.sapApis.v2", "dmr.sapApis.v1"];
 const BACKUP_KEY = "dmr.sapApis.backup.latest";
 
 const GATE_HEADER_REQUEST: FieldDef[] = [
-  { key: "plant", label: "Plant", type: "string", showInForm: true },
+  { key: "plant", label: "Plant", type: "string", required: true, showInForm: true },
   { key: "gate_id", label: "Gate Entry No", type: "string", required: true, showInForm: true },
   { key: "gate_date", label: "Gate Entry Date", type: "date", showInForm: true },
   { key: "gate_time", label: "Gate Entry Time", type: "time", showInForm: true },
   { key: "vendor", label: "Vendor Code", type: "string", showInForm: true },
   { key: "vendor_name", label: "Vendor Name", type: "string", showInForm: true },
-  { key: "dc_number", label: "DC Number", type: "string", showInForm: true },
-  { key: "invoice_no", label: "Invoice Number", type: "string", showInForm: true },
+  { key: "invoice_no", label: "DC/Invoice Number", type: "string", showInForm: true },
+
   { key: "invoice_date", label: "Invoice Date", type: "date", showInForm: true },
   { key: "mode_of_transport", label: "Mode of Transport", type: "string", showInForm: true },
   { key: "transporter_name", label: "Transporter Name", type: "string", showInForm: true },

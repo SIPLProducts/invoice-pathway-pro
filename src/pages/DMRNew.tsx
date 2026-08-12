@@ -24,6 +24,25 @@ function emptyRowFromFields(fields: FieldDef[]): Row {
   return row;
 }
 
+const PO_NUMBER_FIELD: FieldDef = {
+  key: "po_number",
+  label: "PO Number",
+  type: "string",
+  showInForm: true,
+};
+
+const OBD_FIELD: FieldDef = {
+  key: "obd_number",
+  label: "OBD",
+  type: "string",
+  showInForm: true,
+};
+
+const PO_DEFAULTS: Row = {
+  [PO_NUMBER_FIELD.key]: "",
+  [OBD_FIELD.key]: "",
+};
+
 function coerce(v: string, type: FieldDef["type"]): string | number | boolean {
   if (type === "number") return v === "" ? 0 : Number(v);
   if (type === "boolean") return v === "true";

@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Send, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Send, Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useSapApis, GATE_AMOUNT_KEYS, type FieldDef, type SapApi } from "@/lib/sapApisStore";
+import { useSapApis, GATE_AMOUNT_KEYS, PO_LINE_FIELDS, type FieldDef, type SapApi } from "@/lib/sapApisStore";
 import { useSapCreate } from "@/hooks/useSapCreate";
+import { useSapPoLookup } from "@/hooks/useSapPoLookup";
 import { OcrCaptureCard } from "@/components/OcrCaptureCard";
 import { inr } from "@/lib/format";
+
 
 
 

@@ -157,6 +157,8 @@ export default function DMRNew() {
   }, [api?.name]);
 
   const { submit, loading, proxyConfigured } = useSapCreate(api ?? null);
+  const poLookup = useSapPoLookup();
+
 
   const onSubmit = async () => {
     if (!api) return;

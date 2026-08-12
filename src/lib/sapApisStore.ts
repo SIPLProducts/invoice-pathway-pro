@@ -207,7 +207,22 @@ const GATE_ITEM_RESPONSE: FieldDef[] = [
   { key: "remarks", label: "Remarks", type: "string", showInTable: true },
 ];
 
+export const PO_LINE_FIELDS: FieldDef[] = [
+  { key: "line_id", label: "Line ID", type: "string", showInTable: true },
+  { key: "material_code", label: "Material Code", type: "string", showInTable: true },
+  { key: "material_description", label: "Material Description", type: "string", showInTable: true },
+  { key: "po_quantity", label: "PO Quantity", type: "number", showInTable: true, align: "right" },
+  { key: "uom", label: "UOM", type: "string", showInTable: true },
+  { key: "unit_rate", label: "Unit Rate", type: "number", showInTable: true, align: "right" },
+  { key: "tax_code", label: "Tax Code", type: "string", showInTable: true },
+  { key: "plant", label: "Plant", type: "string", showInTable: true },
+  { key: "storage_location", label: "Storage Location", type: "string", showInTable: true },
+  { key: "open_quantity", label: "Open Quantity", type: "number", showInTable: true, align: "right" },
+  { key: "received_quantity", label: "Received Quantity", type: "number", showInTable: true, align: "right" },
+];
+
 export const DEFAULT_GATE_REQUEST_HEADER = GATE_HEADER_REQUEST;
+
 export const DEFAULT_GATE_REQUEST_ITEM = GATE_ITEM_REQUEST;
 export const DEFAULT_GATE_RESPONSE_HEADER = GATE_HEADER_RESPONSE;
 export const DEFAULT_GATE_RESPONSE_ITEM = GATE_ITEM_RESPONSE;

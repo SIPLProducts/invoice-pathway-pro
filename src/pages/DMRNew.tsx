@@ -431,3 +431,38 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   );
 }
+
+function AmountBox({
+  label,
+  value,
+  input,
+  readOnly,
+  emphasis,
+}: {
+  label: string;
+  value?: string;
+  input?: React.ReactNode;
+  readOnly?: boolean;
+  emphasis?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-lg border p-3 ${emphasis ? "border-primary/40 bg-primary/5" : "bg-card"}`}
+    >
+      <div
+        className={`mb-1 text-xs ${emphasis ? "font-semibold text-foreground" : "font-medium text-muted-foreground"}`}
+      >
+        {label}
+      </div>
+      {readOnly ? (
+        <div
+          className={`text-right font-mono ${emphasis ? "text-xl font-bold text-primary" : "text-base font-semibold text-foreground"}`}
+        >
+          {value}
+        </div>
+      ) : (
+        input
+      )}
+    </div>
+  );
+}

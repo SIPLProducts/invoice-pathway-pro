@@ -4,9 +4,11 @@ import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Send, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { useSapApis, type FieldDef, type SapApi } from "@/lib/sapApisStore";
+import { useSapApis, GATE_AMOUNT_KEYS, type FieldDef, type SapApi } from "@/lib/sapApisStore";
 import { useSapCreate } from "@/hooks/useSapCreate";
 import { OcrCaptureCard } from "@/components/OcrCaptureCard";
+import { inr } from "@/lib/format";
+
 
 
 

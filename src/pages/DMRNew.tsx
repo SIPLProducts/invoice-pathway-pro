@@ -303,7 +303,9 @@ export default function DMRNew() {
                       </div>
                     </div>
                   )}
-                </Grid>
+                  </Grid>
+                </div>
+
 
                 {amountFields.length > 0 && (
                   <div className="space-y-3">

@@ -355,6 +355,28 @@ export default function DMRNew() {
               </div>
             </Section>
 
+            <Section title="Purchase Order Details">
+              <Grid>
+                <Field label={PO_NUMBER_FIELD.label}>
+                  <FieldInput
+                    field={PO_NUMBER_FIELD}
+                    value={header[PO_NUMBER_FIELD.key] as string}
+                    onChange={(v) =>
+                      setHeader((h) => ({ ...h, [PO_NUMBER_FIELD.key]: v }))
+                    }
+                  />
+                </Field>
+                <Field label={OBD_FIELD.label}>
+                  <FieldInput
+                    field={OBD_FIELD}
+                    value={header[OBD_FIELD.key] as string}
+                    onChange={(v) =>
+                      setHeader((h) => ({ ...h, [OBD_FIELD.key]: v }))
+                    }
+                  />
+                </Field>
+              </Grid>
+            </Section>
 
             {itemFields.length > 0 && (
               <Section title="Line Items (_Item)">

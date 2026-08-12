@@ -67,6 +67,21 @@ export default function DMRNew() {
     itemFields.length ? [emptyRowFromFields(itemFields)] : [],
   );
 
+  const amountKeys = new Set<string>(GATE_AMOUNT_KEYS as readonly string[]);
+  const gridFields = headerFields.filter((f) => !amountKeys.has(f.key));
+  const amountFields = headerFields.filter((f) => amountKeys.has(f.key));
+
+  const num = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);
+  const totalInvoiceValue = items.reduce((sum, row) => {
+    const amount = num(row["amount"]);
+    if (amount) return sum + amount;
+    return sum + num(row["quantity"]) * num(row["rate"]);
+  }, 0);
+  const totalAmount =
+    totalInvoiceValue + amountFields.reduce((sum, f) => sum + num(header[f.key]), 0);
+
+
+
   // (Source API is fixed to Create_Gate_Service — no selector / handler needed.)
 
   const autoGenerateFromResponse = () => {

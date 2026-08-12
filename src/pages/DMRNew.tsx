@@ -24,6 +24,25 @@ function emptyRowFromFields(fields: FieldDef[]): Row {
   return row;
 }
 
+const PO_NUMBER_FIELD: FieldDef = {
+  key: "po_number",
+  label: "PO Number",
+  type: "string",
+  showInForm: true,
+};
+
+const OBD_FIELD: FieldDef = {
+  key: "obd_number",
+  label: "OBD",
+  type: "string",
+  showInForm: true,
+};
+
+const PO_DEFAULTS: Row = {
+  [PO_NUMBER_FIELD.key]: "",
+  [OBD_FIELD.key]: "",
+};
+
 function coerce(v: string, type: FieldDef["type"]): string | number | boolean {
   if (type === "number") return v === "" ? 0 : Number(v);
   if (type === "boolean") return v === "true";
@@ -62,7 +81,10 @@ export default function DMRNew() {
     []
   ).filter((f) => f.showInForm !== false && f.key);
 
-  const [header, setHeader] = useState<Row>(() => emptyRowFromFields(headerFields));
+  const [header, setHeader] = useState<Row>(() => ({
+    ...emptyRowFromFields(headerFields),
+    ...PO_DEFAULTS,
+  }));
   const [items, setItems] = useState<Row[]>(() =>
     itemFields.length ? [emptyRowFromFields(itemFields)] : [],
   );
@@ -103,7 +125,7 @@ export default function DMRNew() {
     }
     setDerivedHeaderFields(hf);
     setDerivedItemFields(itf);
-    setHeader(emptyRowFromFields(hf));
+    setHeader({ ...emptyRowFromFields(hf), ...PO_DEFAULTS });
     setItems(itf.length ? [emptyRowFromFields(itf)] : []);
     toast.success(
       `Generated ${hf.length} header + ${itf.length} item field(s) from response schema`,
@@ -122,7 +144,7 @@ export default function DMRNew() {
     if (!hasReqHeader && hasRespHeader) {
       const hf = (api.responseHeaderFields ?? []).map((f) => ({ ...f, showInForm: true }));
       setDerivedHeaderFields(hf);
-      setHeader(emptyRowFromFields(hf));
+      setHeader({ ...emptyRowFromFields(hf), ...PO_DEFAULTS });
     }
     if (!hasReqItem && hasRespItem) {
       const itf = (api.responseItemFields ?? []).map((f) => ({ ...f, showInForm: true }));
@@ -333,6 +355,28 @@ export default function DMRNew() {
               </div>
             </Section>
 
+            <Section title="Purchase Order Details">
+              <Grid>
+                <Field label={PO_NUMBER_FIELD.label}>
+                  <FieldInput
+                    field={PO_NUMBER_FIELD}
+                    value={header[PO_NUMBER_FIELD.key] as string}
+                    onChange={(v) =>
+                      setHeader((h) => ({ ...h, [PO_NUMBER_FIELD.key]: v }))
+                    }
+                  />
+                </Field>
+                <Field label={OBD_FIELD.label}>
+                  <FieldInput
+                    field={OBD_FIELD}
+                    value={header[OBD_FIELD.key] as string}
+                    onChange={(v) =>
+                      setHeader((h) => ({ ...h, [OBD_FIELD.key]: v }))
+                    }
+                  />
+                </Field>
+              </Grid>
+            </Section>
 
             {itemFields.length > 0 && (
               <Section title="Line Items (_Item)">

@@ -125,7 +125,7 @@ export default function DMRNew() {
     }
     setDerivedHeaderFields(hf);
     setDerivedItemFields(itf);
-    setHeader(emptyRowFromFields(hf));
+    setHeader({ ...emptyRowFromFields(hf), ...PO_DEFAULTS });
     setItems(itf.length ? [emptyRowFromFields(itf)] : []);
     toast.success(
       `Generated ${hf.length} header + ${itf.length} item field(s) from response schema`,

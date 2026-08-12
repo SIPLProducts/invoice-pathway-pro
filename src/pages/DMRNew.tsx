@@ -227,33 +227,60 @@ export default function DMRNew() {
         <div className="space-y-5">
           <div className="space-y-5">
             <Section title={`${api.name} — Header`}>
-              <Grid>
-                {headerFields.map((f) => (
-                  <Field key={f.key} label={`${f.label || f.key}${f.required ? " *" : ""}`}>
-                    <FieldInput
-                      field={f}
-                      value={header[f.key] as string | number | boolean}
-                      onChange={(v) => setHeader((h) => ({ ...h, [f.key]: v }))}
-                    />
-                  </Field>
-                ))}
-                {headerFields.length === 0 && (
-                  <div className="col-span-full rounded-lg border-2 border-dashed p-4 text-center text-xs text-muted-foreground">
-                    <div>No request header fields configured for <strong>{api.name}</strong>.</div>
-                    <div className="mt-2 flex flex-wrap justify-center gap-2">
-                      <Button size="sm" variant="outline" onClick={autoGenerateFromResponse}>
-                        Auto-generate from response schema
-                      </Button>
-                      <Button size="sm" variant="ghost" asChild>
-                        <Link to={`/sap/settings/${encodeURIComponent(api.name)}`}>
-                          Open SAP Settings →
-                        </Link>
-                      </Button>
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+                <Grid>
+                  {gridFields.map((f) => (
+                    <Field key={f.key} label={`${f.label || f.key}${f.required ? " *" : ""}`}>
+                      <FieldInput
+                        field={f}
+                        value={header[f.key] as string | number | boolean}
+                        onChange={(v) => setHeader((h) => ({ ...h, [f.key]: v }))}
+                      />
+                    </Field>
+                  ))}
+                  {headerFields.length === 0 && (
+                    <div className="col-span-full rounded-lg border-2 border-dashed p-4 text-center text-xs text-muted-foreground">
+                      <div>No request header fields configured for <strong>{api.name}</strong>.</div>
+                      <div className="mt-2 flex flex-wrap justify-center gap-2">
+                        <Button size="sm" variant="outline" onClick={autoGenerateFromResponse}>
+                          Auto-generate from response schema
+                        </Button>
+                        <Button size="sm" variant="ghost" asChild>
+                          <Link to={`/sap/settings/${encodeURIComponent(api.name)}`}>
+                            Open SAP Settings →
+                          </Link>
+                        </Button>
+                      </div>
                     </div>
+                  )}
+                </Grid>
+
+                {amountFields.length > 0 && (
+                  <div className="space-y-3">
+                    <AmountBox label="Total Invoice Value" value={inr(totalInvoiceValue)} readOnly />
+                    {amountFields.map((f) => (
+                      <AmountBox
+                        key={f.key}
+                        label={f.label || f.key}
+                        input={
+                          <input
+                            type="number"
+                            step="any"
+                            className="h-9 w-full rounded-md border bg-background px-2.5 text-right font-mono text-sm outline-none focus:shadow-glow"
+                            value={String(header[f.key] ?? 0)}
+                            onChange={(e) =>
+                              setHeader((h) => ({ ...h, [f.key]: coerce(e.target.value, "number") }))
+                            }
+                          />
+                        }
+                      />
+                    ))}
+                    <AmountBox label="Total Amount" value={inr(totalAmount)} readOnly emphasis />
                   </div>
                 )}
-              </Grid>
+              </div>
             </Section>
+
 
             {itemFields.length > 0 && (
               <Section title="Line Items (_Item)">

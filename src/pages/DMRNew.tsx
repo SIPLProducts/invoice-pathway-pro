@@ -81,7 +81,10 @@ export default function DMRNew() {
     []
   ).filter((f) => f.showInForm !== false && f.key);
 
-  const [header, setHeader] = useState<Row>(() => emptyRowFromFields(headerFields));
+  const [header, setHeader] = useState<Row>(() => ({
+    ...emptyRowFromFields(headerFields),
+    ...PO_DEFAULTS,
+  }));
   const [items, setItems] = useState<Row[]>(() =>
     itemFields.length ? [emptyRowFromFields(itemFields)] : [],
   );

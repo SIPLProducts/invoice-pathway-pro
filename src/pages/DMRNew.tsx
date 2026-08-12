@@ -144,7 +144,7 @@ export default function DMRNew() {
     if (!hasReqHeader && hasRespHeader) {
       const hf = (api.responseHeaderFields ?? []).map((f) => ({ ...f, showInForm: true }));
       setDerivedHeaderFields(hf);
-      setHeader(emptyRowFromFields(hf));
+      setHeader({ ...emptyRowFromFields(hf), ...PO_DEFAULTS });
     }
     if (!hasReqItem && hasRespItem) {
       const itf = (api.responseItemFields ?? []).map((f) => ({ ...f, showInForm: true }));

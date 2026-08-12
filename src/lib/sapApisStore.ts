@@ -107,12 +107,13 @@ const LEGACY_STORAGE_KEYS = ["dmr.sapApis.v2", "dmr.sapApis.v1"];
 const BACKUP_KEY = "dmr.sapApis.backup.latest";
 
 const GATE_HEADER_REQUEST: FieldDef[] = [
+  { key: "plant", label: "Plant", type: "string", showInForm: true },
   { key: "gate_id", label: "Gate Entry No", type: "string", required: true, showInForm: true },
   { key: "gate_date", label: "Gate Entry Date", type: "date", showInForm: true },
   { key: "gate_time", label: "Gate Entry Time", type: "time", showInForm: true },
   { key: "vendor", label: "Vendor Code", type: "string", showInForm: true },
   { key: "vendor_name", label: "Vendor Name", type: "string", showInForm: true },
-  { key: "dc_oblig", label: "DC OBLIG", type: "string", showInForm: true },
+  { key: "dc_number", label: "DC Number", type: "string", showInForm: true },
   { key: "invoice_no", label: "Invoice Number", type: "string", showInForm: true },
   { key: "invoice_date", label: "Invoice Date", type: "date", showInForm: true },
   { key: "mode_of_transport", label: "Mode of Transport", type: "string", showInForm: true },
@@ -133,10 +134,19 @@ const GATE_HEADER_REQUEST: FieldDef[] = [
   { key: "received_date", label: "Received Date", type: "date", showInForm: true },
   { key: "received_by", label: "Received By", type: "string", showInForm: true },
   { key: "unloading_location", label: "Unloading Location", type: "string", showInForm: true },
+  { key: "sgst", label: "SGST", type: "number", showInForm: true, align: "right" },
+  { key: "cgst", label: "CGST", type: "number", showInForm: true, align: "right" },
+  { key: "igst", label: "IGST", type: "number", showInForm: true, align: "right" },
+  { key: "freight", label: "Freight", type: "number", showInForm: true, align: "right" },
+  { key: "other_charges", label: "Other Charges", type: "number", showInForm: true, align: "right" },
 ];
 
+/** Header keys rendered in the amount-summary panel instead of the field grid. */
+export const GATE_AMOUNT_KEYS = ["sgst", "cgst", "igst", "freight", "other_charges"] as const;
+
 /** Bump when GATE_HEADER_REQUEST changes so saved cloud configs are refreshed. */
-const GATE_HEADER_FIELDS_VERSION = "2026-08-11-gate-header-v2";
+const GATE_HEADER_FIELDS_VERSION = "2026-08-12-gate-header-v3";
+
 
 
 const GATE_ITEM_REQUEST: FieldDef[] = [

@@ -4,9 +4,11 @@ import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Send, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { useSapApis, type FieldDef, type SapApi } from "@/lib/sapApisStore";
+import { useSapApis, GATE_AMOUNT_KEYS, type FieldDef, type SapApi } from "@/lib/sapApisStore";
 import { useSapCreate } from "@/hooks/useSapCreate";
 import { OcrCaptureCard } from "@/components/OcrCaptureCard";
+import { inr } from "@/lib/format";
+
 
 
 
@@ -64,6 +66,21 @@ export default function DMRNew() {
   const [items, setItems] = useState<Row[]>(() =>
     itemFields.length ? [emptyRowFromFields(itemFields)] : [],
   );
+
+  const amountKeys = new Set<string>(GATE_AMOUNT_KEYS as readonly string[]);
+  const gridFields = headerFields.filter((f) => !amountKeys.has(f.key));
+  const amountFields = headerFields.filter((f) => amountKeys.has(f.key));
+
+  const num = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);
+  const totalInvoiceValue = items.reduce((sum, row) => {
+    const amount = num(row["amount"]);
+    if (amount) return sum + amount;
+    return sum + num(row["quantity"]) * num(row["rate"]);
+  }, 0);
+  const totalAmount =
+    totalInvoiceValue + amountFields.reduce((sum, f) => sum + num(header[f.key]), 0);
+
+
 
   // (Source API is fixed to Create_Gate_Service — no selector / handler needed.)
 
@@ -227,33 +244,60 @@ export default function DMRNew() {
         <div className="space-y-5">
           <div className="space-y-5">
             <Section title={`${api.name} — Header`}>
-              <Grid>
-                {headerFields.map((f) => (
-                  <Field key={f.key} label={`${f.label || f.key}${f.required ? " *" : ""}`}>
-                    <FieldInput
-                      field={f}
-                      value={header[f.key] as string | number | boolean}
-                      onChange={(v) => setHeader((h) => ({ ...h, [f.key]: v }))}
-                    />
-                  </Field>
-                ))}
-                {headerFields.length === 0 && (
-                  <div className="col-span-full rounded-lg border-2 border-dashed p-4 text-center text-xs text-muted-foreground">
-                    <div>No request header fields configured for <strong>{api.name}</strong>.</div>
-                    <div className="mt-2 flex flex-wrap justify-center gap-2">
-                      <Button size="sm" variant="outline" onClick={autoGenerateFromResponse}>
-                        Auto-generate from response schema
-                      </Button>
-                      <Button size="sm" variant="ghost" asChild>
-                        <Link to={`/sap/settings/${encodeURIComponent(api.name)}`}>
-                          Open SAP Settings →
-                        </Link>
-                      </Button>
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+                <Grid>
+                  {gridFields.map((f) => (
+                    <Field key={f.key} label={`${f.label || f.key}${f.required ? " *" : ""}`}>
+                      <FieldInput
+                        field={f}
+                        value={header[f.key] as string | number | boolean}
+                        onChange={(v) => setHeader((h) => ({ ...h, [f.key]: v }))}
+                      />
+                    </Field>
+                  ))}
+                  {headerFields.length === 0 && (
+                    <div className="col-span-full rounded-lg border-2 border-dashed p-4 text-center text-xs text-muted-foreground">
+                      <div>No request header fields configured for <strong>{api.name}</strong>.</div>
+                      <div className="mt-2 flex flex-wrap justify-center gap-2">
+                        <Button size="sm" variant="outline" onClick={autoGenerateFromResponse}>
+                          Auto-generate from response schema
+                        </Button>
+                        <Button size="sm" variant="ghost" asChild>
+                          <Link to={`/sap/settings/${encodeURIComponent(api.name)}`}>
+                            Open SAP Settings →
+                          </Link>
+                        </Button>
+                      </div>
                     </div>
+                  )}
+                </Grid>
+
+                {amountFields.length > 0 && (
+                  <div className="space-y-3">
+                    <AmountBox label="Total Invoice Value" value={inr(totalInvoiceValue)} readOnly />
+                    {amountFields.map((f) => (
+                      <AmountBox
+                        key={f.key}
+                        label={f.label || f.key}
+                        input={
+                          <input
+                            type="number"
+                            step="any"
+                            className="h-9 w-full rounded-md border bg-background px-2.5 text-right font-mono text-sm outline-none focus:shadow-glow"
+                            value={String(header[f.key] ?? 0)}
+                            onChange={(e) =>
+                              setHeader((h) => ({ ...h, [f.key]: coerce(e.target.value, "number") }))
+                            }
+                          />
+                        }
+                      />
+                    ))}
+                    <AmountBox label="Total Amount" value={inr(totalAmount)} readOnly emphasis />
                   </div>
                 )}
-              </Grid>
+              </div>
             </Section>
+
 
             {itemFields.length > 0 && (
               <Section title="Line Items (_Item)">
@@ -384,6 +428,41 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label className="mb-1 block text-xs font-medium text-muted-foreground">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function AmountBox({
+  label,
+  value,
+  input,
+  readOnly,
+  emphasis,
+}: {
+  label: string;
+  value?: string;
+  input?: React.ReactNode;
+  readOnly?: boolean;
+  emphasis?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-lg border p-3 ${emphasis ? "border-primary/40 bg-primary/5" : "bg-card"}`}
+    >
+      <div
+        className={`mb-1 text-xs ${emphasis ? "font-semibold text-foreground" : "font-medium text-muted-foreground"}`}
+      >
+        {label}
+      </div>
+      {readOnly ? (
+        <div
+          className={`text-right font-mono ${emphasis ? "text-xl font-bold text-primary" : "text-base font-semibold text-foreground"}`}
+        >
+          {value}
+        </div>
+      ) : (
+        input
+      )}
     </div>
   );
 }

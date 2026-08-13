@@ -176,12 +176,15 @@ const GATE_ITEM_REQUEST: FieldDef[] = [
   { key: "debit_credit_indicator", label: "Debit/Credit indicator", type: "string", showInForm: true },
   { key: "grn_status", label: "GRN Status", type: "string", showInForm: true },
   { key: "receipt_delay_reason", label: "Receipt Delay Reason", type: "string", showInForm: true },
+  { key: "gross_weight", label: "Gross Weight", type: "number", showInForm: true, align: "right" },
+  { key: "tare_weight", label: "Tare Weight", type: "number", showInForm: true, align: "right" },
+  { key: "net_weight", label: "Net Weight", type: "number", showInForm: true, align: "right" },
   { key: "shortage_breakages", label: "Shortage/Brekages", type: "string", showInForm: true },
   { key: "remarks", label: "Remarks", type: "string", showInForm: true },
 ];
 
 /** Bump when GATE_ITEM_REQUEST changes so saved cloud configs are refreshed. */
-const GATE_ITEM_FIELDS_VERSION = "2026-08-13-gate-item-v1";
+const GATE_ITEM_FIELDS_VERSION = "2026-08-13-gate-item-v2";
 
 
 const GATE_HEADER_RESPONSE: FieldDef[] = [

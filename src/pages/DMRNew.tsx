@@ -401,13 +401,39 @@ export default function DMRNew() {
                   </div>
                 </Field>
                 <Field label={OBD_FIELD.label}>
-                  <FieldInput
-                    field={OBD_FIELD}
-                    value={header[OBD_FIELD.key] as string}
-                    onChange={(v) =>
-                      setHeader((h) => ({ ...h, [OBD_FIELD.key]: v }))
-                    }
-                  />
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <input
+                        type="text"
+                        className="h-9 w-full rounded-md border bg-background px-2.5 text-sm outline-none focus:shadow-glow"
+                        value={String(header[OBD_FIELD.key] ?? "")}
+                        onChange={(e) => {
+                          obdLookup.reset();
+                          setHeader((h) => ({ ...h, [OBD_FIELD.key]: e.target.value }));
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void runObdLookup();
+                          }
+                        }}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-9 shrink-0 px-3"
+                      disabled={obdLookup.loading}
+                      onClick={() => void runObdLookup()}
+                    >
+                      {obdLookup.loading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        "Enter"
+                      )}
+                    </Button>
+                  </div>
                 </Field>
               </Grid>
 

@@ -142,7 +142,7 @@ const GATE_HEADER_REQUEST: FieldDef[] = [
 export const GATE_AMOUNT_KEYS = ["sgst", "cgst", "igst", "freight", "other_charges"] as const;
 
 /** Bump when GATE_HEADER_REQUEST changes so saved cloud configs are refreshed. */
-const GATE_HEADER_FIELDS_VERSION = "2026-08-12-gate-header-v4";
+const GATE_HEADER_FIELDS_VERSION = "2026-08-13-gate-header-v5";
 
 
 

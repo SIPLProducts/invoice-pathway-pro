@@ -100,6 +100,8 @@ export default function DMRNew() {
 
   const num = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);
   const totalInvoiceValue = items.reduce((sum, row) => {
+    const invoiceValue = num(row["invoice_value"]);
+    if (invoiceValue) return sum + invoiceValue;
     const amount = num(row["amount"]);
     if (amount) return sum + amount;
     return sum + num(row["quantity"]) * num(row["rate"]);

@@ -160,6 +160,13 @@ export default function DMRNew() {
 
   const { submit, loading, proxyConfigured } = useSapCreate(api ?? null);
   const poLookup = useSapPoLookup();
+  const obdLookup = useSapObdLookup();
+  const [obdOpen, setObdOpen] = useState(false);
+
+  const runObdLookup = async () => {
+    setObdOpen(true);
+    await obdLookup.lookup(String(header[OBD_FIELD.key] ?? ""));
+  };
 
 
   const onSubmit = async () => {

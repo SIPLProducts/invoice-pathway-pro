@@ -655,6 +655,30 @@ async function bootstrapCloud(): Promise<void> {
       console.warn("[sapApisStore] Gate header field refresh failed (non-fatal).", e);
     }
 
+    // One-time (per version) refresh of the gate line-item request fields.
+    try {
+      const ITEM_VERSION_FLAG = "dmr.gateItemFieldsVersion";
+      const appliedItem =
+        typeof window !== "undefined" ? localStorage.getItem(ITEM_VERSION_FLAG) : GATE_ITEM_FIELDS_VERSION;
+      if (appliedItem !== GATE_ITEM_FIELDS_VERSION) {
+        const isGateApi = (a: SapApi) => /gate/i.test(a.name);
+        const updates = cloud
+          .filter(isGateApi)
+          .map((a) => ({ ...a, requestItemFields: GATE_ITEM_REQUEST.map((f) => ({ ...f })) }));
+        if (updates.length > 0) {
+          await bulkUpsert(updates);
+          cloud = await fetchAllFromCloud();
+          console.info(
+            `[sapApisStore] Refreshed gate item request fields on ${updates.length} config(s).`,
+          );
+        }
+        if (typeof window !== "undefined")
+          localStorage.setItem(ITEM_VERSION_FLAG, GATE_ITEM_FIELDS_VERSION);
+      }
+    } catch (e) {
+      console.warn("[sapApisStore] Gate item field refresh failed (non-fatal).", e);
+    }
+
 
 
     cloudReady = true;

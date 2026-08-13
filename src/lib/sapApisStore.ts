@@ -242,6 +242,20 @@ export const PO_LINE_FIELDS: FieldDef[] = [
   { key: "received_quantity", label: "Received Quantity", type: "number", showInTable: true, align: "right" },
 ];
 
+/** Columns shown in the OBD Details popup on DMR → New Entry. */
+export const OBD_LINE_FIELDS: FieldDef[] = [
+  { key: "line_id", label: "Line ID", type: "string", showInTable: true },
+  { key: "delivery_item", label: "Delivery Item", type: "string", showInTable: true },
+  { key: "material_code", label: "Material Code", type: "string", showInTable: true },
+  { key: "material_description", label: "Material Description", type: "string", showInTable: true },
+  { key: "delivery_quantity", label: "Delivery Quantity", type: "number", showInTable: true, align: "right" },
+  { key: "uom", label: "UOM", type: "string", showInTable: true },
+  { key: "batch_no", label: "Batch", type: "string", showInTable: true },
+  { key: "plant", label: "Plant", type: "string", showInTable: true },
+  { key: "storage_location", label: "Storage Location", type: "string", showInTable: true },
+  { key: "po_number", label: "PO Number", type: "string", showInTable: true },
+];
+
 export const DEFAULT_GATE_REQUEST_HEADER = GATE_HEADER_REQUEST;
 
 export const DEFAULT_GATE_REQUEST_ITEM = GATE_ITEM_REQUEST;

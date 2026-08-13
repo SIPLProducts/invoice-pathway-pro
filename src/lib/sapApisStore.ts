@@ -150,21 +150,42 @@ const GATE_HEADER_FIELDS_VERSION = "2026-08-12-gate-header-v4";
 
 
 const GATE_ITEM_REQUEST: FieldDef[] = [
-  { key: "item_no", label: "Item No", type: "string", required: true, showInForm: true },
-  { key: "material", label: "Material", type: "string", required: true, showInForm: true },
-  { key: "material_desc", label: "Material Desc", type: "string", showInForm: true },
-  { key: "quantity", label: "Quantity", type: "number", required: true, showInForm: true, align: "right" },
-  { key: "unit", label: "Unit", type: "string", required: true, showInForm: true, defaultValue: "KG" },
-  { key: "batch", label: "Batch", type: "string", showInForm: true },
-  { key: "storage_location", label: "Storage Loc", type: "string", showInForm: true },
+  { key: "company_code", label: "Company Code", type: "string", showInForm: true },
+  { key: "profit_center_plant", label: "Profit Center / Plant", type: "string", showInForm: true },
   { key: "po_number", label: "PO Number", type: "string", showInForm: true },
-  { key: "po_item", label: "PO Item", type: "string", showInForm: true },
-  { key: "delivery_no", label: "Delivery No", type: "string", showInForm: true },
-  { key: "delivery_item", label: "Delivery Item", type: "string", showInForm: true },
-  { key: "invoice_no", label: "Invoice No", type: "string", showInForm: true },
-  { key: "weight", label: "Weight", type: "number", showInForm: true, align: "right" },
+  { key: "po_date", label: "PO Date", type: "date", showInForm: true },
+  { key: "movement_type", label: "MOVEMENT TYPE", type: "string", showInForm: true },
+  { key: "hsn_code", label: "HSN Code", type: "string", showInForm: true },
+  { key: "materials_code", label: "Materials Code", type: "string", showInForm: true },
+  { key: "materials_description", label: "Materials Description", type: "string", showInForm: true },
+  { key: "storage_location", label: "Storage Location", type: "string", showInForm: true },
+  { key: "uom", label: "UOM", type: "string", showInForm: true },
+  { key: "po_quantity", label: "PO Quantity", type: "number", showInForm: true, align: "right" },
+  { key: "goods_receipt_quantity", label: "Goods Receipt Quantity", type: "number", showInForm: true, align: "right" },
+  { key: "invoice_quantity", label: "Invoice Quantity", type: "number", showInForm: true, align: "right" },
+  { key: "invoice_value", label: "Invoice Value", type: "number", showInForm: true, align: "right" },
+  { key: "currency", label: "Currency", type: "string", showInForm: true },
+  { key: "wbs_element", label: "WBS ELEMENT", type: "string", showInForm: true },
+  { key: "supplier_batch", label: "Supplier Batch", type: "string", showInForm: true },
+  { key: "date_of_manuf", label: "DATE OF MANUF.", type: "date", showInForm: true },
+  { key: "material_doc_year", label: "Material Doc. Year", type: "string", showInForm: true },
+  { key: "expiry_date", label: "Expiry Date", type: "date", showInForm: true },
+  { key: "warranty", label: "WARRANTY", type: "string", showInForm: true },
+  { key: "batch_no", label: "BATCH NO", type: "string", showInForm: true },
+  { key: "purchase_requestion_number", label: "Purchase Requestion Number", type: "string", showInForm: true },
+  { key: "purchase_requestion_date", label: "Purchase Requestion Date", type: "date", showInForm: true },
+  { key: "requirements_date", label: "Requirements date", type: "date", showInForm: true },
+  { key: "entry_date_time", label: "Entry Date & Time", type: "string", showInForm: true },
+  { key: "debit_credit_indicator", label: "Debit/Credit indicator", type: "string", showInForm: true },
+  { key: "grn_status", label: "GRN Status", type: "string", showInForm: true },
+  { key: "receipt_delay_reason", label: "Receipt Delay Reason", type: "string", showInForm: true },
+  { key: "shortage_breakages", label: "Shortage/Brekages", type: "string", showInForm: true },
   { key: "remarks", label: "Remarks", type: "string", showInForm: true },
 ];
+
+/** Bump when GATE_ITEM_REQUEST changes so saved cloud configs are refreshed. */
+const GATE_ITEM_FIELDS_VERSION = "2026-08-13-gate-item-v1";
+
 
 const GATE_HEADER_RESPONSE: FieldDef[] = [
   { key: "gate_id", label: "Gate ID", type: "string", showInTable: true },

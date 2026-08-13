@@ -7,6 +7,14 @@ import { toast } from "sonner";
 import { useSapApis, GATE_AMOUNT_KEYS, PO_LINE_FIELDS, type FieldDef, type SapApi } from "@/lib/sapApisStore";
 import { useSapCreate } from "@/hooks/useSapCreate";
 import { useSapPoLookup } from "@/hooks/useSapPoLookup";
+import { useSapObdLookup } from "@/hooks/useSapObdLookup";
+import { OBD_LINE_FIELDS } from "@/lib/sapApisStore";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { OcrCaptureCard } from "@/components/OcrCaptureCard";
 import { inr } from "@/lib/format";
 

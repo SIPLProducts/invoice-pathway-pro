@@ -128,9 +128,6 @@ const GATE_HEADER_REQUEST: FieldDef[] = [
   { key: "eway_bill_no", label: "E-Way Bill Number", type: "string", showInForm: true },
   { key: "eway_bill_date", label: "E-Way Bill Date", type: "date", showInForm: true },
   { key: "weighment_ticket_no", label: "Weighment Ticket Number", type: "string", showInForm: true },
-  { key: "gross_weight", label: "Gross Weight", type: "number", showInForm: true, align: "right" },
-  { key: "tare_weight", label: "Tare Weight", type: "number", showInForm: true, align: "right" },
-  { key: "net_weight", label: "Net Weight", type: "number", showInForm: true, align: "right" },
   { key: "received_date", label: "Received Date", type: "date", showInForm: true },
   { key: "received_by", label: "Received By", type: "string", showInForm: true },
   { key: "unloading_location", label: "Unloading Location", type: "string", showInForm: true },
@@ -145,7 +142,7 @@ const GATE_HEADER_REQUEST: FieldDef[] = [
 export const GATE_AMOUNT_KEYS = ["sgst", "cgst", "igst", "freight", "other_charges"] as const;
 
 /** Bump when GATE_HEADER_REQUEST changes so saved cloud configs are refreshed. */
-const GATE_HEADER_FIELDS_VERSION = "2026-08-12-gate-header-v4";
+const GATE_HEADER_FIELDS_VERSION = "2026-08-13-gate-header-v5";
 
 
 
@@ -179,12 +176,15 @@ const GATE_ITEM_REQUEST: FieldDef[] = [
   { key: "debit_credit_indicator", label: "Debit/Credit indicator", type: "string", showInForm: true },
   { key: "grn_status", label: "GRN Status", type: "string", showInForm: true },
   { key: "receipt_delay_reason", label: "Receipt Delay Reason", type: "string", showInForm: true },
+  { key: "gross_weight", label: "Gross Weight", type: "number", showInForm: true, align: "right" },
+  { key: "tare_weight", label: "Tare Weight", type: "number", showInForm: true, align: "right" },
+  { key: "net_weight", label: "Net Weight", type: "number", showInForm: true, align: "right" },
   { key: "shortage_breakages", label: "Shortage/Brekages", type: "string", showInForm: true },
   { key: "remarks", label: "Remarks", type: "string", showInForm: true },
 ];
 
 /** Bump when GATE_ITEM_REQUEST changes so saved cloud configs are refreshed. */
-const GATE_ITEM_FIELDS_VERSION = "2026-08-13-gate-item-v1";
+const GATE_ITEM_FIELDS_VERSION = "2026-08-13-gate-item-v2";
 
 
 const GATE_HEADER_RESPONSE: FieldDef[] = [
@@ -240,6 +240,20 @@ export const PO_LINE_FIELDS: FieldDef[] = [
   { key: "storage_location", label: "Storage Location", type: "string", showInTable: true },
   { key: "open_quantity", label: "Open Quantity", type: "number", showInTable: true, align: "right" },
   { key: "received_quantity", label: "Received Quantity", type: "number", showInTable: true, align: "right" },
+];
+
+/** Columns shown in the OBD Details popup on DMR → New Entry. */
+export const OBD_LINE_FIELDS: FieldDef[] = [
+  { key: "line_id", label: "Line ID", type: "string", showInTable: true },
+  { key: "delivery_item", label: "Delivery Item", type: "string", showInTable: true },
+  { key: "material_code", label: "Material Code", type: "string", showInTable: true },
+  { key: "material_description", label: "Material Description", type: "string", showInTable: true },
+  { key: "delivery_quantity", label: "Delivery Quantity", type: "number", showInTable: true, align: "right" },
+  { key: "uom", label: "UOM", type: "string", showInTable: true },
+  { key: "batch_no", label: "Batch", type: "string", showInTable: true },
+  { key: "plant", label: "Plant", type: "string", showInTable: true },
+  { key: "storage_location", label: "Storage Location", type: "string", showInTable: true },
+  { key: "po_number", label: "PO Number", type: "string", showInTable: true },
 ];
 
 export const DEFAULT_GATE_REQUEST_HEADER = GATE_HEADER_REQUEST;
@@ -415,6 +429,32 @@ const seed: SapApi[] = [
     responseItemFields: PO_LINE_FIELDS,
     listEndpoint: "/api/po/{po_number}",
     proxyPath: "/api/po/{po_number}",
+    middleware: {
+      url: "",
+      port: "3202",
+      secret: "",
+      connectionMode: "Via Proxy Server",
+      deploymentMode: "Self-Hosted (Client Server)",
+    },
+  },
+  {
+    name: "Get OBD Details",
+    description:
+      "Fetches Outbound Delivery (OBD) line items via the Node middleware. Used by the Enter button beside the OBD field on DMR → New Entry.",
+    baseUrl: "https://fa530628-e5cb-4817-8c70-9991654babd5.abap-web.us10.hana.ondemand.com",
+    endpoint:
+      "/sap/opu/odata4/sap/api_outbound_delivery/srvd_a2x/sap/outbounddelivery/0001/OutbDeliveryItem?$filter=OutboundDelivery eq '{obd_number}'&sap-client=100",
+    method: "GET",
+    auth: "Basic",
+    status: "Active",
+    tag: "Proxy",
+    type: "live",
+    autoSync: { enabled: false, frequencyMinutes: 5 },
+    rowsPath: "value",
+    rowKey: "line_id",
+    responseItemFields: OBD_LINE_FIELDS,
+    listEndpoint: "/api/obd/{obd_number}",
+    proxyPath: "/api/obd/{obd_number}",
     middleware: {
       url: "",
       port: "3202",

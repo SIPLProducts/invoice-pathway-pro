@@ -7,6 +7,14 @@ import { toast } from "sonner";
 import { useSapApis, GATE_AMOUNT_KEYS, PO_LINE_FIELDS, type FieldDef, type SapApi } from "@/lib/sapApisStore";
 import { useSapCreate } from "@/hooks/useSapCreate";
 import { useSapPoLookup } from "@/hooks/useSapPoLookup";
+import { useSapObdLookup } from "@/hooks/useSapObdLookup";
+import { OBD_LINE_FIELDS } from "@/lib/sapApisStore";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { OcrCaptureCard } from "@/components/OcrCaptureCard";
 import { inr } from "@/lib/format";
 
@@ -160,6 +168,13 @@ export default function DMRNew() {
 
   const { submit, loading, proxyConfigured } = useSapCreate(api ?? null);
   const poLookup = useSapPoLookup();
+  const obdLookup = useSapObdLookup();
+  const [obdOpen, setObdOpen] = useState(false);
+
+  const runObdLookup = async () => {
+    setObdOpen(true);
+    await obdLookup.lookup(String(header[OBD_FIELD.key] ?? ""));
+  };
 
 
   const onSubmit = async () => {
@@ -401,13 +416,39 @@ export default function DMRNew() {
                   </div>
                 </Field>
                 <Field label={OBD_FIELD.label}>
-                  <FieldInput
-                    field={OBD_FIELD}
-                    value={header[OBD_FIELD.key] as string}
-                    onChange={(v) =>
-                      setHeader((h) => ({ ...h, [OBD_FIELD.key]: v }))
-                    }
-                  />
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <input
+                        type="text"
+                        className="h-9 w-full rounded-md border bg-background px-2.5 text-sm outline-none focus:shadow-glow"
+                        value={String(header[OBD_FIELD.key] ?? "")}
+                        onChange={(e) => {
+                          obdLookup.reset();
+                          setHeader((h) => ({ ...h, [OBD_FIELD.key]: e.target.value }));
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void runObdLookup();
+                          }
+                        }}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-9 shrink-0 px-3"
+                      disabled={obdLookup.loading}
+                      onClick={() => void runObdLookup()}
+                    >
+                      {obdLookup.loading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        "Enter"
+                      )}
+                    </Button>
+                  </div>
                 </Field>
               </Grid>
 
@@ -463,6 +504,58 @@ export default function DMRNew() {
               )}
             </Section>
 
+            <Dialog open={obdOpen} onOpenChange={setObdOpen}>
+              <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle>OBD Details</DialogTitle>
+                </DialogHeader>
+                {obdLookup.loading && (
+                  <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Fetching OBD details…
+                  </div>
+                )}
+                {!obdLookup.loading && obdLookup.notFound && (
+                  <div className="py-6 text-sm font-medium text-destructive">OBD not found</div>
+                )}
+                {!obdLookup.loading && obdLookup.error && (
+                  <div className="py-6 text-sm font-medium text-destructive">{obdLookup.error}</div>
+                )}
+                {!obdLookup.loading && obdLookup.lines.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                          {OBD_LINE_FIELDS.map((f) => (
+                            <th
+                              key={f.key}
+                              className={`whitespace-nowrap py-2 pr-3 font-medium ${f.align === "right" ? "text-right" : ""}`}
+                            >
+                              {f.label || f.key}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {obdLookup.lines.map((row, idx) => (
+                          <tr key={idx} className="border-b last:border-0">
+                            {OBD_LINE_FIELDS.map((f) => (
+                              <td
+                                key={f.key}
+                                className={`whitespace-nowrap py-1.5 pr-3 ${f.align === "right" ? "text-right font-mono" : ""}`}
+                              >
+                                {row[f.key] === null || row[f.key] === undefined
+                                  ? "—"
+                                  : String(row[f.key])}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
 
             {itemFields.length > 0 && (
               <Section title="Line Items (_Item)">

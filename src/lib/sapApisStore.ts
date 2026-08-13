@@ -437,6 +437,32 @@ const seed: SapApi[] = [
       deploymentMode: "Self-Hosted (Client Server)",
     },
   },
+  {
+    name: "Get OBD Details",
+    description:
+      "Fetches Outbound Delivery (OBD) line items via the Node middleware. Used by the Enter button beside the OBD field on DMR → New Entry.",
+    baseUrl: "https://fa530628-e5cb-4817-8c70-9991654babd5.abap-web.us10.hana.ondemand.com",
+    endpoint:
+      "/sap/opu/odata4/sap/api_outbound_delivery/srvd_a2x/sap/outbounddelivery/0001/OutbDeliveryItem?$filter=OutboundDelivery eq '{obd_number}'&sap-client=100",
+    method: "GET",
+    auth: "Basic",
+    status: "Active",
+    tag: "Proxy",
+    type: "live",
+    autoSync: { enabled: false, frequencyMinutes: 5 },
+    rowsPath: "value",
+    rowKey: "line_id",
+    responseItemFields: OBD_LINE_FIELDS,
+    listEndpoint: "/api/obd/{obd_number}",
+    proxyPath: "/api/obd/{obd_number}",
+    middleware: {
+      url: "",
+      port: "3202",
+      secret: "",
+      connectionMode: "Via Proxy Server",
+      deploymentMode: "Self-Hosted (Client Server)",
+    },
+  },
 ];
 
 

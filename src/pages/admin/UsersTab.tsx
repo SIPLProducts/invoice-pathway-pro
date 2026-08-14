@@ -162,11 +162,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
-    if (!form.sap_user_id.trim()) e.sap_user_id = "SAP User ID is required";
     if (!form.first_name.trim()) e.first_name = "First name is required";
-    if (!form.last_name.trim()) e.last_name = "Last name is required";
-    if (!form.email.trim()) e.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = "Enter a valid email";
     if (!form.contact.trim()) e.contact = "Contact is required";
     else if (!PHONE_RE.test(form.contact.trim())) e.contact = "Enter a valid phone number";
 
@@ -181,7 +177,6 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
 
     if (form.plant_ids.length === 0) e.plants = "Select at least one plant";
     if (form.role_ids.length === 0) e.roles = "Select at least one role";
-    if (form.plant_ids.some((pid) => !form.roleByPlant[pid])) e.rolePerPlant = "Assign a role for each selected plant";
 
     setErrors(e);
     if (Object.keys(e).length) {
@@ -191,30 +186,34 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
     return true;
   };
 
+  const makeUserId = (): string => {
+    const base =
+      `${form.first_name}${form.last_name}`.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16) || "user";
+    const taken = new Set(users.map((u) => (u.sap_user_id ?? "").toLowerCase()));
+    let candidate = "";
+    do {
+      candidate = `${base}${Math.floor(1000 + Math.random() * 9000)}`;
+    } while (taken.has(candidate));
+    return candidate;
+  };
+
   const save = async () => {
     if (!validate()) return;
 
-    const rolePairs = Object.entries(form.roleByPlant)
-      .filter(([, roleId]) => !!roleId)
-      .map(([plantKey, roleId]) => ({ plant_id: plantKey === "global" ? null : plantKey, role_id: roleId }));
+    const rolePairs = form.plant_ids.flatMap((plantId) =>
+      form.role_ids.map((roleId) => ({ plant_id: plantId, role_id: roleId })),
+    );
 
-    const seen = new Set<string>();
-    for (const p of rolePairs) {
-      const key = `${p.plant_id}|${p.role_id}`;
-      if (seen.has(key)) {
-        toast.error("Duplicate plant + role combination");
-        return;
-      }
-      seen.add(key);
-    }
+    const userId = form.id ? form.sap_user_id : makeUserId();
+    const email = form.id ? form.email : `${userId}@siplusers.internal`;
 
     setSaving(true);
     try {
       await callAdmin(form.id ? "update_user" : "create_user", {
         id: form.id,
-        sap_user_id: form.sap_user_id.trim(),
+        sap_user_id: userId,
         name: `${form.first_name.trim()} ${form.last_name.trim()}`.trim(),
-        email: form.email.trim(),
+        email,
         contact: form.contact.trim(),
         password: form.password || undefined,
         status: form.status,
@@ -230,6 +229,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
       setSaving(false);
     }
   };
+
 
 
   const doDelete = async (mode: "soft" | "permanent") => {

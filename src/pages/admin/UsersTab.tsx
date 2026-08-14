@@ -79,6 +79,9 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showPw, setShowPw] = useState(false);
+  const [showPw2, setShowPw2] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
 
   const plantName = (id: string) => {

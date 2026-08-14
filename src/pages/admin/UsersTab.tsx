@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Loader2, Pencil, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, Loader2, Pencil, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,25 +41,34 @@ interface Props {
 interface FormState {
   id?: string;
   sap_user_id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   email: string;
   contact: string;
   password: string;
+  confirm_password: string;
   status: string;
   plant_ids: string[];
+  role_ids: string[];
   roleByPlant: Record<string, string>;
 }
 
 const emptyForm: FormState = {
   sap_user_id: "",
-  name: "",
+  first_name: "",
+  last_name: "",
   email: "",
   contact: "",
   password: "",
+  confirm_password: "",
   status: "active",
   plant_ids: [],
+  role_ids: [],
   roleByPlant: {},
 };
+
+const PHONE_RE = /^\+?[0-9][0-9\s-]{7,18}$/;
+
 
 export function UsersTab({ users, plants, roles, loading, reload }: Props) {
   const { can } = useAuth();
@@ -70,6 +80,9 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showPw, setShowPw] = useState(false);
+  const [showPw2, setShowPw2] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
 
   const plantName = (id: string) => {
@@ -77,6 +90,10 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
     return p ? `${p.code} · ${p.name}` : "—";
   };
   const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? "—";
+  const selectableRoles = useMemo(
+    () => (form.role_ids.length ? roles.filter((r) => form.role_ids.includes(r.id)) : roles),
+    [roles, form.role_ids],
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -95,23 +112,29 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
 
   const openCreate = () => {
     setForm(emptyForm);
+    setErrors({});
     setOpen(true);
   };
 
   const openEdit = (u: UserRow) => {
     const roleByPlant: Record<string, string> = {};
     for (const r of u.roles) roleByPlant[r.plant_id ?? "global"] = r.role_id;
+    const parts = (u.name ?? "").trim().split(/\s+/);
     setForm({
       id: u.id,
       sap_user_id: u.sap_user_id,
-      name: u.name,
+      first_name: parts[0] ?? "",
+      last_name: parts.slice(1).join(" "),
       email: u.email,
       contact: u.contact ?? "",
       password: "",
+      confirm_password: "",
       status: u.status,
       plant_ids: u.plants.map((p) => p.plant_id),
+      role_ids: Array.from(new Set(u.roles.map((r) => r.role_id))),
       roleByPlant,
     });
+    setErrors({});
     setOpen(true);
   };
 
@@ -125,15 +148,52 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
     });
   };
 
+  const toggleRole = (id: string) => {
+    setForm((f) => {
+      const has = f.role_ids.includes(id);
+      const role_ids = has ? f.role_ids.filter((r) => r !== id) : [...f.role_ids, id];
+      const roleByPlant = { ...f.roleByPlant };
+      if (has) {
+        for (const k of Object.keys(roleByPlant)) if (roleByPlant[k] === id) delete roleByPlant[k];
+      }
+      return { ...f, role_ids, roleByPlant };
+    });
+  };
+
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
+    if (!form.sap_user_id.trim()) e.sap_user_id = "SAP User ID is required";
+    if (!form.first_name.trim()) e.first_name = "First name is required";
+    if (!form.last_name.trim()) e.last_name = "Last name is required";
+    if (!form.email.trim()) e.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = "Enter a valid email";
+    if (!form.contact.trim()) e.contact = "Contact is required";
+    else if (!PHONE_RE.test(form.contact.trim())) e.contact = "Enter a valid phone number";
+
+    if (!form.id) {
+      if (form.password.length < 8) e.password = "Password must be at least 8 characters";
+      if (!form.confirm_password) e.confirm_password = "Confirm the password";
+      else if (form.password !== form.confirm_password) e.confirm_password = "Passwords do not match";
+    } else if (form.password || form.confirm_password) {
+      if (form.password.length < 8) e.password = "Password must be at least 8 characters";
+      if (form.password !== form.confirm_password) e.confirm_password = "Passwords do not match";
+    }
+
+    if (form.plant_ids.length === 0) e.plants = "Select at least one plant";
+    if (form.role_ids.length === 0) e.roles = "Select at least one role";
+    if (form.plant_ids.some((pid) => !form.roleByPlant[pid])) e.rolePerPlant = "Assign a role for each selected plant";
+
+    setErrors(e);
+    if (Object.keys(e).length) {
+      toast.error("Please fix the highlighted fields");
+      return false;
+    }
+    return true;
+  };
+
   const save = async () => {
-    if (!form.sap_user_id.trim() || !form.name.trim() || !form.email.trim()) {
-      toast.error("SAP User ID, Name and Email are required");
-      return;
-    }
-    if (!form.id && form.password.length < 8) {
-      toast.error("Password must be at least 8 characters");
-      return;
-    }
+    if (!validate()) return;
+
     const rolePairs = Object.entries(form.roleByPlant)
       .filter(([, roleId]) => !!roleId)
       .map(([plantKey, roleId]) => ({ plant_id: plantKey === "global" ? null : plantKey, role_id: roleId }));
@@ -153,7 +213,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
       await callAdmin(form.id ? "update_user" : "create_user", {
         id: form.id,
         sap_user_id: form.sap_user_id.trim(),
-        name: form.name.trim(),
+        name: `${form.first_name.trim()} ${form.last_name.trim()}`.trim(),
         email: form.email.trim(),
         contact: form.contact.trim(),
         password: form.password || undefined,
@@ -170,6 +230,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
       setSaving(false);
     }
   };
+
 
   const doDelete = async (mode: "soft" | "permanent") => {
     if (!deleteTarget) return;
@@ -334,22 +395,45 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
           </DialogHeader>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="SAP User ID">
-              <Input value={form.sap_user_id} onChange={(e) => setForm({ ...form, sap_user_id: e.target.value })} />
+            <Field label="SAP User ID" required error={errors.sap_user_id}>
+              <Input
+                placeholder="e.g. SAP12345"
+                value={form.sap_user_id}
+                onChange={(e) => setForm({ ...form, sap_user_id: e.target.value })}
+              />
             </Field>
-            <Field label="Name">
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <Field label="First Name" required error={errors.first_name}>
+              <Input
+                placeholder="Enter first name"
+                value={form.first_name}
+                onChange={(e) => setForm({ ...form, first_name: e.target.value })}
+              />
             </Field>
-            <Field label="Email">
-              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <Field label="Last Name" required error={errors.last_name}>
+              <Input
+                placeholder="Enter last name"
+                value={form.last_name}
+                onChange={(e) => setForm({ ...form, last_name: e.target.value })}
+              />
             </Field>
-            <Field label="Contact">
-              <Input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
+            <Field label="Email" required error={errors.email}>
+              <Input
+                type="email"
+                placeholder="Enter email address"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
             </Field>
-            <Field label={form.id ? "New password (optional)" : "Password"}>
-              <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            <Field label="Contact" required error={errors.contact}>
+              <Input
+                type="tel"
+                inputMode="tel"
+                placeholder="Enter contact number"
+                value={form.contact}
+                onChange={(e) => setForm({ ...form, contact: e.target.value })}
+              />
             </Field>
-            <Field label="Status">
+            <Field label="Status" required error={errors.status}>
               <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -358,23 +442,120 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
                 </SelectContent>
               </Select>
             </Field>
+            <Field label={form.id ? "New password (optional)" : "Password"} required={!form.id} error={errors.password}>
+              <div className="relative">
+                <Input
+                  type={showPw ? "text" : "password"}
+                  placeholder="Enter password"
+                  className="pr-10"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                />
+                <button
+                  type="button"
+                  aria-label={showPw ? "Hide password" : "Show password"}
+                  onClick={() => setShowPw((s) => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </Field>
+            <Field label="Confirm Password" required={!form.id} error={errors.confirm_password}>
+              <div className="relative">
+                <Input
+                  type={showPw2 ? "text" : "password"}
+                  placeholder="Confirm password"
+                  className="pr-10"
+                  value={form.confirm_password}
+                  onChange={(e) => setForm({ ...form, confirm_password: e.target.value })}
+                />
+                <button
+                  type="button"
+                  aria-label={showPw2 ? "Hide password" : "Show password"}
+                  onClick={() => setShowPw2((s) => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPw2 ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </Field>
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Plant assignment</Label>
-            <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
-              {plants.map((p) => (
-                <label key={p.id} className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={form.plant_ids.includes(p.id)} onCheckedChange={() => togglePlant(p.id)} />
-                  {p.code} · {p.name}
-                </label>
-              ))}
-              {plants.length === 0 && <span className="text-sm text-muted-foreground">No plants configured yet.</span>}
-            </div>
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Plant assignment <span className="text-destructive">*</span>
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-between font-normal">
+                  {form.plant_ids.length ? `${form.plant_ids.length} plant(s) selected` : "Select one or more plants"}
+                  <ChevronDown className="h-4 w-4 opacity-60" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-2" align="start">
+                <div className="max-h-56 space-y-1 overflow-y-auto">
+                  {plants.map((p) => (
+                    <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+                      <Checkbox checked={form.plant_ids.includes(p.id)} onCheckedChange={() => togglePlant(p.id)} />
+                      {p.code} · {p.name}
+                    </label>
+                  ))}
+                  {plants.length === 0 && <span className="block px-2 py-1.5 text-sm text-muted-foreground">No plants configured yet.</span>}
+                </div>
+              </PopoverContent>
+            </Popover>
+            {form.plant_ids.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {form.plant_ids.map((pid) => (
+                  <Badge key={pid} variant="secondary" className="gap-1">
+                    {plantName(pid)}
+                    <button type="button" aria-label="Remove plant" onClick={() => togglePlant(pid)}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {errors.plants && <p className="text-xs text-destructive">{errors.plants}</p>}
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Role per plant</Label>
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Role assignment <span className="text-destructive">*</span>
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-between font-normal">
+                  {form.role_ids.length ? `${form.role_ids.length} role(s) selected` : "Select roles"}
+                  <ChevronDown className="h-4 w-4 opacity-60" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-2" align="start">
+                <div className="max-h-56 space-y-1 overflow-y-auto">
+                  {roles.map((r) => (
+                    <label key={r.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+                      <Checkbox checked={form.role_ids.includes(r.id)} onCheckedChange={() => toggleRole(r.id)} />
+                      {r.name}
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            {form.role_ids.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {form.role_ids.map((rid) => (
+                  <Badge key={rid} variant="secondary" className="gap-1">
+                    {roleName(rid)}
+                    <button type="button" aria-label="Remove role" onClick={() => toggleRole(rid)}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {errors.roles && <p className="text-xs text-destructive">{errors.roles}</p>}
+
             <div className="space-y-2 rounded-lg border p-3">
               <div className="flex items-center gap-3">
                 <span className="w-40 shrink-0 text-sm font-medium">All plants (global)</span>
@@ -392,7 +573,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
                   <SelectTrigger className="h-9"><SelectValue placeholder="No role" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No role</SelectItem>
-                    {roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                    {selectableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -410,16 +591,21 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
                       })
                     }
                   >
-                    <SelectTrigger className="h-9"><SelectValue placeholder="No role" /></SelectTrigger>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Select role for this plant" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No role</SelectItem>
-                      {roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                      {selectableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               ))}
+              {form.plant_ids.length === 0 && (
+                <p className="text-sm text-muted-foreground">Please select a plant and assign a role for each plant.</p>
+              )}
             </div>
+            {errors.rolePerPlant && <p className="text-xs text-destructive">{errors.rolePerPlant}</p>}
           </div>
+
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
@@ -452,11 +638,26 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  required,
+  error,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  error?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-medium">{label}</Label>
+      <Label className="text-xs font-medium">
+        {label}
+        {required && <span className="ml-0.5 text-destructive">*</span>}
+      </Label>
       {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
+

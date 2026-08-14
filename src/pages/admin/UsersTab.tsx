@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Eye, EyeOff, Loader2, Pencil, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, Loader2, Pencil, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -89,6 +90,10 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
     return p ? `${p.code} · ${p.name}` : "—";
   };
   const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? "—";
+  const selectableRoles = useMemo(
+    () => (form.role_ids.length ? roles.filter((r) => form.role_ids.includes(r.id)) : roles),
+    [roles, form.role_ids],
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -143,9 +148,25 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
     });
   };
 
+  const toggleRole = (id: string) => {
+    setForm((f) => {
+      const has = f.role_ids.includes(id);
+      const role_ids = has ? f.role_ids.filter((r) => r !== id) : [...f.role_ids, id];
+      const roleByPlant = { ...f.roleByPlant };
+      if (has) {
+        for (const k of Object.keys(roleByPlant)) if (roleByPlant[k] === id) delete roleByPlant[k];
+      }
+      return { ...f, role_ids, roleByPlant };
+    });
+  };
+
   const validate = (): boolean => {
     const e: Record<string, string> = {};
+    if (!form.sap_user_id.trim()) e.sap_user_id = "SAP User ID is required";
     if (!form.first_name.trim()) e.first_name = "First name is required";
+    if (!form.last_name.trim()) e.last_name = "Last name is required";
+    if (!form.email.trim()) e.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = "Enter a valid email";
     if (!form.contact.trim()) e.contact = "Contact is required";
     else if (!PHONE_RE.test(form.contact.trim())) e.contact = "Enter a valid phone number";
 
@@ -159,6 +180,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
     }
 
     if (form.plant_ids.length === 0) e.plants = "Select at least one plant";
+    if (form.role_ids.length === 0) e.roles = "Select at least one role";
     if (form.plant_ids.some((pid) => !form.roleByPlant[pid])) e.rolePerPlant = "Assign a role for each selected plant";
 
     setErrors(e);
@@ -190,16 +212,15 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
     try {
       await callAdmin(form.id ? "update_user" : "create_user", {
         id: form.id,
-        sap_user_id: form.sap_user_id || undefined,
+        sap_user_id: form.sap_user_id.trim(),
         name: `${form.first_name.trim()} ${form.last_name.trim()}`.trim(),
-        email: form.email || undefined,
+        email: form.email.trim(),
         contact: form.contact.trim(),
         password: form.password || undefined,
         status: form.status,
         plant_ids: form.plant_ids,
         roles: rolePairs,
       });
-
       toast.success(form.id ? "User updated" : "User created");
       setOpen(false);
       reload();
@@ -374,6 +395,13 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
           </DialogHeader>
 
           <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="SAP User ID" required error={errors.sap_user_id}>
+              <Input
+                placeholder="e.g. SAP12345"
+                value={form.sap_user_id}
+                onChange={(e) => setForm({ ...form, sap_user_id: e.target.value })}
+              />
+            </Field>
             <Field label="First Name" required error={errors.first_name}>
               <Input
                 placeholder="Enter first name"
@@ -381,14 +409,21 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
                 onChange={(e) => setForm({ ...form, first_name: e.target.value })}
               />
             </Field>
-            <Field label="Last Name (Optional)" error={errors.last_name}>
+            <Field label="Last Name" required error={errors.last_name}>
               <Input
                 placeholder="Enter last name"
                 value={form.last_name}
                 onChange={(e) => setForm({ ...form, last_name: e.target.value })}
               />
             </Field>
-
+            <Field label="Email" required error={errors.email}>
+              <Input
+                type="email"
+                placeholder="Enter email address"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
+            </Field>
             <Field label="Contact" required error={errors.contact}>
               <Input
                 type="tel"
@@ -447,59 +482,129 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
             </Field>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Plant assignment <span className="text-destructive">*</span>
-              </Label>
-              <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border p-2">
-                {plants.map((p) => (
-                  <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
-                    <Checkbox checked={form.plant_ids.includes(p.id)} onCheckedChange={() => togglePlant(p.id)} />
-                    {p.code} – {p.name}
-                  </label>
-                ))}
-                {plants.length === 0 && <span className="block px-2 py-1.5 text-sm text-muted-foreground">No plants configured yet.</span>}
-              </div>
-              <p className="text-xs text-muted-foreground">{form.plant_ids.length} plant(s) selected</p>
-              {errors.plants && <p className="text-xs text-destructive">{errors.plants}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Role assignment <span className="text-destructive">*</span>
-              </Label>
-              <div className="max-h-56 space-y-2 overflow-y-auto rounded-lg border p-3">
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Plant assignment <span className="text-destructive">*</span>
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-between font-normal">
+                  {form.plant_ids.length ? `${form.plant_ids.length} plant(s) selected` : "Select one or more plants"}
+                  <ChevronDown className="h-4 w-4 opacity-60" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-2" align="start">
+                <div className="max-h-56 space-y-1 overflow-y-auto">
+                  {plants.map((p) => (
+                    <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+                      <Checkbox checked={form.plant_ids.includes(p.id)} onCheckedChange={() => togglePlant(p.id)} />
+                      {p.code} · {p.name}
+                    </label>
+                  ))}
+                  {plants.length === 0 && <span className="block px-2 py-1.5 text-sm text-muted-foreground">No plants configured yet.</span>}
+                </div>
+              </PopoverContent>
+            </Popover>
+            {form.plant_ids.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
                 {form.plant_ids.map((pid) => (
-                  <div key={pid} className="space-y-1">
-                    <span className="block text-sm font-medium">{plantName(pid)}</span>
-                    <Select
-                      value={form.roleByPlant[pid] ?? "none"}
-                      onValueChange={(v) =>
-                        setForm((f) => {
-                          const roleByPlant = { ...f.roleByPlant };
-                          if (v === "none") delete roleByPlant[pid];
-                          else roleByPlant[pid] = v;
-                          return { ...f, roleByPlant };
-                        })
-                      }
-                    >
-                      <SelectTrigger className="h-9"><SelectValue placeholder="Select role for this plant" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No role</SelectItem>
-                        {roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Badge key={pid} variant="secondary" className="gap-1">
+                    {plantName(pid)}
+                    <button type="button" aria-label="Remove plant" onClick={() => togglePlant(pid)}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
                 ))}
-                {form.plant_ids.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Select a plant to assign a role.</p>
-                )}
               </div>
-              {errors.rolePerPlant && <p className="text-xs text-destructive">{errors.rolePerPlant}</p>}
-            </div>
+            )}
+            {errors.plants && <p className="text-xs text-destructive">{errors.plants}</p>}
           </div>
 
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Role assignment <span className="text-destructive">*</span>
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-between font-normal">
+                  {form.role_ids.length ? `${form.role_ids.length} role(s) selected` : "Select roles"}
+                  <ChevronDown className="h-4 w-4 opacity-60" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-2" align="start">
+                <div className="max-h-56 space-y-1 overflow-y-auto">
+                  {roles.map((r) => (
+                    <label key={r.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+                      <Checkbox checked={form.role_ids.includes(r.id)} onCheckedChange={() => toggleRole(r.id)} />
+                      {r.name}
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            {form.role_ids.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {form.role_ids.map((rid) => (
+                  <Badge key={rid} variant="secondary" className="gap-1">
+                    {roleName(rid)}
+                    <button type="button" aria-label="Remove role" onClick={() => toggleRole(rid)}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {errors.roles && <p className="text-xs text-destructive">{errors.roles}</p>}
+
+            <div className="space-y-2 rounded-lg border p-3">
+              <div className="flex items-center gap-3">
+                <span className="w-40 shrink-0 text-sm font-medium">All plants (global)</span>
+                <Select
+                  value={form.roleByPlant["global"] ?? "none"}
+                  onValueChange={(v) =>
+                    setForm((f) => {
+                      const roleByPlant = { ...f.roleByPlant };
+                      if (v === "none") delete roleByPlant["global"];
+                      else roleByPlant["global"] = v;
+                      return { ...f, roleByPlant };
+                    })
+                  }
+                >
+                  <SelectTrigger className="h-9"><SelectValue placeholder="No role" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No role</SelectItem>
+                    {selectableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {form.plant_ids.map((pid) => (
+                <div key={pid} className="flex items-center gap-3">
+                  <span className="w-40 shrink-0 text-sm font-medium">{plantName(pid)}</span>
+                  <Select
+                    value={form.roleByPlant[pid] ?? "none"}
+                    onValueChange={(v) =>
+                      setForm((f) => {
+                        const roleByPlant = { ...f.roleByPlant };
+                        if (v === "none") delete roleByPlant[pid];
+                        else roleByPlant[pid] = v;
+                        return { ...f, roleByPlant };
+                      })
+                    }
+                  >
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Select role for this plant" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No role</SelectItem>
+                      {selectableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+              {form.plant_ids.length === 0 && (
+                <p className="text-sm text-muted-foreground">Please select a plant and assign a role for each plant.</p>
+              )}
+            </div>
+            {errors.rolePerPlant && <p className="text-xs text-destructive">{errors.rolePerPlant}</p>}
+          </div>
 
 
           <DialogFooter>

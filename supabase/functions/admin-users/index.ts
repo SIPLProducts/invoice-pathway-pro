@@ -107,15 +107,20 @@ Deno.serve(async (req) => {
 
     if (action === "create_user") {
       if (!(await callerCan(caller.id, "create"))) return json({ error: "Not allowed" }, 403);
-      const { sap_user_id, name, email, contact, password, status, plant_ids = [], roles = [] } = body.payload ?? {};
-      if (!sap_user_id || !name || !email || !password) return json({ error: "Missing required fields" }, 400);
+      const payload = body.payload ?? {};
+      const { name, contact, password, status, plant_ids = [], roles = [] } = payload;
+      if (!name || !password) return json({ error: "Missing required fields" }, 400);
+
+      const generated = `u${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+      const sap_user_id: string = payload.sap_user_id?.trim() || generated;
+      const email: string = payload.email?.trim() || `${sap_user_id.toLowerCase()}@siplusers.internal`;
 
       const { data: dup } = await admin
         .from("profiles")
         .select("id,email,sap_user_id")
         .is("deleted_at", null)
         .or(`email.eq.${email},sap_user_id.eq.${sap_user_id}`);
-      if (dup && dup.length) return json({ error: "Email or SAP User ID already exists" }, 409);
+      if (dup && dup.length) return json({ error: "This user already exists" }, 409);
 
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
         email,
@@ -144,16 +149,25 @@ Deno.serve(async (req) => {
 
     if (action === "update_user") {
       if (!(await callerCan(caller.id, "edit"))) return json({ error: "Not allowed" }, 403);
-      const { id, sap_user_id, name, email, contact, password, status, plant_ids = [], roles = [] } = body.payload ?? {};
+      const payload = body.payload ?? {};
+      const { id, name, contact, password, status, plant_ids = [], roles = [] } = payload;
       if (!id) return json({ error: "Missing user id" }, 400);
+      const sap_user_id: string | undefined = payload.sap_user_id?.trim() || undefined;
+      const email: string | undefined = payload.email?.trim() || undefined;
 
-      const { data: dup } = await admin
-        .from("profiles")
-        .select("id")
-        .is("deleted_at", null)
-        .neq("id", id)
-        .or(`email.eq.${email},sap_user_id.eq.${sap_user_id}`);
-      if (dup && dup.length) return json({ error: "Email or SAP User ID already exists" }, 409);
+      const filters = [
+        email ? `email.eq.${email}` : null,
+        sap_user_id ? `sap_user_id.eq.${sap_user_id}` : null,
+      ].filter(Boolean) as string[];
+      if (filters.length) {
+        const { data: dup } = await admin
+          .from("profiles")
+          .select("id")
+          .is("deleted_at", null)
+          .neq("id", id)
+          .or(filters.join(","));
+        if (dup && dup.length) return json({ error: "This user already exists" }, 409);
+      }
 
       const authUpdate: Record<string, unknown> = {};
       if (email) authUpdate.email = email;
@@ -163,15 +177,22 @@ Deno.serve(async (req) => {
         if (error) return json({ error: error.message }, 400);
       }
 
-      const { error: profErr } = await admin
-        .from("profiles")
-        .update({ sap_user_id, name, email, contact: contact || null, status, updated_by: caller.id })
-        .eq("id", id);
+      const profileUpdate: Record<string, unknown> = {
+        name,
+        contact: contact || null,
+        status,
+        updated_by: caller.id,
+      };
+      if (sap_user_id) profileUpdate.sap_user_id = sap_user_id;
+      if (email) profileUpdate.email = email;
+
+      const { error: profErr } = await admin.from("profiles").update(profileUpdate).eq("id", id);
       if (profErr) return json({ error: profErr.message }, 400);
 
       await syncAssignments(id, plant_ids, roles);
       return json({ ok: true });
     }
+
 
     if (action === "delete_user") {
       if (!(await callerCan(caller.id, "delete"))) return json({ error: "Not allowed" }, 403);

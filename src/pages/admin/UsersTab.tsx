@@ -482,10 +482,12 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
             </Field>
           </div>
 
+          <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Plant assignment <span className="text-destructive">*</span>
+              Plants <span className="text-destructive">*</span>
             </Label>
+
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-full justify-between font-normal">

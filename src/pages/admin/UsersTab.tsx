@@ -90,6 +90,10 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
     return p ? `${p.code} · ${p.name}` : "—";
   };
   const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? "—";
+  const selectableRoles = useMemo(
+    () => (form.role_ids.length ? roles.filter((r) => form.role_ids.includes(r.id)) : roles),
+    [roles, form.role_ids],
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

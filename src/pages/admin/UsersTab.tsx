@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, Eye, EyeOff, Loader2, Pencil, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Eye, EyeOff, Loader2, Pencil, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -90,10 +89,6 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
     return p ? `${p.code} · ${p.name}` : "—";
   };
   const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? "—";
-  const selectableRoles = useMemo(
-    () => (form.role_ids.length ? roles.filter((r) => form.role_ids.includes(r.id)) : roles),
-    [roles, form.role_ids],
-  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -145,18 +140,6 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
       const roleByPlant = { ...f.roleByPlant };
       if (has) delete roleByPlant[id];
       return { ...f, plant_ids, roleByPlant };
-    });
-  };
-
-  const toggleRole = (id: string) => {
-    setForm((f) => {
-      const has = f.role_ids.includes(id);
-      const role_ids = has ? f.role_ids.filter((r) => r !== id) : [...f.role_ids, id];
-      const roleByPlant = { ...f.roleByPlant };
-      if (has) {
-        for (const k of Object.keys(roleByPlant)) if (roleByPlant[k] === id) delete roleByPlant[k];
-      }
-      return { ...f, role_ids, roleByPlant };
     });
   };
 

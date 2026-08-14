@@ -104,23 +104,29 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
 
   const openCreate = () => {
     setForm(emptyForm);
+    setErrors({});
     setOpen(true);
   };
 
   const openEdit = (u: UserRow) => {
     const roleByPlant: Record<string, string> = {};
     for (const r of u.roles) roleByPlant[r.plant_id ?? "global"] = r.role_id;
+    const parts = (u.name ?? "").trim().split(/\s+/);
     setForm({
       id: u.id,
       sap_user_id: u.sap_user_id,
-      name: u.name,
+      first_name: parts[0] ?? "",
+      last_name: parts.slice(1).join(" "),
       email: u.email,
       contact: u.contact ?? "",
       password: "",
+      confirm_password: "",
       status: u.status,
       plant_ids: u.plants.map((p) => p.plant_id),
+      role_ids: Array.from(new Set(u.roles.map((r) => r.role_id))),
       roleByPlant,
     });
+    setErrors({});
     setOpen(true);
   };
 
@@ -134,15 +140,52 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
     });
   };
 
+  const toggleRole = (id: string) => {
+    setForm((f) => {
+      const has = f.role_ids.includes(id);
+      const role_ids = has ? f.role_ids.filter((r) => r !== id) : [...f.role_ids, id];
+      const roleByPlant = { ...f.roleByPlant };
+      if (has) {
+        for (const k of Object.keys(roleByPlant)) if (roleByPlant[k] === id) delete roleByPlant[k];
+      }
+      return { ...f, role_ids, roleByPlant };
+    });
+  };
+
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
+    if (!form.sap_user_id.trim()) e.sap_user_id = "SAP User ID is required";
+    if (!form.first_name.trim()) e.first_name = "First name is required";
+    if (!form.last_name.trim()) e.last_name = "Last name is required";
+    if (!form.email.trim()) e.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = "Enter a valid email";
+    if (!form.contact.trim()) e.contact = "Contact is required";
+    else if (!PHONE_RE.test(form.contact.trim())) e.contact = "Enter a valid phone number";
+
+    if (!form.id) {
+      if (form.password.length < 8) e.password = "Password must be at least 8 characters";
+      if (!form.confirm_password) e.confirm_password = "Confirm the password";
+      else if (form.password !== form.confirm_password) e.confirm_password = "Passwords do not match";
+    } else if (form.password || form.confirm_password) {
+      if (form.password.length < 8) e.password = "Password must be at least 8 characters";
+      if (form.password !== form.confirm_password) e.confirm_password = "Passwords do not match";
+    }
+
+    if (form.plant_ids.length === 0) e.plants = "Select at least one plant";
+    if (form.role_ids.length === 0) e.roles = "Select at least one role";
+    if (form.plant_ids.some((pid) => !form.roleByPlant[pid])) e.rolePerPlant = "Assign a role for each selected plant";
+
+    setErrors(e);
+    if (Object.keys(e).length) {
+      toast.error("Please fix the highlighted fields");
+      return false;
+    }
+    return true;
+  };
+
   const save = async () => {
-    if (!form.sap_user_id.trim() || !form.name.trim() || !form.email.trim()) {
-      toast.error("SAP User ID, Name and Email are required");
-      return;
-    }
-    if (!form.id && form.password.length < 8) {
-      toast.error("Password must be at least 8 characters");
-      return;
-    }
+    if (!validate()) return;
+
     const rolePairs = Object.entries(form.roleByPlant)
       .filter(([, roleId]) => !!roleId)
       .map(([plantKey, roleId]) => ({ plant_id: plantKey === "global" ? null : plantKey, role_id: roleId }));
@@ -162,7 +205,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
       await callAdmin(form.id ? "update_user" : "create_user", {
         id: form.id,
         sap_user_id: form.sap_user_id.trim(),
-        name: form.name.trim(),
+        name: `${form.first_name.trim()} ${form.last_name.trim()}`.trim(),
         email: form.email.trim(),
         contact: form.contact.trim(),
         password: form.password || undefined,
@@ -179,6 +222,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
       setSaving(false);
     }
   };
+
 
   const doDelete = async (mode: "soft" | "permanent") => {
     if (!deleteTarget) return;

@@ -54,9 +54,11 @@ Tables (all with `created_at`, `updated_at`, `created_by`, `updated_by`, `delete
 `profiles` (user_id code, sap_user_id, name, email, contact, status, last_login_at), `plants`, `roles`, `screens`, `user_plants`, `user_roles` (user + plant + role, unique), `screen_permissions` (role + screen + can_view/create/edit/delete/approve, unique).
 
 - `user_roles` stays a separate table — roles are never stored on `profiles`.
-- Security-definer helpers: `is_super_admin(uid)`, `has_permission(uid, screen_key, action)`; all RLS policies call these to avoid recursion.
+- Security-definer helpers: `is_master_admin(uid)` (Sharvi Admin), `has_permission(uid, screen_key, action)`; all RLS policies call these to avoid recursion.
+- SAP-ID login: a security-definer function resolves a SAP User ID to its account email so sign-in can accept either; it returns nothing else.
 - GRANTs issued for `authenticated` (and `service_role`) on every new table; no `anon` access.
-- Admin user creation/deletion runs through an edge function using the service role (creating auth accounts requires it), which itself verifies the caller is a Super Admin or holds User Management create/delete rights.
+- Admin user creation/deletion runs through an edge function using the service role (creating auth accounts requires it), which itself verifies the caller is Sharvi Admin or holds User Management create/delete rights. The same function seeds the master account.
+
 - New client pieces: `useAuth` (session + profile), `usePermissions` (effective permission map + `can(screen, action)`), `RequirePermission` route guard; `RequireAuth`, `AppShell`, and `Login` are rewritten against real auth; `src/lib/demoAuth.ts` is removed.
 - Plants are managed manually in the plants table (a small plants editor is included inside the Users tab area).
 

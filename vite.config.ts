@@ -62,7 +62,18 @@ export default defineConfig(({ mode }) => ({
         // Don't try to serve cached HTML for OAuth or backend / proxy routes
         navigateFallbackDenylist: [/^\/~oauth/, /^\/api/, /^\/functions\//],
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
+        // A new build must take over immediately, otherwise published clients
+        // keep running an older bundle from cache.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
+          {
+            // Auth endpoints must NEVER be cached or delayed by the SW —
+            // a stale/replayed session response logs the user straight out.
+            urlPattern: /^https:\/\/.*\.supabase\.co\/auth\/v1\/.*/i,
+            handler: "NetworkOnly",
+          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: "CacheFirst",

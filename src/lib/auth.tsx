@@ -93,31 +93,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-      if (!s?.user) {
-        setProfile(null);
-        setPermissions({});
-        setRoleNames([]);
-        setIsMaster(false);
+    let active = true;
+    let loadedFor: string | null = null;
+
+    const clear = () => {
+      setProfile(null);
+      setPermissions({});
+      setRoleNames([]);
+      setIsMaster(false);
+      loadedFor = null;
+    };
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      if (!active) return;
+      if (import.meta.env.DEV) console.debug("[auth]", event, !!s);
+
+      if (event === "SIGNED_OUT") {
+        setSession(null);
+        clear();
         setLoading(false);
-      } else {
-        setTimeout(() => {
-          loadContext(s.user.id).finally(() => setLoading(false));
-        }, 0);
+        return;
       }
+
+      // Transient null session on a non-sign-out event (e.g. a rate-limited
+      // token refresh): keep the current state and re-check instead of
+      // dropping the user back to the login screen.
+      if (!s?.user) {
+        setLoading(false);
+        setTimeout(async () => {
+          const { data } = await supabase.auth.getSession();
+          if (!active) return;
+          if (data.session?.user) {
+            setSession(data.session);
+          } else {
+            setSession(null);
+            clear();
+          }
+        }, 1500);
+        return;
+      }
+
+      setSession(s);
+      if (loadedFor === s.user.id) {
+        // Same user, just a refreshed token — no need to refetch RBAC data.
+        setLoading(false);
+        return;
+      }
+      loadedFor = s.user.id;
+      setTimeout(() => {
+        loadContext(s.user.id).finally(() => active && setLoading(false));
+      }, 0);
     });
 
     supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+      if (!active) return;
+      setSession((prev) => prev ?? data.session);
       if (data.session?.user) {
-        loadContext(data.session.user.id).finally(() => setLoading(false));
+        if (loadedFor === data.session.user.id) {
+          setLoading(false);
+          return;
+        }
+        loadedFor = data.session.user.id;
+        loadContext(data.session.user.id).finally(() => active && setLoading(false));
       } else {
         setLoading(false);
       }
     });
 
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
   }, [loadContext]);
 
   const can = useCallback(

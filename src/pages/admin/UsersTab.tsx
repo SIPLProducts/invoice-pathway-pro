@@ -196,7 +196,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
 
     const rolePairs = Object.entries(form.roleByPlant)
       .filter(([, roleId]) => !!roleId)
-      .map(([plantKey, roleId]) => ({ plant_id: plantKey === "global" ? null : plantKey, role_id: roleId }));
+      .map(([plantKey, roleId]) => ({ plant_id: plantKey, role_id: roleId }));
 
     const seen = new Set<string>();
     for (const p of rolePairs) {

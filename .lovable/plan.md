@@ -15,30 +15,32 @@ Refactor the existing user modal in `src/pages/admin/UsersTab.tsx` so the form f
   - Required on create; on edit they remain optional but must match if either is filled.
 - **Status** dropdown stays, default `Active`.
 
-## Plant & Role Assignment layout
+## Plants & Roles layout
 
-Replace the current stacked Plant + Role sections with a side-by-side two-column layout on medium screens and up:
+Replace the current stacked sections with a side-by-side two-column layout on medium screens and up:
 
 ```text
 +----------------------------+----------------------------+
-|  Plant Assignment          |  Role Assignment           |
+|  Plants                    |  Roles                     |
 |  [Select plants dropdown]  |  1000 - Main Plant     [v] |
 |  2 plant(s) selected       |  2000 - Secondary Plant[v] |
 |  [chip] [chip]             |                            |
 +----------------------------+----------------------------+
 ```
 
-- **Plant Assignment (left)**
+- **Plants (left)**
+  - Section heading: **Plants** (no "Assignment" wording).
   - Keep the existing popover multi-select with checkboxes.
   - Show plant code and name, e.g. `1000 - Main Plant`.
   - Display the selected count and removable chips.
   - Removing a plant clears its role from the right side.
 
-- **Role Assignment (right)**
-  - Heading: **Role Assignment**.
+- **Roles (right)**
+  - Section heading: **Roles**.
   - List each selected plant with its own Role dropdown.
-  - Remove the current global "All plants" row so every assignment is plant-specific.
+  - Remove the "All plants (global)" row entirely — including its state key, submit payload branch (`plant_id: null`) and any related UI — so every assignment is plant-specific.
   - If no plant is selected, show the existing hint: "Please select a plant and assign a role for each plant."
+
 
 ## Validation
 

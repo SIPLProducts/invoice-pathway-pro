@@ -8,14 +8,16 @@ A production-ready access-control module: real cloud accounts, plant-scoped role
 User -> Plant -> Role -> Screen Permissions
 ```
 
-A user can hold a different role in each plant. Effective permissions = union of permissions from the roles the user holds. Super Admin bypasses all checks.
+A user can hold a different role in each plant. Effective permissions = union of permissions from the roles the user holds. "Sharvi Admin" is the master role and bypasses all checks.
 
 ## Sign-in changes
 
 - Real email/password sign-in replaces the demo login and the "switch role (demo)" menu.
+- Users can sign in with **either their SAP User ID or their email**, plus password.
 - Admin-created users get a real account and can sign in immediately (no email confirmation step).
-- `masteradmin@sharviinfotech.com` is seeded as Super Admin with the "Sharvi Admin" role and cannot be deleted, deactivated, or stripped of its role by the UI or the database.
+- Master account seeded: SAP User ID `sharvi`, email `masteradmin@sharviinfotech.com`, password `Vision@2026`, role **Sharvi Admin** — cannot be deleted, deactivated, or stripped of its role by the UI or the database.
 - Password reset by email is included (forgot-password + reset page).
+
 
 ## Admin screen: three tabs at `/admin/users`
 

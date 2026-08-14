@@ -40,25 +40,34 @@ interface Props {
 interface FormState {
   id?: string;
   sap_user_id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   email: string;
   contact: string;
   password: string;
+  confirm_password: string;
   status: string;
   plant_ids: string[];
+  role_ids: string[];
   roleByPlant: Record<string, string>;
 }
 
 const emptyForm: FormState = {
   sap_user_id: "",
-  name: "",
+  first_name: "",
+  last_name: "",
   email: "",
   contact: "",
   password: "",
+  confirm_password: "",
   status: "active",
   plant_ids: [],
+  role_ids: [],
   roleByPlant: {},
 };
+
+const PHONE_RE = /^\+?[0-9][0-9\s-]{7,18}$/;
+
 
 export function UsersTab({ users, plants, roles, loading, reload }: Props) {
   const { can } = useAuth();

@@ -8,14 +8,16 @@ A production-ready access-control module: real cloud accounts, plant-scoped role
 User -> Plant -> Role -> Screen Permissions
 ```
 
-A user can hold a different role in each plant. Effective permissions = union of permissions from the roles the user holds. Super Admin bypasses all checks.
+A user can hold a different role in each plant. Effective permissions = union of permissions from the roles the user holds. "Sharvi Admin" is the master role and bypasses all checks.
 
 ## Sign-in changes
 
 - Real email/password sign-in replaces the demo login and the "switch role (demo)" menu.
+- Users can sign in with **either their SAP User ID or their email**, plus password.
 - Admin-created users get a real account and can sign in immediately (no email confirmation step).
-- `masteradmin@sharviinfotech.com` is seeded as Super Admin with the "Sharvi Admin" role and cannot be deleted, deactivated, or stripped of its role by the UI or the database.
+- Master account seeded: SAP User ID `sharvi`, email `masteradmin@sharviinfotech.com`, password `Vision@2026`, role **Sharvi Admin** — cannot be deleted, deactivated, or stripped of its role by the UI or the database.
 - Password reset by email is included (forgot-password + reset page).
+
 
 ## Admin screen: three tabs at `/admin/users`
 
@@ -30,12 +32,14 @@ Table columns: SAP User ID, Name, Email, Contact, Status, Plants, Roles, Last Lo
 ### 2. Roles
 - Table: Role Name, Description, Status, users assigned, Actions.
 - Create / Edit / Delete; delete is blocked with a clear message when the role is assigned to any user.
-- "Sharvi Admin" ships as the default system role and is protected from deletion.
+- Three roles ship by default and are protected from deletion: **Sharvi Admin** (master, full access), **Super Admin**, **Admin**.
 
 ### 3. Screen Permissions
 - Matrix: rows = screens, columns = View / Create / Edit / Delete / Approve, with a role selector at the top.
 - Seeded screens: Dashboard, DMR, Gate Entries, GRN, SAP Tracker, SAP Module, Approvals, Documents, Reports, User Management, Role Management.
-- Checkbox changes save to the database; Super Admin's matrix is read-only (always full access).
+- Default seeded permissions: Super Admin and Admin get full access to every screen **except SAP Module and SAP Tracker** (no access at all to those two). Sharvi Admin always has everything.
+- Checkbox changes save to the database; the Sharvi Admin matrix is read-only (always full access).
+
 
 ## Enforcement
 
@@ -50,9 +54,11 @@ Tables (all with `created_at`, `updated_at`, `created_by`, `updated_by`, `delete
 `profiles` (user_id code, sap_user_id, name, email, contact, status, last_login_at), `plants`, `roles`, `screens`, `user_plants`, `user_roles` (user + plant + role, unique), `screen_permissions` (role + screen + can_view/create/edit/delete/approve, unique).
 
 - `user_roles` stays a separate table — roles are never stored on `profiles`.
-- Security-definer helpers: `is_super_admin(uid)`, `has_permission(uid, screen_key, action)`; all RLS policies call these to avoid recursion.
+- Security-definer helpers: `is_master_admin(uid)` (Sharvi Admin), `has_permission(uid, screen_key, action)`; all RLS policies call these to avoid recursion.
+- SAP-ID login: a security-definer function resolves a SAP User ID to its account email so sign-in can accept either; it returns nothing else.
 - GRANTs issued for `authenticated` (and `service_role`) on every new table; no `anon` access.
-- Admin user creation/deletion runs through an edge function using the service role (creating auth accounts requires it), which itself verifies the caller is a Super Admin or holds User Management create/delete rights.
+- Admin user creation/deletion runs through an edge function using the service role (creating auth accounts requires it), which itself verifies the caller is Sharvi Admin or holds User Management create/delete rights. The same function seeds the master account.
+
 - New client pieces: `useAuth` (session + profile), `usePermissions` (effective permission map + `can(screen, action)`), `RequirePermission` route guard; `RequireAuth`, `AppShell`, and `Login` are rewritten against real auth; `src/lib/demoAuth.ts` is removed.
 - Plants are managed manually in the plants table (a small plants editor is included inside the Users tab area).
 

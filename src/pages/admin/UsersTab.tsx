@@ -524,7 +524,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
 
           <div className="space-y-2">
             <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Role assignment <span className="text-destructive">*</span>
+              Roles <span className="text-destructive">*</span>
             </Label>
             <Popover>
               <PopoverTrigger asChild>

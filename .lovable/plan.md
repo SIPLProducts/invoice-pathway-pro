@@ -32,12 +32,14 @@ Table columns: SAP User ID, Name, Email, Contact, Status, Plants, Roles, Last Lo
 ### 2. Roles
 - Table: Role Name, Description, Status, users assigned, Actions.
 - Create / Edit / Delete; delete is blocked with a clear message when the role is assigned to any user.
-- "Sharvi Admin" ships as the default system role and is protected from deletion.
+- Three roles ship by default and are protected from deletion: **Sharvi Admin** (master, full access), **Super Admin**, **Admin**.
 
 ### 3. Screen Permissions
 - Matrix: rows = screens, columns = View / Create / Edit / Delete / Approve, with a role selector at the top.
 - Seeded screens: Dashboard, DMR, Gate Entries, GRN, SAP Tracker, SAP Module, Approvals, Documents, Reports, User Management, Role Management.
-- Checkbox changes save to the database; Super Admin's matrix is read-only (always full access).
+- Default seeded permissions: Super Admin and Admin get full access to every screen **except SAP Module and SAP Tracker** (no access at all to those two). Sharvi Admin always has everything.
+- Checkbox changes save to the database; the Sharvi Admin matrix is read-only (always full access).
+
 
 ## Enforcement
 

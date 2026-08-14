@@ -118,7 +118,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
 
   const openEdit = (u: UserRow) => {
     const roleByPlant: Record<string, string> = {};
-    for (const r of u.roles) roleByPlant[r.plant_id ?? "global"] = r.role_id;
+    for (const r of u.roles) if (r.plant_id) roleByPlant[r.plant_id] = r.role_id;
     const parts = (u.name ?? "").trim().split(/\s+/);
     setForm({
       id: u.id,
@@ -196,7 +196,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
 
     const rolePairs = Object.entries(form.roleByPlant)
       .filter(([, roleId]) => !!roleId)
-      .map(([plantKey, roleId]) => ({ plant_id: plantKey === "global" ? null : plantKey, role_id: roleId }));
+      .map(([plantKey, roleId]) => ({ plant_id: plantKey, role_id: roleId }));
 
     const seen = new Set<string>();
     for (const p of rolePairs) {
@@ -482,10 +482,12 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
             </Field>
           </div>
 
+          <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Plant assignment <span className="text-destructive">*</span>
+              Plants <span className="text-destructive">*</span>
             </Label>
+
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-full justify-between font-normal">
@@ -522,7 +524,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
 
           <div className="space-y-2">
             <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Role assignment <span className="text-destructive">*</span>
+              Roles <span className="text-destructive">*</span>
             </Label>
             <Popover>
               <PopoverTrigger asChild>
@@ -557,26 +559,6 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
             {errors.roles && <p className="text-xs text-destructive">{errors.roles}</p>}
 
             <div className="space-y-2 rounded-lg border p-3">
-              <div className="flex items-center gap-3">
-                <span className="w-40 shrink-0 text-sm font-medium">All plants (global)</span>
-                <Select
-                  value={form.roleByPlant["global"] ?? "none"}
-                  onValueChange={(v) =>
-                    setForm((f) => {
-                      const roleByPlant = { ...f.roleByPlant };
-                      if (v === "none") delete roleByPlant["global"];
-                      else roleByPlant["global"] = v;
-                      return { ...f, roleByPlant };
-                    })
-                  }
-                >
-                  <SelectTrigger className="h-9"><SelectValue placeholder="No role" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No role</SelectItem>
-                    {selectableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
               {form.plant_ids.map((pid) => (
                 <div key={pid} className="flex items-center gap-3">
                   <span className="w-40 shrink-0 text-sm font-medium">{plantName(pid)}</span>
@@ -605,6 +587,8 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
             </div>
             {errors.rolePerPlant && <p className="text-xs text-destructive">{errors.rolePerPlant}</p>}
           </div>
+          </div>
+
 
 
           <DialogFooter>

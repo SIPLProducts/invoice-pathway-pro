@@ -162,11 +162,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
-    if (!form.sap_user_id.trim()) e.sap_user_id = "SAP User ID is required";
     if (!form.first_name.trim()) e.first_name = "First name is required";
-    if (!form.last_name.trim()) e.last_name = "Last name is required";
-    if (!form.email.trim()) e.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = "Enter a valid email";
     if (!form.contact.trim()) e.contact = "Contact is required";
     else if (!PHONE_RE.test(form.contact.trim())) e.contact = "Enter a valid phone number";
 
@@ -180,7 +176,6 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
     }
 
     if (form.plant_ids.length === 0) e.plants = "Select at least one plant";
-    if (form.role_ids.length === 0) e.roles = "Select at least one role";
     if (form.plant_ids.some((pid) => !form.roleByPlant[pid])) e.rolePerPlant = "Assign a role for each selected plant";
 
     setErrors(e);
@@ -212,15 +207,16 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
     try {
       await callAdmin(form.id ? "update_user" : "create_user", {
         id: form.id,
-        sap_user_id: form.sap_user_id.trim(),
+        sap_user_id: form.sap_user_id || undefined,
         name: `${form.first_name.trim()} ${form.last_name.trim()}`.trim(),
-        email: form.email.trim(),
+        email: form.email || undefined,
         contact: form.contact.trim(),
         password: form.password || undefined,
         status: form.status,
         plant_ids: form.plant_ids,
         roles: rolePairs,
       });
+
       toast.success(form.id ? "User updated" : "User created");
       setOpen(false);
       reload();

@@ -557,26 +557,6 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
             {errors.roles && <p className="text-xs text-destructive">{errors.roles}</p>}
 
             <div className="space-y-2 rounded-lg border p-3">
-              <div className="flex items-center gap-3">
-                <span className="w-40 shrink-0 text-sm font-medium">All plants (global)</span>
-                <Select
-                  value={form.roleByPlant["global"] ?? "none"}
-                  onValueChange={(v) =>
-                    setForm((f) => {
-                      const roleByPlant = { ...f.roleByPlant };
-                      if (v === "none") delete roleByPlant["global"];
-                      else roleByPlant["global"] = v;
-                      return { ...f, roleByPlant };
-                    })
-                  }
-                >
-                  <SelectTrigger className="h-9"><SelectValue placeholder="No role" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No role</SelectItem>
-                    {selectableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
               {form.plant_ids.map((pid) => (
                 <div key={pid} className="flex items-center gap-3">
                   <span className="w-40 shrink-0 text-sm font-medium">{plantName(pid)}</span>
@@ -605,6 +585,8 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
             </div>
             {errors.rolePerPlant && <p className="text-xs text-destructive">{errors.rolePerPlant}</p>}
           </div>
+          </div>
+
 
 
           <DialogFooter>

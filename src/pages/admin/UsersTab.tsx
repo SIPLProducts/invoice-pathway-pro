@@ -395,13 +395,6 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
           </DialogHeader>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="SAP User ID" required error={errors.sap_user_id}>
-              <Input
-                placeholder="e.g. SAP12345"
-                value={form.sap_user_id}
-                onChange={(e) => setForm({ ...form, sap_user_id: e.target.value })}
-              />
-            </Field>
             <Field label="First Name" required error={errors.first_name}>
               <Input
                 placeholder="Enter first name"
@@ -409,19 +402,11 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
                 onChange={(e) => setForm({ ...form, first_name: e.target.value })}
               />
             </Field>
-            <Field label="Last Name" required error={errors.last_name}>
+            <Field label="Last Name (Optional)" error={errors.last_name}>
               <Input
                 placeholder="Enter last name"
                 value={form.last_name}
                 onChange={(e) => setForm({ ...form, last_name: e.target.value })}
-              />
-            </Field>
-            <Field label="Email" required error={errors.email}>
-              <Input
-                type="email"
-                placeholder="Enter email address"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
             </Field>
             <Field label="Contact" required error={errors.contact}>
@@ -432,15 +417,6 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
                 value={form.contact}
                 onChange={(e) => setForm({ ...form, contact: e.target.value })}
               />
-            </Field>
-            <Field label="Status" required error={errors.status}>
-              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
             </Field>
             <Field label={form.id ? "New password (optional)" : "Password"} required={!form.id} error={errors.password}>
               <div className="relative">
@@ -480,131 +456,95 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
                 </button>
               </div>
             </Field>
+            <Field label="Status" required error={errors.status}>
+              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Plant assignment <span className="text-destructive">*</span>
-            </Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-between font-normal">
-                  {form.plant_ids.length ? `${form.plant_ids.length} plant(s) selected` : "Select one or more plants"}
-                  <ChevronDown className="h-4 w-4 opacity-60" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-2" align="start">
-                <div className="max-h-56 space-y-1 overflow-y-auto">
-                  {plants.map((p) => (
-                    <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
-                      <Checkbox checked={form.plant_ids.includes(p.id)} onCheckedChange={() => togglePlant(p.id)} />
-                      {p.code} · {p.name}
-                    </label>
-                  ))}
-                  {plants.length === 0 && <span className="block px-2 py-1.5 text-sm text-muted-foreground">No plants configured yet.</span>}
-                </div>
-              </PopoverContent>
-            </Popover>
-            {form.plant_ids.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {form.plant_ids.map((pid) => (
-                  <Badge key={pid} variant="secondary" className="gap-1">
-                    {plantName(pid)}
-                    <button type="button" aria-label="Remove plant" onClick={() => togglePlant(pid)}>
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
-            {errors.plants && <p className="text-xs text-destructive">{errors.plants}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Role assignment <span className="text-destructive">*</span>
-            </Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-between font-normal">
-                  {form.role_ids.length ? `${form.role_ids.length} role(s) selected` : "Select roles"}
-                  <ChevronDown className="h-4 w-4 opacity-60" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-2" align="start">
-                <div className="max-h-56 space-y-1 overflow-y-auto">
-                  {roles.map((r) => (
-                    <label key={r.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
-                      <Checkbox checked={form.role_ids.includes(r.id)} onCheckedChange={() => toggleRole(r.id)} />
-                      {r.name}
-                    </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Plants <span className="text-destructive">*</span>
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between font-normal">
+                    {form.plant_ids.length ? `${form.plant_ids.length} plant(s) selected` : "Select one or more plants"}
+                    <ChevronDown className="h-4 w-4 opacity-60" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-2" align="start">
+                  <div className="max-h-56 space-y-1 overflow-y-auto">
+                    {plants.map((p) => (
+                      <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+                        <Checkbox checked={form.plant_ids.includes(p.id)} onCheckedChange={() => togglePlant(p.id)} />
+                        {p.code} - {p.name}
+                      </label>
+                    ))}
+                    {plants.length === 0 && <span className="block px-2 py-1.5 text-sm text-muted-foreground">No plants configured yet.</span>}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              {form.plant_ids.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {form.plant_ids.map((pid) => (
+                    <Badge key={pid} variant="secondary" className="gap-1">
+                      {plantName(pid)}
+                      <button type="button" aria-label="Remove plant" onClick={() => togglePlant(pid)}>
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
                   ))}
                 </div>
-              </PopoverContent>
-            </Popover>
-            {form.role_ids.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {form.role_ids.map((rid) => (
-                  <Badge key={rid} variant="secondary" className="gap-1">
-                    {roleName(rid)}
-                    <button type="button" aria-label="Remove role" onClick={() => toggleRole(rid)}>
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
-            {errors.roles && <p className="text-xs text-destructive">{errors.roles}</p>}
-
-            <div className="space-y-2 rounded-lg border p-3">
-              <div className="flex items-center gap-3">
-                <span className="w-40 shrink-0 text-sm font-medium">All plants (global)</span>
-                <Select
-                  value={form.roleByPlant["global"] ?? "none"}
-                  onValueChange={(v) =>
-                    setForm((f) => {
-                      const roleByPlant = { ...f.roleByPlant };
-                      if (v === "none") delete roleByPlant["global"];
-                      else roleByPlant["global"] = v;
-                      return { ...f, roleByPlant };
-                    })
-                  }
-                >
-                  <SelectTrigger className="h-9"><SelectValue placeholder="No role" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No role</SelectItem>
-                    {selectableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              {form.plant_ids.map((pid) => (
-                <div key={pid} className="flex items-center gap-3">
-                  <span className="w-40 shrink-0 text-sm font-medium">{plantName(pid)}</span>
-                  <Select
-                    value={form.roleByPlant[pid] ?? "none"}
-                    onValueChange={(v) =>
-                      setForm((f) => {
-                        const roleByPlant = { ...f.roleByPlant };
-                        if (v === "none") delete roleByPlant[pid];
-                        else roleByPlant[pid] = v;
-                        return { ...f, roleByPlant };
-                      })
-                    }
-                  >
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Select role for this plant" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No role</SelectItem>
-                      {selectableRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-              {form.plant_ids.length === 0 && (
-                <p className="text-sm text-muted-foreground">Please select a plant and assign a role for each plant.</p>
               )}
+              {errors.plants && <p className="text-xs text-destructive">{errors.plants}</p>}
             </div>
-            {errors.rolePerPlant && <p className="text-xs text-destructive">{errors.rolePerPlant}</p>}
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Roles <span className="text-destructive">*</span>
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between font-normal">
+                    {form.role_ids.length ? `${form.role_ids.length} role(s) selected` : "Select one or more roles"}
+                    <ChevronDown className="h-4 w-4 opacity-60" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-2" align="start">
+                  <div className="max-h-56 space-y-1 overflow-y-auto">
+                    {roles.map((r) => (
+                      <label key={r.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+                        <Checkbox checked={form.role_ids.includes(r.id)} onCheckedChange={() => toggleRole(r.id)} />
+                        {r.name}
+                      </label>
+                    ))}
+                    {roles.length === 0 && <span className="block px-2 py-1.5 text-sm text-muted-foreground">No roles configured yet.</span>}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              {form.role_ids.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {form.role_ids.map((rid) => (
+                    <Badge key={rid} variant="secondary" className="gap-1">
+                      {roleName(rid)}
+                      <button type="button" aria-label="Remove role" onClick={() => toggleRole(rid)}>
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              {errors.roles && <p className="text-xs text-destructive">{errors.roles}</p>}
+            </div>
           </div>
+
 
 
           <DialogFooter>

@@ -118,7 +118,7 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
 
   const openEdit = (u: UserRow) => {
     const roleByPlant: Record<string, string> = {};
-    for (const r of u.roles) roleByPlant[r.plant_id ?? "global"] = r.role_id;
+    for (const r of u.roles) if (r.plant_id) roleByPlant[r.plant_id] = r.role_id;
     const parts = (u.name ?? "").trim().split(/\s+/);
     setForm({
       id: u.id,

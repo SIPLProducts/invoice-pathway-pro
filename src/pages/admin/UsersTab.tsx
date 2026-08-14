@@ -387,8 +387,9 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
           <DialogHeader>
             <DialogTitle>{form.id ? "Edit user" : "Create user"}</DialogTitle>
             <DialogDescription>
-              USER_ID is generated automatically. Assign plants first, then pick a role for each plant.
+              The login ID is generated automatically. Select the plants and roles for this user.
             </DialogDescription>
+
           </DialogHeader>
 
           <div className="grid gap-4 sm:grid-cols-2">

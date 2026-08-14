@@ -1,66 +1,106 @@
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
-import { Users, ShieldCheck, Workflow, Database, Settings as Cog, Activity, FileWarning, Sliders, KeySquare } from "lucide-react";
-import { Button } from "@/components/ui/button";
-
-const sections = [
-  { icon: Users, title: "Users & Roles", description: "Manage 142 users across 4 roles & 12 sites" },
-  { icon: ShieldCheck, title: "Permissions Matrix", description: "Granular RBAC and field-level access" },
-  { icon: Workflow, title: "Approval Workflows", description: "Configure multi-level approvals by amount, project, type" },
-  { icon: Database, title: "SAP Field Mappings", description: "OData / API field mappings to S/4HANA" },
-  { icon: Sliders, title: "Tolerance Rules", description: "Price, quantity, and tax tolerance thresholds" },
-  { icon: FileWarning, title: "Duplicate Detection", description: "Vendor + invoice no + date matching rules" },
-  { icon: KeySquare, title: "SSO & Security", description: "SAML/OIDC, MFA, and session policies" },
-  { icon: Activity, title: "Integration Logs", description: "Live SAP API logs, retries, and queue monitor" },
-  { icon: Cog, title: "System Parameters", description: "Tax codes, GL defaults, retention %, fiscal year" },
-];
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
+import { NoAccess } from "@/components/RequirePermission";
+import { UsersTab } from "@/pages/admin/UsersTab";
+import { RolesTab } from "@/pages/admin/RolesTab";
+import { PermissionsTab } from "@/pages/admin/PermissionsTab";
+import {
+  fetchPermissions,
+  fetchPlants,
+  fetchRoles,
+  fetchScreens,
+  fetchUsers,
+  type PermissionRow,
+  type PlantRow,
+  type RoleRow,
+  type ScreenRow,
+  type UserRow,
+} from "@/lib/rbac";
 
 export default function Admin() {
+  const { can, loading: authLoading } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") ?? "users";
+
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [plants, setPlants] = useState<PlantRow[]>([]);
+  const [roles, setRoles] = useState<RoleRow[]>([]);
+  const [screens, setScreens] = useState<ScreenRow[]>([]);
+  const [permissions, setPermissions] = useState<PermissionRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const canUsers = can("user_management");
+  const canRoles = can("role_management");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [u, p, r, s, perms] = await Promise.all([
+        fetchUsers(true),
+        fetchPlants(),
+        fetchRoles(),
+        fetchScreens(),
+        fetchPermissions(),
+      ]);
+      setUsers(u);
+      setPlants(p);
+      setRoles(r);
+      setScreens(s);
+      setPermissions(perms);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not load administration data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && (canUsers || canRoles)) load();
+  }, [authLoading, canUsers, canRoles, load]);
+
+  if (authLoading) return null;
+  if (!canUsers && !canRoles) return <NoAccess screen="User Management" />;
+
   return (
     <>
       <PageHeader
-        title="System Administration"
-        description="Configure users, workflows, SAP mappings, security, and integration health."
-        actions={<Button size="sm" variant="outline">Audit Logs</Button>}
+        title="User Management & Access Control"
+        description="Manage users, plant assignments, roles, and screen-level permissions."
       />
 
-      <div className="mb-6 rounded-xl border bg-gradient-surface p-5 shadow-card">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-primary shadow-glow">
-            <Activity className="h-6 w-6 text-primary-foreground" />
-          </div>
-          <div className="flex-1">
-            <div className="font-display text-base font-semibold">System Health: All Green</div>
-            <div className="text-sm text-muted-foreground">SAP S/4HANA · OCR Service · Auth · Storage all operational</div>
-          </div>
-          <div className="flex flex-wrap gap-2 text-xs">
-            <Pill label="API p95" value="412ms" />
-            <Pill label="OCR avg" value="3.1s" />
-            <Pill label="Uptime (30d)" value="99.94%" />
-          </div>
-        </div>
-      </div>
+      <Tabs value={tab} onValueChange={(v) => setParams({ tab: v }, { replace: true })}>
+        <TabsList>
+          {canUsers && <TabsTrigger value="users">Users</TabsTrigger>}
+          {canRoles && <TabsTrigger value="roles">Roles</TabsTrigger>}
+          {canRoles && <TabsTrigger value="permissions">Screen Permissions</TabsTrigger>}
+        </TabsList>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {sections.map((s) => (
-          <div key={s.title} className="group cursor-pointer rounded-xl border bg-card p-5 shadow-card transition-all hover:border-primary/40 hover:shadow-elegant">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-              <s.icon className="h-5 w-5" />
-            </div>
-            <h3 className="mt-4 font-display font-semibold">{s.title}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{s.description}</p>
-            <div className="mt-3 text-xs font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">Configure →</div>
-          </div>
-        ))}
-      </div>
+        {canUsers && (
+          <TabsContent value="users" className="mt-5">
+            <UsersTab users={users} plants={plants} roles={roles} loading={loading} reload={load} />
+          </TabsContent>
+        )}
+        {canRoles && (
+          <TabsContent value="roles" className="mt-5">
+            <RolesTab roles={roles} users={users} loading={loading} reload={load} />
+          </TabsContent>
+        )}
+        {canRoles && (
+          <TabsContent value="permissions" className="mt-5">
+            <PermissionsTab
+              roles={roles}
+              screens={screens}
+              permissions={permissions}
+              loading={loading}
+              reload={load}
+            />
+          </TabsContent>
+        )}
+      </Tabs>
     </>
-  );
-}
-
-function Pill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border bg-card px-2.5 py-1.5">
-      <span className="text-muted-foreground">{label}: </span>
-      <span className="font-mono font-semibold">{value}</span>
-    </div>
   );
 }

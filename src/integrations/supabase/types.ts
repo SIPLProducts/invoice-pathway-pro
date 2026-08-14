@@ -14,6 +14,132 @@ export type Database = {
   }
   public: {
     Tables: {
+      plants: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          name: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          contact: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          email: string
+          id: string
+          last_login_at: string | null
+          name: string
+          sap_user_id: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+          user_code: string
+        }
+        Insert: {
+          contact?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          email: string
+          id: string
+          last_login_at?: string | null
+          name: string
+          sap_user_id: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_code?: string
+        }
+        Update: {
+          contact?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          email?: string
+          id?: string
+          last_login_at?: string | null
+          name?: string
+          sap_user_id?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_code?: string
+        }
+        Relationships: []
+      }
+      roles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          description: string | null
+          id: string
+          is_master: boolean
+          is_system: boolean
+          name: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          is_master?: boolean
+          is_system?: boolean
+          name: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          is_master?: boolean
+          is_system?: boolean
+          name?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       sap_api_configs: {
         Row: {
           config: Json
@@ -41,12 +167,199 @@ export type Database = {
         }
         Relationships: []
       }
+      screen_permissions: {
+        Row: {
+          can_approve: boolean
+          can_create: boolean
+          can_delete: boolean
+          can_edit: boolean
+          can_view: boolean
+          created_at: string
+          id: string
+          role_id: string
+          screen_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          can_approve?: boolean
+          can_create?: boolean
+          can_delete?: boolean
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          role_id: string
+          screen_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          can_approve?: boolean
+          can_create?: boolean
+          can_delete?: boolean
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          role_id?: string
+          screen_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "screen_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "screen_permissions_screen_id_fkey"
+            columns: ["screen_id"]
+            isOneToOne: false
+            referencedRelation: "screens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      screens: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          name: string
+          route: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          name: string
+          route?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          name?: string
+          route?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_plants: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          plant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          plant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          plant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_plants_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_plants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          plant_id: string | null
+          role_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          plant_id?: string | null
+          role_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          plant_id?: string | null
+          role_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_roles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_permission: {
+        Args: { _action: string; _screen_key: string; _user_id: string }
+        Returns: boolean
+      }
+      is_master_admin: { Args: { _user_id: string }; Returns: boolean }
+      resolve_login_email: { Args: { _login: string }; Returns: string }
+      touch_last_login: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

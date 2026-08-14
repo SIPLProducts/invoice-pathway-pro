@@ -1,71 +1,60 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Loader2, ShieldCheck, Lock, Mail, Building2, ArrowRight, CheckCircle2, Copy, UserCircle2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldCheck, Lock, Mail, Building2, ArrowRight, CheckCircle2 } from "lucide-react";
 import logo from "@/assets/rithwik-logo.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { DEMO_USERS, getCurrentUser, signIn, type DemoUser } from "@/lib/demoAuth";
-
-const roleColors: Record<DemoUser["role"], string> = {
-  site: "bg-blue-500/10 text-blue-700 ring-blue-500/20",
-  accounts: "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20",
-  management: "bg-amber-500/10 text-amber-700 ring-amber-500/20",
-  admin: "bg-purple-500/10 text-purple-700 ring-purple-500/20",
-};
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { session, signIn } = useAuth();
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState("anil.kumar@rithwik.com");
-  const [password, setPassword] = useState("site@123");
+  const [login, setLogin] = useState("");
+  const [password, setPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
-    if (getCurrentUser()) navigate("/", { replace: true });
-  }, [navigate]);
+    if (session) navigate("/", { replace: true });
+  }, [session, navigate]);
 
-  const doSignIn = (em: string, pw: string, displayName?: string) => {
-    setLoading(true);
-    setTimeout(() => {
-      const user = signIn(em, pw);
-      setLoading(false);
-      if (!user) {
-        toast.error("Invalid credentials. Try a demo account below.");
-        return;
-      }
-      toast.success(`Welcome back, ${displayName ?? user.name}`);
-      navigate("/", { replace: true });
-    }, 500);
-  };
-
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast.error("Please enter your email and password");
+    if (!login || !password) {
+      toast.error("Enter your SAP User ID or email, and password");
       return;
     }
-    doSignIn(email, password);
+    setLoading(true);
+    const { error } = await signIn(login, password);
+    setLoading(false);
+    if (error) {
+      toast.error(error === "Invalid login credentials" ? "Invalid credentials" : error);
+      return;
+    }
+    toast.success("Welcome back");
+    navigate("/", { replace: true });
   };
 
-  const useDemo = (u: DemoUser) => {
-    setEmail(u.email);
-    setPassword(u.password);
-    doSignIn(u.email, u.password, u.name);
-  };
-
-  const copy = (text: string, label: string) => {
-    navigator.clipboard?.writeText(text).then(
-      () => toast.success(`${label} copied`),
-      () => toast.error("Copy failed"),
-    );
+  const onForgot = async () => {
+    if (!login.includes("@")) {
+      toast.error("Enter your email address above to reset your password");
+      return;
+    }
+    setResetting(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(login.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetting(false);
+    if (error) toast.error(error.message);
+    else toast.success("Password reset link sent to your email");
   };
 
   return (
     <div className="min-h-screen w-full bg-background lg:grid lg:grid-cols-[1fr_minmax(420px,560px)]">
-      {/* Left brand panel */}
       <aside className="relative hidden overflow-hidden bg-gradient-primary lg:flex lg:flex-col lg:justify-between lg:p-12 text-primary-foreground">
         <div
           className="absolute inset-0 opacity-[0.07]"
@@ -103,13 +92,9 @@ export default function Login() {
             <br />
             <span className="text-primary-foreground/70">Accelerate GRN posting.</span>
           </h1>
-          <p className="text-sm leading-relaxed text-primary-foreground/80">
-            One unified workspace for OCR-based invoice capture, SAP-integrated validations, GRN posting and finance
-            tracking — across every project site.
-          </p>
           <ul className="space-y-3 text-sm text-primary-foreground/90">
             {[
-              "OCR invoice capture with confidence scoring",
+              "Role-based access across every plant",
               "Auto-validated PO, GSTIN, HSN & tax codes",
               "Real-time GRN, MIRO and payment tracking",
             ].map((f) => (
@@ -123,11 +108,10 @@ export default function Login() {
 
         <div className="relative z-10 flex items-center justify-between text-[11px] text-primary-foreground/60">
           <span>© {new Date().getFullYear()} Rithwik Projects Pvt. Ltd.</span>
-          <span>v2.4.1 · Build 24081</span>
+          <span>v2.4.1</span>
         </div>
       </aside>
 
-      {/* Right form panel */}
       <main className="flex min-h-screen flex-col justify-center px-6 py-10 sm:px-10 lg:px-14">
         <div className="mx-auto w-full max-w-md">
           <div className="mb-8 flex items-center justify-end">
@@ -137,9 +121,7 @@ export default function Login() {
           </div>
 
           <h2 className="font-display text-2xl font-bold tracking-tight">Sign in to your workspace</h2>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Use your corporate credentials, or pick a demo account below.
-          </p>
+          <p className="mt-1.5 text-sm text-muted-foreground">Use your SAP User ID or work email with your password.</p>
 
           <form onSubmit={onSubmit} className="mt-7 space-y-4">
             <div className="space-y-1.5">
@@ -151,16 +133,15 @@ export default function Login() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-xs font-medium">Work email</Label>
+              <Label htmlFor="login" className="text-xs font-medium">SAP User ID or email</Label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  id="email"
-                  type="email"
+                  id="login"
                   autoComplete="username"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@rithwik.com"
+                  value={login}
+                  onChange={(e) => setLogin(e.target.value)}
+                  placeholder="sharvi or name@company.com"
                   className="h-11 pl-9"
                 />
               </div>
@@ -169,8 +150,13 @@ export default function Login() {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="text-xs font-medium">Password</Label>
-                <button type="button" className="text-xs font-medium text-primary hover:underline">
-                  Forgot password?
+                <button
+                  type="button"
+                  onClick={onForgot}
+                  disabled={resetting}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  {resetting ? "Sending…" : "Forgot password?"}
                 </button>
               </div>
               <div className="relative">
@@ -195,12 +181,6 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Checkbox id="remember" defaultChecked /> Keep me signed in for 30 days
-              </label>
-            </div>
-
             <Button type="submit" disabled={loading} className="h-11 w-full text-sm font-semibold">
               {loading ? (
                 <>
@@ -214,78 +194,8 @@ export default function Login() {
             </Button>
           </form>
 
-          {/* Demo accounts */}
-          <div className="mt-8">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <UserCircle2 className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Demo accounts
-                </span>
-              </div>
-              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-500/20">
-                For evaluation only
-              </span>
-            </div>
-
-            <div className="grid gap-2">
-              {DEMO_USERS.map((u) => (
-                <div
-                  key={u.id}
-                  className="group flex items-center gap-3 rounded-lg border bg-card p-3 transition-shadow hover:shadow-sm"
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-primary text-xs font-semibold text-primary-foreground">
-                    {u.initials}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-semibold">{u.name}</span>
-                      <span
-                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ${roleColors[u.role]}`}
-                      >
-                        {u.roleLabel}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
-                      <button
-                        type="button"
-                        onClick={() => copy(u.email, "Email")}
-                        className="inline-flex items-center gap-1 hover:text-foreground"
-                        title="Copy email"
-                      >
-                        {u.email} <Copy className="h-3 w-3 opacity-60" />
-                      </button>
-                      <span className="opacity-40">·</span>
-                      <button
-                        type="button"
-                        onClick={() => copy(u.password, "Password")}
-                        className="inline-flex items-center gap-1 font-mono hover:text-foreground"
-                        title="Copy password"
-                      >
-                        {u.password} <Copy className="h-3 w-3 opacity-60" />
-                      </button>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={loading}
-                    onClick={() => useDemo(u)}
-                    className="shrink-0"
-                  >
-                    Use
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <p className="mt-8 text-center text-[11px] leading-relaxed text-muted-foreground">
-            By signing in you agree to Rithwik's{" "}
-            <a href="#" className="font-medium text-foreground hover:underline">Terms of Use</a> and{" "}
-            <a href="#" className="font-medium text-foreground hover:underline">Privacy Policy</a>. Activity is monitored
-            for compliance.
+          <p className="mt-8 text-center text-xs text-muted-foreground">
+            Accounts are created by your administrator in User Management.
           </p>
         </div>
       </main>

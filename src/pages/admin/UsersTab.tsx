@@ -395,13 +395,6 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
           </DialogHeader>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="SAP User ID" required error={errors.sap_user_id}>
-              <Input
-                placeholder="e.g. SAP12345"
-                value={form.sap_user_id}
-                onChange={(e) => setForm({ ...form, sap_user_id: e.target.value })}
-              />
-            </Field>
             <Field label="First Name" required error={errors.first_name}>
               <Input
                 placeholder="Enter first name"
@@ -409,21 +402,14 @@ export function UsersTab({ users, plants, roles, loading, reload }: Props) {
                 onChange={(e) => setForm({ ...form, first_name: e.target.value })}
               />
             </Field>
-            <Field label="Last Name" required error={errors.last_name}>
+            <Field label="Last Name (Optional)" error={errors.last_name}>
               <Input
                 placeholder="Enter last name"
                 value={form.last_name}
                 onChange={(e) => setForm({ ...form, last_name: e.target.value })}
               />
             </Field>
-            <Field label="Email" required error={errors.email}>
-              <Input
-                type="email"
-                placeholder="Enter email address"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-              />
-            </Field>
+
             <Field label="Contact" required error={errors.contact}>
               <Input
                 type="tel"

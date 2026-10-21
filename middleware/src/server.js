@@ -6,6 +6,7 @@ const cors = require("cors");
 const morgan = require("morgan");
 
 const gateRoutes = require("./routes/gate");
+const odataRoutes = require("./routes/odata");
 const healthRoutes = require("./routes/health");
 const sapTarget = require("./sapTarget");
 const { errorEnvelope } = require("./util/errors");
@@ -67,6 +68,7 @@ app.get("/api/health", (_req, res) => res.json({ ok: true, service: "sap-gate-pr
 
 app.use("/api/health", healthRoutes);
 app.use("/api/gate", gateRoutes);
+app.use("/api/odata", odataRoutes);
 
 // 404
 app.use((req, res) => {

@@ -108,13 +108,22 @@ export function useSapPoLookup(): UseSapPoLookupResult {
           throw new Error(`Non-JSON response from middleware (${res.status}).`);
         }
 
+        const errObj = data as { error?: { message?: string; code?: string } } | null;
         if (res.status === 404) {
+          // A middleware-generated 404 (missing route) carries an error envelope
+          // with code "not_found" — show the real message instead of "PO Number
+          // not found". A SAP-side 404 (code "sap_error" / no envelope) means the
+          // PO really does not exist.
+          if (errObj?.error?.code === "not_found") {
+            throw new Error(
+              `${errObj.error.message} — the middleware has no route for this request. Copy the latest middleware/src files and restart node server.js.`,
+            );
+          }
           if (id === reqId.current) setNotFound(true);
           return;
         }
         if (!res.ok) {
           if (res.status === 401 || res.status === 403) markSapSessionExpired();
-          const errObj = data as { error?: { message?: string; code?: string } } | null;
           if (errObj?.error?.code === "sap_auth_redirect") markSapSessionExpired();
           throw new Error(errObj?.error?.message || `HTTP ${res.status}`);
         }

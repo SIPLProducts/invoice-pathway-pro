@@ -114,6 +114,7 @@ export default function SapGateEntries() {
                 itemUpdateApi={itemUpdateApi ?? undefined}
                 onItemSaved={() => setRefreshKey((k) => k + 1)}
                 onDataChange={onDataChange}
+                selectable
                 onRowClick={async (row) => {
                   if (pdfBusy) return;
                   setPdfBusy(true);

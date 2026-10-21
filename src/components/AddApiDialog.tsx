@@ -39,7 +39,7 @@ export function AddApiDialog() {
   const [form, setForm] = useState({
     name: "",
     description: "",
-      endpoint: "",
+    endpoint: "",
     method: "POST" as SapMethod,
     auth: "Basic" as SapAuth,
     tag: "Proxy" as SapTag,
@@ -55,7 +55,7 @@ export function AddApiDialog() {
     setForm({
       name: "",
       description: "",
-          endpoint: "",
+    endpoint: "",
       method: "POST",
       auth: "Basic",
       tag: "Proxy",

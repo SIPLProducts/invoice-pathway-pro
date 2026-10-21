@@ -54,8 +54,6 @@ export default function SAPApiEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isNew = id === "new";
-  const [showSecret, setShowSecret] = useState(false);
-  const [showSapPwd, setShowSapPwd] = useState(false);
   const [tab, setTab] = useState("details");
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");

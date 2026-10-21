@@ -1,4 +1,10 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { FileSpreadsheet, FileDown, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { exportDmrExcel, exportDmrPdf } from "@/lib/dmrExport";
+import type { ColumnDef } from "@/lib/sapApiSchemas";
+import logoUrl from "@/assets/rithwik-logo.png";
 import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { SapLiveTable } from "@/components/SapLiveTable";
@@ -9,6 +15,14 @@ import { useSapApis } from "@/lib/sapApisStore";
 export default function SapGateEntries() {
   const [editing, setEditing] = useState<{ row: Record<string, unknown> } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [data, setData] = useState<{
+    rows: Record<string, unknown>[];
+    selected: Record<string, unknown>[];
+    columns: ColumnDef[];
+    childColumns?: ColumnDef[];
+  }>({ rows: [], selected: [], columns: [] });
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const onDataChange = useCallback((d: typeof data) => setData(d), []);
   const apis = useSapApis();
   // SAP Gate Entries tab shows any GET API that targets the gate service.
   const liveApis = apis.filter((a) => {
@@ -74,6 +88,7 @@ export default function SapGateEntries() {
       ? apis.find((a) => a.status === "Active" && isItemApi(a)) ?? null
       : null;
 
+  const childKey = selectedApi ? buildSchemaFromApi(selectedApi).childKey : undefined;
   const body = 
         (() => {
           if (!selectedApi) {
@@ -98,6 +113,8 @@ export default function SapGateEntries() {
                 onEdit={updateApi ? (row) => setEditing({ row }) : undefined}
                 itemUpdateApi={itemUpdateApi ?? undefined}
                 onItemSaved={() => setRefreshKey((k) => k + 1)}
+                selectable
+                onDataChange={onDataChange}
               />
               {updateNeedsConfig && (
                 <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-xs text-foreground">
@@ -166,7 +183,39 @@ export default function SapGateEntries() {
         })();
   return (
     <>
-      <PageHeader title="All DMR" description="Live gate entries from SAP — view and edit headers and line items." />
+      <PageHeader
+        title="All DMR"
+        description="Live gate entries from SAP — view and edit headers and line items."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              disabled={data.rows.length === 0}
+              onClick={() =>
+                exportDmrExcel(data.rows, data.columns, childKey, data.childColumns)
+              }
+            >
+              <FileSpreadsheet className="h-4 w-4" /> Download Excel
+            </Button>
+            <Button
+              disabled={data.selected.length === 0 || pdfBusy}
+              onClick={async () => {
+                setPdfBusy(true);
+                try {
+                  await exportDmrPdf(data.selected, data.columns, childKey, data.childColumns, logoUrl);
+                } catch (e) {
+                  toast.error("Could not create PDF", { description: String(e) });
+                } finally {
+                  setPdfBusy(false);
+                }
+              }}
+            >
+              {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+              Download PDF{data.selected.length ? ` (${data.selected.length})` : ""}
+            </Button>
+          </>
+        }
+      />
       {body}
     </>
   );

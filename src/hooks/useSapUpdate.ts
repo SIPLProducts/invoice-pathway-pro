@@ -98,6 +98,23 @@ function pickSapDetailMessage(sapErr: unknown): string | null {
 }
 
 /**
+ * Read `key` from a row, tolerating naming styles: `{gate_id}` also matches
+ * `GateId` / `gateId`, so templates work whatever the SAP service names its fields.
+ */
+export function pickRowValue(row: Record<string, unknown> | undefined, key: string): unknown {
+  if (!row) return undefined;
+  if (row[key] !== undefined && row[key] !== null && row[key] !== "") return row[key];
+  const norm = key.replace(/_/g, "").toLowerCase();
+  for (const k of Object.keys(row)) {
+    if (k.replace(/_/g, "").toLowerCase() === norm) {
+      const v = row[k];
+      if (v !== undefined && v !== null && v !== "") return v;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Resolve `{placeholder}` tokens in a path template using values from `row`.
  * Returns null + the missing key if a token can't be filled.
  */
@@ -109,7 +126,7 @@ export function resolveUrlTemplate(
   let url = template;
   for (const t of tokens) {
     const key = t[1];
-    const v = row[key];
+    const v = pickRowValue(row, key);
     if (v === undefined || v === null || v === "") {
       return { url: null, missing: key };
     }

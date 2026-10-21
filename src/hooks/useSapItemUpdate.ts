@@ -1,3 +1,4 @@
+import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useState } from "react";
 import type { SapApi, FieldDef } from "@/lib/sapApisStore";
 import { resolveProxyUrl } from "./useSapProxy";
@@ -207,6 +208,7 @@ export function useSapItemUpdate(api: SapApi | null | undefined) {
         Accept: "application/json",
         "ngrok-skip-browser-warning": "true",
         ...getSapSessionHeaders(),
+          ...getSapTargetHeaders(api),
       };
       if (secret) headers["x-proxy-secret"] = secret;
 

@@ -47,7 +47,7 @@ async function loginToSap() {
   if (inflightLogin) return inflightLogin;
 
   inflightLogin = (async () => {
-    if (!SAP_BASE_URL || !SAP_SERVICE_PATH) {
+    if (!SAP_BASE_URL || !require("./sapTarget").current().servicePath) {
       const err = new Error("SAP_BASE_URL / SAP_SERVICE_PATH not configured in middleware/.env");
       err.code = "sap_config_missing";
       err.sapStatus = 500;
@@ -64,7 +64,8 @@ async function loginToSap() {
       throw err;
     }
 
-    const url = `${SAP_BASE_URL}${SAP_SERVICE_PATH}/GateHeader?$top=0&sap-client=${SAP_CLIENT}`;
+    const t = require("./sapTarget").current();
+    const url = `${SAP_BASE_URL}${t.servicePath}/${t.headerEntity}?$top=0&sap-client=${SAP_CLIENT}`;
     const res = await axios.get(url, {
       auth: { username: SAP_USER, password: SAP_PASSWORD },
       headers: { Accept: "application/json" },

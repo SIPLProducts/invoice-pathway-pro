@@ -6,6 +6,7 @@ const { CookieJar } = require("tough-cookie");
 const { wrapper } = require("axios-cookiejar-support");
 const { fromAxios, detectAuthHtml } = require("./util/errors");
 const sapSessionStore = require("./sapSessionStore");
+const sapTarget = require("./sapTarget");
 const {
   logSapCall,
   logLoginOk,
@@ -45,8 +46,8 @@ function effectiveAuthMode() {
   return "basic";
 }
 
-if (!SAP_BASE_URL || !SAP_SERVICE_PATH) {
-  console.warn("[sapClient] Missing SAP_BASE_URL / SAP_SERVICE_PATH.");
+if (!SAP_BASE_URL) {
+  console.warn("[sapClient] Missing SAP_BASE_URL.");
 }
 if (useBearer && !SAP_BEARER_TOKEN) {
   console.warn("[sapClient] SAP_AUTH_MODE=bearer but SAP_BEARER_TOKEN is empty.");
@@ -112,7 +113,7 @@ if (useBearer && SAP_BEARER_TOKEN) {
 
 const http = wrapper(
   axios.create({
-    baseURL: `${SAP_BASE_URL}${SAP_SERVICE_PATH}`,
+    baseURL: `${SAP_BASE_URL}`,
     // NOTE: No instance-level Basic auth. We auto-login via sapSessionStore
     // and forward JSESSIONID/__VCAP_ID__ cookies on every request instead.
     timeout: 30000,
@@ -217,7 +218,7 @@ async function ensureCsrf(force = false, cookies = "") {
   if (csrfToken && !force && !stale) return csrfToken;
 
   const cfg = buildRequestConfig(cookies, { "x-csrf-token": "fetch" });
-  const res = await http.get(`/GateHeader?$top=0&sap-client=${SAP_CLIENT}`, cfg);
+  const res = await http.get(withClient(`/${sapTarget.current().headerEntity}?$top=0`), cfg);
   ensureJson(res, "CSRF fetch", Boolean(cookies));
   if (res.status >= 400) {
     const err = new Error(`CSRF fetch failed (${res.status})`);
@@ -232,8 +233,10 @@ async function ensureCsrf(force = false, cookies = "") {
 }
 
 function withClient(path) {
-  if (path.includes("sap-client=")) return path;
-  return path + (path.includes("?") ? "&" : "?") + `sap-client=${SAP_CLIENT}`;
+  const svc = sapTarget.current().servicePath;
+  const full = path.startsWith("/sap/") ? path : `${svc}${path}`;
+  if (full.includes("sap-client=")) return full;
+  return full + (full.includes("?") ? "&" : "?") + `sap-client=${SAP_CLIENT}`;
 }
 
 /**

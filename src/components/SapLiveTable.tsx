@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +17,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useSapProxy } from "@/hooks/useSapProxy";
-import type { ColumnDef, SapApiSchema } from "@/lib/sapApiSchemas";
+import { mergeColumnsWithData, type ColumnDef, type SapApiSchema } from "@/lib/sapApiSchemas";
 import type { SapApi } from "@/lib/sapApisStore";
 import { getPath } from "@/lib/getPath";
 import { RefreshCw, AlertCircle, Wifi, WifiOff, Package, KeyRound, Pencil } from "lucide-react";
@@ -54,7 +54,24 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
     parent: Record<string, unknown>;
   } | null>(null);
 
-  const hasChildren = Boolean(schema.childKey && schema.childColumns?.length);
+  const hiddenHeader = (api.responseHeaderFields ?? []).filter((f) => f.showInTable === false).map((f) => f.key);
+  const hiddenItem = (api.responseItemFields ?? []).filter((f) => f.showInTable === false).map((f) => f.key);
+  const columns = useMemo(
+    () => mergeColumnsWithData(schema.columns, rows as Record<string, unknown>[], hiddenHeader),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [schema.columns, rows],
+  );
+  const childColumns = useMemo(() => {
+    if (!schema.childKey) return schema.childColumns;
+    const all = (rows as Record<string, unknown>[]).flatMap(
+      (r) => ((getPath(r, schema.childKey!) as Record<string, unknown>[]) ?? []),
+    );
+    const merged = mergeColumnsWithData(schema.childColumns ?? [], all, hiddenItem);
+    return merged.length ? merged : undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schema.childKey, schema.childColumns, rows]);
+  const viewSchema = useMemo(() => ({ ...schema, columns, childColumns }), [schema, columns, childColumns]);
+  const hasChildren = Boolean(schema.childKey && childColumns?.length);
 
   return (
     <div className="rounded-xl border bg-card shadow-card">
@@ -186,7 +203,7 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40">
-                {schema.columns.map((c) => (
+                {columns.map((c) => (
                   <TableHead
                     key={c.path}
                     className={cn(
@@ -213,7 +230,7 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
               {loading && rows.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={schema.columns.length + (hasChildren ? 1 : 0) + (onEdit ? 1 : 0)}
+                    colSpan={columns.length + (hasChildren ? 1 : 0) + (onEdit ? 1 : 0)}
                     className="py-8 text-center text-sm text-muted-foreground"
                   >
                     Loading…
@@ -223,7 +240,7 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
               {!loading && rows.length === 0 && !error && (
                 <TableRow>
                   <TableCell
-                    colSpan={schema.columns.length + (hasChildren ? 1 : 0) + (onEdit ? 1 : 0)}
+                    colSpan={columns.length + (hasChildren ? 1 : 0) + (onEdit ? 1 : 0)}
                     className="py-8 text-center text-sm text-muted-foreground"
                   >
                     No records returned by SAP.
@@ -240,7 +257,7 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
                 const canEdit = editKey !== undefined && editKey !== null && editKey !== "";
                 return (
                   <TableRow key={key} className="hover:bg-muted/30">
-                    {schema.columns.map((c) => (
+                    {columns.map((c) => (
                       <TableCell
                         key={c.path}
                         className={cn(
@@ -297,9 +314,9 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
               {openRow?.items.length ?? 0} item(s) for this gate entry.
             </DialogDescription>
           </DialogHeader>
-          {schema.childColumns && openRow && (
+          {childColumns && openRow && (
             <EditableItemsTable
-              schema={schema}
+              schema={viewSchema}
               parentRow={openRow.parent}
               items={openRow.items}
               itemUpdateApi={itemUpdateApi}

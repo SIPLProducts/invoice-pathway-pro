@@ -80,3 +80,48 @@ export function buildSchemaFromApi(api: SapApi): SapApiSchema {
     childColumns: itemCols.length ? itemCols : undefined,
   };
 }
+
+/** "GateId" / "gate_id" → "Gate Id" */
+export function humanizeKey(key: string): string {
+  return key
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+const isScalar = (v: unknown) =>
+  v === null || ["string", "number", "boolean"].includes(typeof v);
+
+/**
+ * Configured columns first, then every other scalar field found in the
+ * returned rows (skipping @odata / __metadata / nested navigation objects).
+ */
+export function mergeColumnsWithData(
+  configured: ColumnDef[],
+  rows: Record<string, unknown>[],
+  hiddenKeys: string[] = [],
+): ColumnDef[] {
+  const seen = new Set(
+    [...configured.map((c) => c.path), ...hiddenKeys].map((k) => k.toLowerCase()),
+  );
+  const extra: ColumnDef[] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    for (const [k, v] of Object.entries(row)) {
+      if (k.startsWith("@") || k.startsWith("__") || k.includes("@odata")) continue;
+      if (!isScalar(v)) continue;
+      const lk = k.toLowerCase();
+      if (seen.has(lk)) continue;
+      seen.add(lk);
+      extra.push({
+        header: humanizeKey(k),
+        path: k,
+        format: typeof v === "number" ? "number" : "text",
+        align: typeof v === "number" ? "right" : undefined,
+      });
+    }
+  }
+  return [...configured, ...extra];
+}

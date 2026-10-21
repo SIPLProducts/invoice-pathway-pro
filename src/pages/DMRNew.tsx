@@ -272,7 +272,9 @@ export default function DMRNew() {
       const next = { ...h };
       for (const f of headerFields) {
         const v = lookupAlias(first, f.key, HEADER_ALIASES);
-        if (v !== undefined && v !== "" && (next[f.key] === "" || next[f.key] === undefined)) next[f.key] = v;
+        if (v === undefined || v === "") continue;
+        // Plant always follows the PO; other fields only fill when empty.
+        if (f.key.toLowerCase() === "plant" || next[f.key] === "" || next[f.key] === undefined) next[f.key] = v;
       }
       return next;
     });

@@ -56,7 +56,22 @@ function formatCell(value: unknown, col: ColumnDef): string {
 }
 
 export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, selectable, onDataChange }: Props) {
-  const { rows, loading, error, lastFetched, proxyConfigured, refresh } = useSapProxy(api, schema);
+  const { rows: rawRows, loading, error, lastFetched, proxyConfigured, refresh } = useSapProxy(api, schema);
+  // Add a derived Total Quantity (sum of line-item Quantity) to each header row.
+  const rows = useMemo(() => {
+    if (!schema.childKey) return rawRows;
+    return (rawRows as Record<string, unknown>[]).map((r) => {
+      const items = (getPath(r, schema.childKey!) as Record<string, unknown>[]) ?? [];
+      if (!Array.isArray(items) || !items.length) return r;
+      let sum = 0;
+      for (const it of items) {
+        const k = Object.keys(it).find((x) => x.toLowerCase() === "quantity");
+        const n = Number(k ? it[k] : NaN);
+        if (!Number.isNaN(n)) sum += n;
+      }
+      return { ...r, TotalQuantity: sum };
+    });
+  }, [rawRows, schema.childKey]);
 
   const [openRow, setOpenRow] = useState<{
     key: string;
@@ -67,7 +82,11 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
   const hiddenHeader = (api.responseHeaderFields ?? []).filter((f) => f.showInTable === false).map((f) => f.key);
   const hiddenItem = (api.responseItemFields ?? []).filter((f) => f.showInTable === false).map((f) => f.key);
   const columns = useMemo(
-    () => mergeColumnsWithData(schema.columns, rows as Record<string, unknown>[], hiddenHeader),
+    () => {
+      const cols = mergeColumnsWithData(schema.columns, rows as Record<string, unknown>[], hiddenHeader);
+      if (!schema.childKey || cols.some((c) => c.path === "TotalQuantity")) return cols;
+      return [...cols, { header: "Total Quantity", path: "TotalQuantity", align: "right" as const }];
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [schema.columns, rows],
   );

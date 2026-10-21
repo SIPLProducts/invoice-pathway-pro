@@ -51,6 +51,39 @@ function normKey(k: string): string {
   return k.toLowerCase().replace(/[\s_\-./]+/g, "");
 }
 
+/** SAP PO-line names that differ from the form's field names. */
+const ITEM_ALIASES: Record<string, string[]> = {
+  openqty: ["OpenQuantity"],
+  quantity: ["OpenQuantity", "PoQuantity"],
+  poquantity: ["PoQuantity"],
+};
+const HEADER_ALIASES: Record<string, string[]> = {
+  vendor: ["vendor", "Vendor"],
+  vendorname: ["vendor_name", "VendorName"],
+  plant: ["Plant"],
+};
+
+export function lookupAlias(src: Row, key: string, aliases: Record<string, string[]>) {
+  const want = normKey(key);
+  for (const [k, v] of Object.entries(src)) if (normKey(k) === want) return v;
+  for (const a of aliases[want] ?? []) {
+    const hit = Object.entries(src).find(([k]) => normKey(k) === normKey(a));
+    if (hit) return hit[1];
+  }
+  return undefined;
+}
+
+/** Map one SAP PO line onto the configured Line Item fields. */
+export function mapPoLine(src: Row, fields: FieldDef[]): Row {
+  const out: Row = {};
+  for (const f of fields) {
+    const v = lookupAlias(src, f.key, ITEM_ALIASES);
+    if (v === undefined || v === null) continue;
+    out[f.key] = f.type === "number" ? Number(v) || 0 : (v as Row[string]);
+  }
+  return out;
+}
+
 /** Keep only configured keys from a row. */
 export function pickConfigured(row: Row, fields: FieldDef[]): Row {
   const out: Row = {};
@@ -228,6 +261,24 @@ export default function DMRNew() {
   const { submit, loading, proxyConfigured } = useSapCreate(api ?? null);
   const poLookup = useSapPoLookup();
   const obdLookup = useSapObdLookup();
+
+  // Fill Line Items (and Vendor/Plant in header) from the PO lines SAP returns.
+  useEffect(() => {
+    if (!poLookup.lines.length) return;
+    const lines = poLookup.lines.map((l) => mapPoLine(l as Row, itemFields));
+    setItems(lines.map((r) => ({ ...emptyRowFromFields(itemFields), ...r })));
+    const first = poLookup.lines[0] as Row;
+    setHeader((h) => {
+      const next = { ...h };
+      for (const f of headerFields) {
+        const v = lookupAlias(first, f.key, HEADER_ALIASES);
+        if (v !== undefined && v !== "" && (next[f.key] === "" || next[f.key] === undefined)) next[f.key] = v;
+      }
+      return next;
+    });
+    toast.success(`${lines.length} line item(s) filled from PO`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poLookup.lines]);
   const [obdOpen, setObdOpen] = useState(false);
 
   const runObdLookup = async () => {

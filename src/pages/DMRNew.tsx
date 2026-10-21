@@ -224,7 +224,7 @@ export default function DMRNew() {
     if (res.ok) {
       const id = (res.data as Record<string, unknown> | undefined)?.[api.rowKey ?? "gate_id"] ?? "";
       toast.success(`Created ${id || "record"} in SAP`);
-      navigate("/dmr");
+      navigate("/dmr/sap-gate-entries");
     } else {
       const sapErr = (res.sapBody as { error?: { hint?: string; code?: string } } | undefined)
         ?.error;
@@ -248,7 +248,7 @@ export default function DMRNew() {
   return (
     <>
       <Link
-        to="/dmr"
+        to="/dmr/sap-gate-entries"
         className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" /> Back to DMR list

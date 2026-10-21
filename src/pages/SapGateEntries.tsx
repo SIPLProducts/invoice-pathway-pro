@@ -166,7 +166,7 @@ export default function SapGateEntries() {
         })();
   return (
     <>
-      <PageHeader title="All SAP Gate Entries" description="Live gate entries from SAP — view and edit headers and line items." />
+      <PageHeader title="All DMR" description="Live gate entries from SAP — view and edit headers and line items." />
       {body}
     </>
   );

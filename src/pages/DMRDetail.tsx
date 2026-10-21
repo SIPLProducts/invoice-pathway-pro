@@ -34,7 +34,7 @@ export default function DMRDetail() {
 
   return (
     <>
-      <Link to="/dmr" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+      <Link to="/dmr/sap-gate-entries" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Back to DMR list
       </Link>
 

@@ -21,6 +21,8 @@ export interface FieldDef {
   showInTable?: boolean;
   /** Request: include as form input. */
   showInForm?: boolean;
+  /** Request: include in the payload sent to SAP (default true). */
+  sendToSap?: boolean;
   align?: "left" | "right";
   width?: string;
 }

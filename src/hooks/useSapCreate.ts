@@ -26,7 +26,7 @@ export interface SubmitOptions {
  * SAP rejects empty strings on numeric/date/time properties with CX_SXML_PARSE_ERROR.
  */
 export function sanitizeRow(row: Record<string, unknown>, fields: FieldDef[]): Record<string, unknown> {
-  const typeByKey = new Map(fields.map((f) => [f.key, f.type] as const));
+  const typeByKey = new Map(fields.filter((f) => f.sendToSap !== false).map((f) => [f.key, f.type] as const));
   const out: Record<string, unknown> = {};
   for (const [k, raw] of Object.entries(row)) {
     if (raw === null || raw === undefined) continue;

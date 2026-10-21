@@ -54,7 +54,7 @@ function normKey(k: string): string {
 /** Keep only configured keys from a row. */
 export function pickConfigured(row: Row, fields: FieldDef[]): Row {
   const out: Row = {};
-  for (const f of fields) if (f.key in row) out[f.key] = row[f.key];
+  for (const f of fields) if (f.sendToSap !== false && f.key in row) out[f.key] = row[f.key];
   return out;
 }
 

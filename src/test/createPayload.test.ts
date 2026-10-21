@@ -17,3 +17,13 @@ describe("Create DMR payload", () => {
     expect(out).toEqual({ Material: "2", OpenQty: 100, Quantity: 100, StorageLocation: "" });
   });
 });
+
+describe("Send to SAP switch", () => {
+  it("does not send fields switched off, but sends PoItem", () => {
+    const fields = [
+      { key: "PoItem", type: "string" },
+      { key: "remarks", type: "string", sendToSap: false },
+    ] as never;
+    expect(sanitizeRow({ PoItem: "10", remarks: "x" }, fields)).toEqual({ PoItem: "10" });
+  });
+});

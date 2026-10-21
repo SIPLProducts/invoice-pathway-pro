@@ -58,6 +58,26 @@ export function pickConfigured(row: Row, fields: FieldDef[]): Row {
   return out;
 }
 
+const isBlank = (v: unknown) => v === undefined || v === null || String(v).trim() === "";
+
+/** First missing required field message, or null when all are filled. */
+export function findMissingRequired(
+  header: Row,
+  items: Row[],
+  headerFields: FieldDef[],
+  itemFields: FieldDef[],
+): string | null {
+  for (const f of headerFields) {
+    if (f.required && isBlank(header[f.key])) return `${f.label || f.key} is required`;
+  }
+  for (let i = 0; i < items.length; i++) {
+    for (const f of itemFields) {
+      if (f.required && isBlank(items[i][f.key])) return `Line ${i + 1}: ${f.label || f.key} is required`;
+    }
+  }
+  return null;
+}
+
 const PO_DEFAULTS: Row = {
   [PO_NUMBER_FIELD.key]: "",
   [OBD_FIELD.key]: "",
@@ -219,11 +239,10 @@ export default function DMRNew() {
   const onSubmit = async () => {
     if (!api) return;
     // Validate required fields
-    for (const f of headerFields) {
-      if (f.required && (header[f.key] === "" || header[f.key] === undefined)) {
-        toast.error(`${f.label || f.key} is required`);
-        return;
-      }
+    const missing = findMissingRequired(header, items, headerFields, itemFields);
+    if (missing) {
+      toast.error(missing);
+      return;
     }
     const childKey = api.childKey ?? "_Item";
     // Send only the fields configured on the API, with the values typed on screen.
@@ -575,6 +594,7 @@ export default function DMRNew() {
                             className={`py-2 pr-2 font-medium ${f.align === "right" ? "text-right" : ""}`}
                           >
                             {f.label || f.key}
+                            {f.required ? " *" : ""}
                           </th>
                         ))}
                         <th className="py-2 w-8" />

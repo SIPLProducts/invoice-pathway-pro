@@ -96,5 +96,5 @@ export function getSapTargetHeaders(api?: SapApi | null): Record<string, string>
 export function fillSapPath(endpoint: string, values: Record<string, string>): string {
   return endpoint.replace(/\{([A-Za-z0-9_]+)\}/g, (_m, k: string) =>
     encodeURIComponent(String(values[k] ?? "").replace(/'/g, "''")),
-  );
+  ).replace(/ /g, "%20");
 }

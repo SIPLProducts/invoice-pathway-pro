@@ -1,5 +1,7 @@
 "use strict";
 
+const _log = require("./util/sessionLog");
+
 const axios = require("axios");
 const qs = require("querystring");
 const { CookieJar } = require("tough-cookie");
@@ -281,12 +283,14 @@ async function withAutoSession(method, path, extraCookies, attempt) {
 
 async function sapGet(path, extraCookies = "") {
   return withAutoSession("GET", path, extraCookies, async ({ cookies }) => {
+    _log.logSapPayload({ method: "GET", path });
     const cfg = buildRequestConfig(cookies);
     let res = await http.get(withClient(path), cfg);
     if (res.status === 401 && useOauthCc) {
       cachedToken = null;
       res = await http.get(withClient(path), cfg);
     }
+    _log.logSapResponse({ method: "GET", path, status: res.status, data: res.data });
     ensureJson(res, `GET ${path}`, Boolean(cookies));
     if (res.status >= 400) {
       throw fromAxios({ message: `GET ${path} failed`, response: res });
@@ -321,6 +325,7 @@ async function sapWrite(method, path, body, extraHeaders = {}, extraCookies = ""
       });
     };
 
+    _log.logSapPayload({ method, path, body });
     let res = await doRequest();
     if (res.status === 401 && useOauthCc) {
       cachedToken = null;
@@ -333,6 +338,7 @@ async function sapWrite(method, path, body, extraHeaders = {}, extraCookies = ""
       csrfToken = null;
       res = await doRequest();
     }
+    _log.logSapResponse({ method, path, status: res.status, data: res.data });
     ensureJson(res, `${method} ${path}`, Boolean(cookies));
     if (res.status >= 400) {
       throw fromAxios({ message: `${method} ${path} failed`, response: res });
@@ -359,6 +365,7 @@ async function sapBatch(multipartBody, boundary, extraCookies = "") {
       });
     };
 
+    _log.logSapPayload({ method: "POST", path: "/$batch", body: multipartBody });
     let res = await doRequest();
     if (res.status === 401 && useOauthCc) {
       cachedToken = null;
@@ -368,6 +375,7 @@ async function sapBatch(multipartBody, boundary, extraCookies = "") {
       csrfToken = null;
       res = await doRequest();
     }
+    _log.logSapResponse({ method: "POST", path: "/$batch", status: res.status, data: res.data });
     ensureJson(res, "$batch", Boolean(cookies));
     if (res.status >= 400) {
       throw fromAxios({ message: `$batch failed`, response: res });

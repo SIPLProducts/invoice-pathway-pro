@@ -82,7 +82,11 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
   const hiddenHeader = (api.responseHeaderFields ?? []).filter((f) => f.showInTable === false).map((f) => f.key);
   const hiddenItem = (api.responseItemFields ?? []).filter((f) => f.showInTable === false).map((f) => f.key);
   const columns = useMemo(
-    () => mergeColumnsWithData(schema.columns, rows as Record<string, unknown>[], hiddenHeader),
+    () => {
+      const cols = mergeColumnsWithData(schema.columns, rows as Record<string, unknown>[], hiddenHeader);
+      if (!schema.childKey || cols.some((c) => c.path === "TotalQuantity")) return cols;
+      return [...cols, { header: "Total Quantity", path: "TotalQuantity", align: "right" as const }];
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [schema.columns, rows],
   );

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Camera, FileScan, Keyboard, Upload } from "lucide-react";
+import { Keyboard } from "lucide-react";
 import { OcrCaptureCard } from "@/components/OcrCaptureCard";
 import { useSapApis, type FieldDef } from "@/lib/sapApisStore";
 

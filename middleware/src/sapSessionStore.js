@@ -47,7 +47,7 @@ async function loginToSap() {
   if (inflightLogin) return inflightLogin;
 
   inflightLogin = (async () => {
-    if (!SAP_BASE_URL || !SAP_SERVICE_PATH) {
+    if (!SAP_BASE_URL || !require("./sapTarget").current().servicePath) {
       const err = new Error("SAP_BASE_URL / SAP_SERVICE_PATH not configured in middleware/.env");
       err.code = "sap_config_missing";
       err.sapStatus = 500;

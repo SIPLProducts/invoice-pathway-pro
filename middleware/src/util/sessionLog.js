@@ -99,10 +99,36 @@ function logRetry({ method, path, ok }) {
   console.log(`[SAP] ${pad(method)} ${path}  retry=${ok ? "ok" : "fail"}`);
 }
 
+const PAYLOAD_LOG = String(process.env.SAP_PAYLOAD_LOG ?? "1") !== "0";
+function short(v) {
+  let s;
+  try {
+    s = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+  } catch {
+    s = String(v);
+  }
+  if (s === undefined) return "(empty)";
+  return s.length > 4000 ? `${s.slice(0, 4000)}\n... (${s.length - 4000} more chars)` : s;
+}
+/** Log the request payload sent to SAP (never cookies/passwords). */
+function logSapPayload({ method, path, body }) {
+  if (!PAYLOAD_LOG) return;
+  console.log(`[SAP-REQ] ${new Date().toISOString()} ${pad(method)} ${path}`);
+  if (body !== undefined && body !== null) console.log(`[SAP-REQ] payload:\n${short(body)}`);
+}
+/** Log SAP's HTTP status and response body. */
+function logSapResponse({ method, path, status, data }) {
+  if (!PAYLOAD_LOG) return;
+  console.log(`[SAP-RES] ${new Date().toISOString()} ${pad(method)} ${path} status=${status}`);
+  console.log(`[SAP-RES] body:\n${short(data)}`);
+}
+
 module.exports = {
   logSapCall,
   logLoginOk,
   logLoginFail,
   logLogout,
   logRetry,
+  logSapPayload,
+  logSapResponse,
 };

@@ -1,0 +1,1 @@
+- SAP service path and entity names are never hardcoded in the middleware; the web app sends them per request (x-sap-service-path / x-sap-header-entity / x-sap-item-entity) from the API endpoint in SAP API Settings, with middleware/.env as fallback — so any OData service works without code changes.

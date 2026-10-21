@@ -47,6 +47,24 @@ const OBD_FIELD: FieldDef = {
   showInForm: true,
 };
 
+function normKey(k: string): string {
+  return k.toLowerCase().replace(/[\s_\-./]+/g, "");
+}
+
+function dedupeFields(fields: FieldDef[], exclude: Set<string> = new Set()): FieldDef[] {
+  const seen = new Set(exclude);
+  const out: FieldDef[] = [];
+  for (const f of fields) {
+    const nk = normKey(f.key);
+    const nl = f.label ? normKey(f.label) : nk;
+    if (seen.has(nk) || seen.has(nl)) continue;
+    seen.add(nk);
+    seen.add(nl);
+    out.push(f);
+  }
+  return out;
+}
+
 const PO_DEFAULTS: Row = {
   [PO_NUMBER_FIELD.key]: "",
   [OBD_FIELD.key]: "",
@@ -79,16 +97,24 @@ export default function DMRNew() {
   const [derivedHeaderFields, setDerivedHeaderFields] = useState<FieldDef[] | null>(null);
   const [derivedItemFields, setDerivedItemFields] = useState<FieldDef[] | null>(null);
 
-  const headerFields = (
+  const headerFieldsRaw = (
     derivedHeaderFields ??
     api?.requestHeaderFields ??
     []
   ).filter((f) => f.showInForm !== false && f.key);
-  const itemFields = (
+  const itemFieldsRaw = (
     derivedItemFields ??
     api?.requestItemFields ??
     []
   ).filter((f) => f.showInForm !== false && f.key);
+  // Show each field once: dedupe within header, then drop item fields already in the header.
+  const headerFields = dedupeFields(headerFieldsRaw);
+  const headerNormToKey = new Map<string, string>();
+  headerFields.forEach((f) => {
+    headerNormToKey.set(normKey(f.key), f.key);
+    if (f.label) headerNormToKey.set(normKey(f.label), f.key);
+  });
+  const itemFields = dedupeFields(itemFieldsRaw, new Set(headerNormToKey.keys()));
 
   const [header, setHeader] = useState<Row>(() => ({
     ...emptyRowFromFields(headerFields),
@@ -100,9 +126,11 @@ export default function DMRNew() {
 
   const amountKeys = new Set<string>(GATE_AMOUNT_KEYS as readonly string[]);
   const plantField = headerFields.find((f) => f.key === "plant");
-  const gridFields = headerFields.filter((f) => !amountKeys.has(f.key) && f.key !== "plant");
+  const poBoxNorms = new Set([normKey(PO_FIELD.key), normKey(OBD_FIELD.key)]);
+  const gridFields = headerFields.filter(
+    (f) => !amountKeys.has(f.key) && f.key !== "plant" && !poBoxNorms.has(normKey(f.key)),
+  );
   const amountFields = headerFields.filter((f) => amountKeys.has(f.key));
-  const plantOptions = (api?.scheduler?.plants ?? []).filter((p) => p.code);
 
 
   const num = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);
@@ -209,7 +237,20 @@ export default function DMRNew() {
     }
     const childKey = api.childKey ?? "_Item";
     const body: Record<string, unknown> = { ...header };
-    if (itemFields.length) body[childKey] = items;
+    if (itemFieldsRaw.length) {
+      // Item fields hidden as duplicates of header fields get the header value.
+      const hidden = itemFieldsRaw.filter((f) => !itemFields.some((i) => i.key === f.key));
+      body[childKey] = items.map((row) => {
+        const out = { ...row };
+        for (const f of hidden) {
+          const hk =
+            headerNormToKey.get(normKey(f.key)) ?? (f.label ? headerNormToKey.get(normKey(f.label)) : undefined);
+          const v = hk ? header[hk] ?? header[PO_FIELD.key] : undefined;
+          if (out[f.key] === undefined || out[f.key] === "") out[f.key] = hk ? header[hk] : v;
+        }
+        return out;
+      });
+    }
 
     if (!proxyConfigured) {
       toast.error(
@@ -220,7 +261,7 @@ export default function DMRNew() {
       return;
     }
 
-    const res = await submit(body, { headerFields, itemFields, childKey });
+    const res = await submit(body, { headerFields: headerFieldsRaw, itemFields: itemFieldsRaw, childKey });
     if (res.ok) {
       const id = (res.data as Record<string, unknown> | undefined)?.[api.rowKey ?? "gate_id"] ?? "";
       toast.success(`Created ${id || "record"} in SAP`);
@@ -257,7 +298,7 @@ export default function DMRNew() {
         title="New DMR Entry"
         description="Capture a daily material receipt — fields are driven by the selected SAP API configuration."
         actions={
-          <>
+          <div className="flex shrink-0 flex-nowrap items-center gap-2">
             <Button variant="outline" size="sm">
               <Save className="h-4 w-4" />
               Save Draft
@@ -271,7 +312,7 @@ export default function DMRNew() {
               <Send className="h-4 w-4" />
               {loading ? "Submitting…" : "Submit to SAP"}
             </Button>
-          </>
+          </div>
         }
       />
 
@@ -298,26 +339,11 @@ export default function DMRNew() {
                         {plantField.label || "Plant"}
                         {plantField.required ? " *" : ""}
                       </label>
-                      {plantOptions.length > 0 ? (
-                        <select
-                          className="h-9 w-full rounded-md border bg-background px-2.5 text-sm outline-none focus:shadow-glow"
-                          value={String(header["plant"] ?? "")}
-                          onChange={(e) => setHeader((h) => ({ ...h, plant: e.target.value }))}
-                        >
-                          <option value="">Select Plant</option>
-                          {plantOptions.map((p) => (
-                            <option key={p.code} value={p.code}>
-                              {p.name ? `${p.code} — ${p.name}` : p.code}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
                         <FieldInput
                           field={plantField}
                           value={header["plant"] as string}
                           onChange={(v) => setHeader((h) => ({ ...h, plant: v }))}
                         />
-                      )}
                     </div>
                   )}
                   <Grid>

@@ -113,8 +113,18 @@ export default function SapGateEntries() {
                 onEdit={updateApi ? (row) => setEditing({ row }) : undefined}
                 itemUpdateApi={itemUpdateApi ?? undefined}
                 onItemSaved={() => setRefreshKey((k) => k + 1)}
-                selectable
                 onDataChange={onDataChange}
+                onRowClick={async (row) => {
+                  if (pdfBusy) return;
+                  setPdfBusy(true);
+                  try {
+                    await exportDmrPdf([row], data.columns, childKey, data.childColumns, logoUrl);
+                  } catch (e) {
+                    toast.error("Could not create PDF", { description: String(e) });
+                  } finally {
+                    setPdfBusy(false);
+                  }
+                }}
               />
               {updateNeedsConfig && (
                 <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-xs text-foreground">
@@ -197,22 +207,11 @@ export default function SapGateEntries() {
             >
               <FileSpreadsheet className="h-4 w-4" /> Download Excel
             </Button>
-            <Button
-              disabled={data.selected.length === 0 || pdfBusy}
-              onClick={async () => {
-                setPdfBusy(true);
-                try {
-                  await exportDmrPdf(data.selected, data.columns, childKey, data.childColumns, logoUrl);
-                } catch (e) {
-                  toast.error("Could not create PDF", { description: String(e) });
-                } finally {
-                  setPdfBusy(false);
-                }
-              }}
-            >
-              {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-              Download PDF{data.selected.length ? ` (${data.selected.length})` : ""}
-            </Button>
+            {pdfBusy && (
+              <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Creating PDF…
+              </span>
+            )}
           </>
         }
       />

@@ -133,7 +133,7 @@ export function useSapProxy<T = Record<string, unknown>>(
     return () => {
       cancelled = true;
     };
-  }, [proxyUrl, proxyConfigured, secret, schema.proxyPath, schema.rowsPath, tick, sessionKey]);
+  }, [proxyUrl, proxyConfigured, secret, schema.proxyPath, schema.rowsPath, tick, sessionKey, api?.endpoint]);
 
   return { rows, loading, error, lastFetched, proxyConfigured, proxyUrl, refresh };
 }

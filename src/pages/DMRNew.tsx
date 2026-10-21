@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Send, Plus, Trash2, Loader2 } from "lucide-react";
@@ -15,7 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { OcrCaptureCard } from "@/components/OcrCaptureCard";
 import { inr } from "@/lib/format";
 
 
@@ -166,6 +165,26 @@ export default function DMRNew() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api?.name]);
 
+  // Pre-fill from OCR Capture screen (passed via navigation state).
+  const location = useLocation();
+  const ocr = (location.state as { ocr?: { header: Row; items: Row[] } } | null)?.ocr;
+  const [ocrApplied, setOcrApplied] = useState(false);
+  useEffect(() => {
+    if (!ocr || ocrApplied || !api) return;
+    setHeader((prev) => {
+      const next = { ...prev };
+      for (const [k, v] of Object.entries(ocr.header ?? {})) {
+        if (v !== "" && v !== undefined && v !== null) next[k] = v;
+      }
+      return next;
+    });
+    if (ocr.items?.length) {
+      setItems(ocr.items.map((row) => ({ ...emptyRowFromFields(itemFields), ...row })));
+    }
+    setOcrApplied(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ocr, api, ocrApplied, itemFields.length]);
+
   const { submit, loading, proxyConfigured } = useSapCreate(api ?? null);
   const poLookup = useSapPoLookup();
   const obdLookup = useSapObdLookup();
@@ -254,33 +273,12 @@ export default function DMRNew() {
         }
       />
 
-      <OcrCaptureCard
-        headerFields={headerFields}
-        itemFields={itemFields}
-        onExtracted={({ header: extractedHeader, items: extractedItems }) => {
-          // Merge extracted header values, never overwriting with empty/undefined
-          setHeader((prev) => {
-            const next = { ...prev };
-            for (const [k, v] of Object.entries(extractedHeader)) {
-              if (v !== "" && v !== undefined && v !== null) next[k] = v;
-            }
-            return next;
-          });
-          // Replace line items if any were detected
-          if (extractedItems.length) {
-            setItems(
-              extractedItems.map((row) => ({
-                ...emptyRowFromFields(itemFields),
-                ...row,
-              })),
-            );
-          }
-          // Scroll the form into view
-          requestAnimationFrame(() => {
-            window.scrollTo({ top: 200, behavior: "smooth" });
-          });
-        }}
-      />
+      {ocrApplied && (
+        <div className="mb-5 rounded-xl border border-primary/30 bg-gradient-surface p-3 text-sm">
+          Fields were filled from the uploaded invoice. Please review before submitting.
+        </div>
+      )}
+
 
       {!api ? (
         <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">

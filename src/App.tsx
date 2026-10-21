@@ -10,6 +10,7 @@ import { AuthProvider } from "@/lib/auth";
 import Dashboard from "./pages/Dashboard";
 import DMRList from "./pages/DMRList";
 import DMRDetail from "./pages/DMRDetail";
+import SapGateEntries from "./pages/SapGateEntries";
 import DMRNew from "./pages/DMRNew";
 import OCRCapture from "./pages/OCRCapture";
 import GRN from "./pages/GRN";
@@ -40,6 +41,7 @@ const App = () => (
             <Route element={<RequireAuth><AppShell /></RequireAuth>}>
               <Route path="/" element={<RequirePermission screen="dashboard" label="Dashboard"><Dashboard /></RequirePermission>} />
               <Route path="/dmr" element={<RequirePermission screen="dmr" label="DMR"><DMRList /></RequirePermission>} />
+              <Route path="/dmr/sap-gate-entries" element={<RequirePermission screen="dmr" label="DMR"><SapGateEntries /></RequirePermission>} />
               <Route path="/dmr/new" element={<RequirePermission screen="dmr" action="create" label="DMR"><DMRNew /></RequirePermission>} />
               <Route path="/dmr/:id" element={<RequirePermission screen="dmr" label="DMR"><DMRDetail /></RequirePermission>} />
               <Route path="/ocr" element={<RequirePermission screen="gate_entries" label="Gate Entries"><OCRCapture /></RequirePermission>} />

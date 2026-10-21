@@ -163,6 +163,7 @@ export default function SapGateEntries() {
               )}
             </div>
           );
+        })();
   return (
     <>
       <PageHeader title="All SAP Gate Entries" description="Live gate entries from SAP — view and edit headers and line items." />

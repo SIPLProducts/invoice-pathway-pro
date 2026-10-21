@@ -82,7 +82,7 @@ export function useSapCreate(api: SapApi | null | undefined, proxyPathOverride?:
   const [loading, setLoading] = useState(false);
   const proxyUrl = resolveProxyUrl(api);
   const proxyPath = proxyPathOverride ?? api?.createEndpoint ?? api?.proxyPath ?? "/api/gate/headers";
-  const secret = api?.middleware?.secret ?? "";
+  const secret = resolveProxySecret(api);
 
   const submit = async (
     body: Record<string, unknown>,

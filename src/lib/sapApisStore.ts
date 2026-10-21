@@ -553,7 +553,10 @@ async function fetchAllFromCloud(): Promise<SapApi[]> {
   if (error) throw error;
   const rows = (data ?? []) as unknown as CloudRow[];
   // Re-hydrate using the stored name as the canonical key.
-  return rows.map((r) => ({ ...(r.config ?? ({} as SapApi)), name: r.name }));
+  // Reserved rows (e.g. "__connection__") hold shared settings, not APIs.
+  return rows
+    .filter((r) => !r.name.startsWith("__"))
+    .map((r) => ({ ...(r.config ?? ({} as SapApi)), name: r.name }));
 }
 
 async function upsertOne(api: SapApi) {

@@ -127,7 +127,7 @@ export function useSapUpdate(api: SapApi | null | undefined) {
   const proxyUrl = resolveProxyUrl(api);
   const method = api?.updateMethod ?? "PATCH";
   const template = api?.updateEndpoint ?? "";
-  const secret = api?.middleware?.secret ?? "";
+  const secret = resolveProxySecret(api);
 
   const submit = async (
     row: Record<string, unknown>,

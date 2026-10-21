@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Send, Plus, Trash2, Loader2, CheckCircle2 } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useSapApis, GATE_AMOUNT_KEYS, type FieldDef, type SapApi } from "@/lib/sapApisStore";
 import { useSapCreate } from "@/hooks/useSapCreate";
@@ -260,7 +259,7 @@ export default function DMRNew() {
   }, [ocr, api, ocrApplied, itemFields.length]);
 
   const { submit, loading, proxyConfigured } = useSapCreate(api ?? null);
-  const [created, setCreated] = useState<{ id: string; data: Row } | null>(null);
+  const [created, setCreated] = useState<{ id: string; data: Record<string, unknown> } | null>(null);
   const poLookup = useSapPoLookup();
   const obdLookup = useSapObdLookup();
 
@@ -342,7 +341,7 @@ export default function DMRNew() {
     }
   };
 
-  const createdItems = created ? ((created.data[api?.childKey ?? "_Item"] as Row[] | undefined) ?? []) : [];
+  const createdItems = created ? ((created.data[api?.childKey ?? "_Item"] as unknown[] | undefined) ?? []) : [];
   const createdFields = created
     ? headerFieldsRaw
         .filter((f) => f.sendToSap !== false)

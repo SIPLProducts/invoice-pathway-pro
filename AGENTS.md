@@ -1,1 +1,2 @@
 - SAP service path and entity names are never hardcoded in the middleware; the web app sends them per request (x-sap-service-path / x-sap-header-entity / x-sap-item-entity) from the API endpoint in SAP API Settings, with middleware/.env as fallback — so any OData service works without code changes.
+- Middleware URL and proxy secret are global (Connection & Credentials tab, stored as reserved '__connection__' row in sap_api_configs) and override per-API values; why: change once, every API follows. SAP user/password stay in middleware/.env, never in the browser.

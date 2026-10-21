@@ -75,7 +75,7 @@ type AuthError = {
 export default function SAPSettings() {
   const apis = useSapApis();
   const session = useSapSession();
-  const [tab, setTab] = useState("apis");
+  const [tab, setTab] = useState("connection");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [authError, setAuthError] = useState<AuthError | null>(null);
@@ -132,11 +132,10 @@ export default function SAPSettings() {
   };
 
   const testSapConnection = async () => {
-    const base =
-      apis.find((a) => a.middleware?.url)?.middleware?.url?.trim().replace(/\/$/, "") ||
-      ((import.meta.env.VITE_SAP_PROXY_URL as string | undefined)?.trim().replace(/\/$/, "") ?? "");
+    const base = resolveProxyUrl(apis.find((a) => a.middleware?.url));
+    const secret = resolveProxySecret(apis.find((a) => a.middleware?.secret));
     if (!base) {
-      toast.error("No middleware URL configured. Set it on any API → API Details.");
+      toast.error("No middleware URL configured. Set it in the Connection & Credentials tab.");
       return;
     }
     setTesting(true);
@@ -145,6 +144,7 @@ export default function SAPSettings() {
         headers: {
           Accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          ...(secret ? { "x-proxy-secret": secret } : {}),
           ...getSapSessionHeaders(),
           ...getSapTargetHeaders(apis.find((a) => /^\/sap\//.test(a.endpoint ?? "") && a.middleware?.url) ?? apis.find((a) => /^\/sap\//.test(a.endpoint ?? ""))),
         },
@@ -210,6 +210,9 @@ export default function SAPSettings() {
         <Tabs value={tab} onValueChange={setTab} className="w-full">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <TabsList>
+              <TabsTrigger value="connection" className="gap-2">
+                <Server className="h-4 w-4" /> Connection & Credentials
+              </TabsTrigger>
               <TabsTrigger value="apis" className="gap-2">
                 <FileText className="h-4 w-4" /> API Configurations
               </TabsTrigger>
@@ -339,6 +342,163 @@ export default function SAPSettings() {
               </div>
             </div>
 
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  try {
+                    const json = exportApis();
+                    const blob = new Blob([json], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    const date = new Date().toISOString().slice(0, 10);
+                    a.href = url;
+                    a.download = `sap-apis-${date}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    toast.success(`Exported ${apis.length} API${apis.length === 1 ? "" : "s"}`);
+                  } catch (e) {
+                    toast.error("Export failed", { description: String((e as Error).message ?? e) });
+                  }
+                }}
+              >
+                <Download className="mr-2 h-4 w-4" /> Export APIs
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "application/json,.json";
+                  input.onchange = async () => {
+                    const file = input.files?.[0];
+                    if (!file) return;
+                    try {
+                      const text = await file.text();
+                      const { added, replaced } = importApis(text);
+                      toast.success(`Imported ${added} new, updated ${replaced}`);
+                    } catch (e) {
+                      toast.error("Import failed", { description: String((e as Error).message ?? e) });
+                    }
+                  };
+                  input.click();
+                }}
+              >
+                <Upload className="mr-2 h-4 w-4" /> Import APIs
+              </Button>
+              <AddApiDialog />
+            </div>
+
+            <div className="rounded-xl border bg-card shadow-card">
+              <div className="border-b p-5">
+                <div className="flex items-center gap-2 font-display text-lg font-semibold">
+                  <FileText className="h-5 w-5 text-primary" /> API Configurations
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Manage your SAP API endpoints and their configurations
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/60 text-xs uppercase tracking-wider text-muted-foreground">
+                    <tr>
+                      <th className="px-5 py-3 text-left font-medium">Name</th>
+                      <th className="px-5 py-3 text-left font-medium">Endpoint</th>
+                      <th className="px-5 py-3 text-left font-medium">Method</th>
+                      <th className="px-5 py-3 text-left font-medium">Auth</th>
+                      <th className="px-5 py-3 text-left font-medium">Status</th>
+                      <th className="px-5 py-3 text-right font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {apis.map((api) => (
+                      <tr key={api.name} className="border-t align-top hover:bg-muted/30">
+                        <td className="px-5 py-4">
+                          <div className="font-semibold">{api.name}</div>
+                          <Badge
+                            variant="outline"
+                            className={
+                              api.tag === "VPN Tunnel"
+                                ? "mt-1 border-warning/40 bg-warning/10 text-warning"
+                                : api.tag === "Direct"
+                                  ? "mt-1 border-muted-foreground/30 bg-muted text-muted-foreground"
+                                  : "mt-1 border-primary/30 bg-primary/10 text-primary"
+                            }
+                          >
+                            {api.tag}
+                          </Badge>
+                          <p className="mt-1 max-w-md text-xs text-muted-foreground">{api.description}</p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <code className="rounded bg-muted px-2 py-1 font-mono text-xs">{api.endpoint}</code>
+                        </td>
+                        <td className="px-5 py-4">
+                          <Badge variant="outline" className={methodColor[api.method]}>
+                            {api.method}
+                          </Badge>
+                        </td>
+                        <td className="px-5 py-4 text-muted-foreground">{api.auth}</td>
+                        <td className="px-5 py-4">
+                          <Badge
+                            variant="outline"
+                            className={
+                              api.status === "Active"
+                                ? "border-success/40 bg-success/10 text-success"
+                                : "border-muted-foreground/30 bg-muted text-muted-foreground"
+                            }
+                          >
+                            {api.status}
+                          </Badge>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center justify-end gap-1">
+                            <Link to={`/sap/settings/edit/${encodeURIComponent(api.name)}`}>
+                              <Button variant="ghost" size="sm" className="gap-1.5">
+                                <Edit3 className="h-3.5 w-3.5" /> Edit
+                              </Button>
+                            </Link>
+                            <Button variant="ghost" size="sm" className="gap-1.5">
+                              <Sliders className="h-3.5 w-3.5" /> Fields
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={() => toast.success(`Tested ${api.name}`)}
+                            >
+                              <Play className="h-3.5 w-3.5" /> Test
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => setPendingDelete(api.name)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {apis.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-5 py-10 text-center text-sm text-muted-foreground">
+                          No API configurations yet. Click "Add API Configuration" to create one.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="connection" className="mt-5 space-y-5">
+            <ConnectionCard onTest={testSapConnection} testing={testing} />
             <div className="rounded-xl border-2 border-success/40 bg-success/5 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -663,160 +823,6 @@ export default function SAPSettings() {
                 </div>
               )}
             </div>
-
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  try {
-                    const json = exportApis();
-                    const blob = new Blob([json], { type: "application/json" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    const date = new Date().toISOString().slice(0, 10);
-                    a.href = url;
-                    a.download = `sap-apis-${date}.json`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    toast.success(`Exported ${apis.length} API${apis.length === 1 ? "" : "s"}`);
-                  } catch (e) {
-                    toast.error("Export failed", { description: String((e as Error).message ?? e) });
-                  }
-                }}
-              >
-                <Download className="mr-2 h-4 w-4" /> Export APIs
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const input = document.createElement("input");
-                  input.type = "file";
-                  input.accept = "application/json,.json";
-                  input.onchange = async () => {
-                    const file = input.files?.[0];
-                    if (!file) return;
-                    try {
-                      const text = await file.text();
-                      const { added, replaced } = importApis(text);
-                      toast.success(`Imported ${added} new, updated ${replaced}`);
-                    } catch (e) {
-                      toast.error("Import failed", { description: String((e as Error).message ?? e) });
-                    }
-                  };
-                  input.click();
-                }}
-              >
-                <Upload className="mr-2 h-4 w-4" /> Import APIs
-              </Button>
-              <AddApiDialog />
-            </div>
-
-            <div className="rounded-xl border bg-card shadow-card">
-              <div className="border-b p-5">
-                <div className="flex items-center gap-2 font-display text-lg font-semibold">
-                  <FileText className="h-5 w-5 text-primary" /> API Configurations
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Manage your SAP API endpoints and their configurations
-                </p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/60 text-xs uppercase tracking-wider text-muted-foreground">
-                    <tr>
-                      <th className="px-5 py-3 text-left font-medium">Name</th>
-                      <th className="px-5 py-3 text-left font-medium">Endpoint</th>
-                      <th className="px-5 py-3 text-left font-medium">Method</th>
-                      <th className="px-5 py-3 text-left font-medium">Auth</th>
-                      <th className="px-5 py-3 text-left font-medium">Status</th>
-                      <th className="px-5 py-3 text-right font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {apis.map((api) => (
-                      <tr key={api.name} className="border-t align-top hover:bg-muted/30">
-                        <td className="px-5 py-4">
-                          <div className="font-semibold">{api.name}</div>
-                          <Badge
-                            variant="outline"
-                            className={
-                              api.tag === "VPN Tunnel"
-                                ? "mt-1 border-warning/40 bg-warning/10 text-warning"
-                                : api.tag === "Direct"
-                                  ? "mt-1 border-muted-foreground/30 bg-muted text-muted-foreground"
-                                  : "mt-1 border-primary/30 bg-primary/10 text-primary"
-                            }
-                          >
-                            {api.tag}
-                          </Badge>
-                          <p className="mt-1 max-w-md text-xs text-muted-foreground">{api.description}</p>
-                        </td>
-                        <td className="px-5 py-4">
-                          <code className="rounded bg-muted px-2 py-1 font-mono text-xs">{api.endpoint}</code>
-                        </td>
-                        <td className="px-5 py-4">
-                          <Badge variant="outline" className={methodColor[api.method]}>
-                            {api.method}
-                          </Badge>
-                        </td>
-                        <td className="px-5 py-4 text-muted-foreground">{api.auth}</td>
-                        <td className="px-5 py-4">
-                          <Badge
-                            variant="outline"
-                            className={
-                              api.status === "Active"
-                                ? "border-success/40 bg-success/10 text-success"
-                                : "border-muted-foreground/30 bg-muted text-muted-foreground"
-                            }
-                          >
-                            {api.status}
-                          </Badge>
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center justify-end gap-1">
-                            <Link to={`/sap/settings/edit/${encodeURIComponent(api.name)}`}>
-                              <Button variant="ghost" size="sm" className="gap-1.5">
-                                <Edit3 className="h-3.5 w-3.5" /> Edit
-                              </Button>
-                            </Link>
-                            <Button variant="ghost" size="sm" className="gap-1.5">
-                              <Sliders className="h-3.5 w-3.5" /> Fields
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="gap-1.5"
-                              onClick={() => toast.success(`Tested ${api.name}`)}
-                            >
-                              <Play className="h-3.5 w-3.5" /> Test
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive"
-                              onClick={() => setPendingDelete(api.name)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {apis.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="px-5 py-10 text-center text-sm text-muted-foreground">
-                          No API configurations yet. Click "Add API Configuration" to create one.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </TabsContent>
 
           <TabsContent value="guide" className="mt-5">
@@ -855,5 +861,96 @@ export default function SAPSettings() {
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+function ConnectionCard({ onTest, testing }: { onTest: () => void; testing: boolean }) {
+  const conn = useSapConnection();
+  const [form, setForm] = useState(conn);
+  const [saving, setSaving] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+  useEffect(() => setForm(conn), [conn]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await saveSapConnection(form);
+      toast.success("Connection saved. All APIs now use these settings.");
+    } catch (e) {
+      toast.error("Couldn't save connection", { description: String((e as Error).message ?? e) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border bg-card p-5 shadow-card">
+      <div className="mb-1 flex items-center gap-2 font-display text-lg font-semibold">
+        <Server className="h-5 w-5 text-primary" /> Middleware & SAP Connection
+      </div>
+      <p className="mb-4 text-sm text-muted-foreground">
+        Set once — every API (DMR List, Gate Service, PO, OBD) uses these settings automatically.
+      </p>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Node.js Middleware URL</Label>
+          <Input
+            placeholder="http://localhost:8080 or https://abc.ngrok-free.app"
+            value={form.middlewareUrl}
+            onChange={(e) => setForm({ ...form, middlewareUrl: e.target.value })}
+          />
+          <p className="text-[11px] text-muted-foreground">Base URL only, no path.</p>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Proxy Secret (optional)</Label>
+          <div className="relative">
+            <Input
+              type={showSecret ? "text" : "password"}
+              value={form.proxySecret}
+              onChange={(e) => setForm({ ...form, proxySecret: e.target.value })}
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowSecret((v) => !v)}
+              className="absolute inset-y-0 right-0 px-3 text-muted-foreground hover:text-foreground"
+              aria-label={showSecret ? "Hide secret" : "Show secret"}
+            >
+              <KeyRound className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">Must match PROXY_SECRET in middleware/.env.</p>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">SAP Host (reference)</Label>
+          <Input
+            placeholder="https://xxxx.abap-web.us10.hana.ondemand.com"
+            value={form.sapHost}
+            onChange={(e) => setForm({ ...form, sapHost: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">SAP Client</Label>
+          <Input value={form.sapClient} onChange={(e) => setForm({ ...form, sapClient: e.target.value })} />
+        </div>
+      </div>
+      <div className="mt-4 rounded-md border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground">
+        SAP user / password (or OAuth client) stay in <code className="rounded bg-muted px-1 font-mono">middleware/.env</code>{" "}
+        on the server for security — they are never stored in the browser.
+      </div>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          {conn.updatedAt ? `Last saved ${new Date(conn.updatedAt).toLocaleString()}` : "Not saved yet"}
+        </span>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={onTest} disabled={testing}>
+            <Activity className="h-4 w-4" /> {testing ? "Testing…" : "Test connection"}
+          </Button>
+          <Button size="sm" onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Save connection"}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

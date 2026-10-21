@@ -7,6 +7,7 @@ import {
   markSapSessionActive,
   markSapSessionExpired,
 } from "@/lib/sapSession";
+import { getSapTargetHeaders, fillSapPath } from "@/lib/sapTarget";
 
 export type PoLine = Record<string, string | number | boolean | null>;
 
@@ -70,10 +71,16 @@ export function useSapPoLookup(): UseSapPoLookupResult {
         return;
       }
 
-      const template = api.proxyPath || api.listEndpoint || "/api/po/{po_number}";
-      const path = template.includes("{po_number}")
-        ? template.replace("{po_number}", encodeURIComponent(po))
-        : `${template.replace(/\/$/, "")}/${encodeURIComponent(po)}`;
+      // Prefer the SAP endpoint configured in SAP API Settings (sent as-is to the
+      // middleware's generic OData route). Fall back to a custom proxy path.
+      const sapEndpoint = (api.endpoint ?? "").trim();
+      const useOdata = sapEndpoint.startsWith("/sap/");
+      const template = api.proxyPath || api.listEndpoint || "";
+      const path = useOdata
+        ? "/api/odata"
+        : template.includes("{po_number}")
+          ? template.replace("{po_number}", encodeURIComponent(po))
+          : `${template.replace(/\/$/, "")}/${encodeURIComponent(po)}`;
 
       setLoading(true);
       try {
@@ -81,7 +88,9 @@ export function useSapPoLookup(): UseSapPoLookupResult {
           Accept: "application/json",
           "ngrok-skip-browser-warning": "true",
           ...getSapSessionHeaders(),
+          ...getSapTargetHeaders(api),
         };
+        if (useOdata) headers["x-sap-path"] = fillSapPath(sapEndpoint, { po_number: po });
         { const s = resolveProxySecret(api); if (s) headers["x-proxy-secret"] = s; }
 
         const res = await fetch(`${proxyUrl}${path}`, { headers });

@@ -1,33 +1,31 @@
 "use strict";
 
+/**
+ * Header/item CRUD. Entity names, key properties and the navigation property
+ * all come from the per-request SAP target (SAP API Settings → x-sap-* headers,
+ * middleware/.env as fallback). Nothing service-specific is hardcoded.
+ */
 const express = require("express");
 const { sapGet, sapWrite, sapBatch, buildCookieFromHeaders } = require("../sapClient");
 const { buildHeaderItemsBatch, parseBatchResponse } = require("../util/batch");
-
-const sapTarget = require("../sapTarget");
-const H = () => sapTarget.current().headerEntity;
-const I = () => sapTarget.current().itemEntity;
+const t = require("../sapTarget");
 
 const router = express.Router();
 
-// GET list with items expanded
 router.get("/headers", async (req, res, next) => {
   try {
-    const cookies = buildCookieFromHeaders(req);
-    const data = await sapGet(`/${H()}?$expand=_Item`, cookies);
+    const data = await sapGet(`/${t.headerEntity()}${t.expandQuery("?")}`, buildCookieFromHeaders(req));
     res.json(data);
   } catch (e) {
     next(e);
   }
 });
 
-// GET one header with items
 router.get("/headers/:gateId", async (req, res, next) => {
   try {
-    const cookies = buildCookieFromHeaders(req);
     const data = await sapGet(
-      `/${H()}(gate_id='${encodeURIComponent(req.params.gateId)}')?$expand=_Item`,
-      cookies,
+      `/${t.headerEntity()}${t.headerKey(req.params.gateId)}${t.expandQuery("?")}`,
+      buildCookieFromHeaders(req),
     );
     res.json(data);
   } catch (e) {
@@ -35,11 +33,9 @@ router.get("/headers/:gateId", async (req, res, next) => {
   }
 });
 
-// POST create header (+ optional _Item array)
 router.post("/headers", async (req, res, next) => {
   try {
-    const cookies = buildCookieFromHeaders(req);
-    const data = await sapWrite("POST", `/${H()}`, req.body, {}, cookies);
+    const data = await sapWrite("POST", `/${t.headerEntity()}`, req.body, {}, buildCookieFromHeaders(req));
     res.status(201).json(data);
   } catch (e) {
     if (e?.code === "sap_error" && e?.sapBody?.error) {
@@ -55,16 +51,14 @@ router.post("/headers", async (req, res, next) => {
   }
 });
 
-// PATCH header
 router.patch("/headers/:gateId", async (req, res, next) => {
   try {
-    const cookies = buildCookieFromHeaders(req);
     const data = await sapWrite(
       "PATCH",
-      `/${H()}(gate_id='${encodeURIComponent(req.params.gateId)}')`,
+      `/${t.headerEntity()}${t.headerKey(req.params.gateId)}`,
       req.body,
       {},
-      cookies,
+      buildCookieFromHeaders(req),
     );
     res.json(data);
   } catch (e) {
@@ -72,18 +66,14 @@ router.patch("/headers/:gateId", async (req, res, next) => {
   }
 });
 
-// PATCH a single item
 router.patch("/items/:gateId/:itemNo", async (req, res, next) => {
   try {
-    const cookies = buildCookieFromHeaders(req);
     const data = await sapWrite(
       "PATCH",
-      `/${I()}(gate_id='${encodeURIComponent(req.params.gateId)}',item_no='${encodeURIComponent(
-        req.params.itemNo,
-      )}')`,
+      `/${t.itemEntity()}${t.itemKey(req.params.gateId, req.params.itemNo)}`,
       req.body,
       {},
-      cookies,
+      buildCookieFromHeaders(req),
     );
     res.json(data);
   } catch (e) {
@@ -91,33 +81,34 @@ router.patch("/items/:gateId/:itemNo", async (req, res, next) => {
   }
 });
 
-// $batch: update header + items atomically
 router.post("/batch", async (req, res, next) => {
   try {
     const { gateId, header = {}, items = [] } = req.body || {};
     if (!gateId) {
       return res.status(400).json({ error: { code: "bad_request", message: "gateId is required" } });
     }
-    const cookies = buildCookieFromHeaders(req);
-    const { body, boundary } = buildHeaderItemsBatch({ gateId, header, items, headerEntity: H(), itemEntity: I() });
-    const raw = await sapBatch(body, boundary, cookies);
-    const parts = parseBatchResponse(raw);
-    res.json({ ok: true, parts });
+    const { body, boundary } = buildHeaderItemsBatch({
+      gateId,
+      header,
+      items,
+      headerPath: (id) => `${t.headerEntity()}${t.headerKey(id)}`,
+      itemPath: (id, no) => `${t.itemEntity()}${t.itemKey(id, no)}`,
+    });
+    const raw = await sapBatch(body, boundary, buildCookieFromHeaders(req));
+    res.json({ ok: true, parts: parseBatchResponse(raw) });
   } catch (e) {
     next(e);
   }
 });
 
-// DELETE
 router.delete("/headers/:gateId", async (req, res, next) => {
   try {
-    const cookies = buildCookieFromHeaders(req);
     await sapWrite(
       "DELETE",
-      `/${H()}(gate_id='${encodeURIComponent(req.params.gateId)}')`,
+      `/${t.headerEntity()}${t.headerKey(req.params.gateId)}`,
       undefined,
       {},
-      cookies,
+      buildCookieFromHeaders(req),
     );
     res.status(204).end();
   } catch (e) {

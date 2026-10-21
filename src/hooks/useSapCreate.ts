@@ -36,7 +36,7 @@ export function sanitizeRow(row: Record<string, unknown>, fields: FieldDef[]): R
       const v = raw.trim();
       if (v === "") {
         // Text fields go as "" (SAP accepts); blank number/date/time are rejected, so skip.
-        if (t === "number" || t === "date" || t === "time" || t === "datetime") continue;
+        if (t === "number" || t === "date" || t === "time") continue;
         out[k] = "";
         continue;
       }

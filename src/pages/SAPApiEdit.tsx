@@ -47,7 +47,6 @@ const TABS = [
   { id: "request", label: "Request Fields" },
   { id: "response", label: "Response Fields" },
   { id: "scheduler", label: "Scheduler" },
-  { id: "credentials", label: "Credentials" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -102,13 +101,7 @@ export default function SAPApiEdit() {
 
   const [api, setApi] = useState<SapApi>(initialApi);
   const [details, setDetails] = useState({
-    sapClient: api.credentials?.sapClient ?? "100",
     timeout: String(api.advanced?.timeoutMs ?? 30000),
-    connectionMode: api.middleware?.connectionMode ?? "Via Proxy Server",
-    deploymentMode: api.middleware?.deploymentMode ?? "Self-Hosted (Client Server)",
-    middlewarePort: api.middleware?.port ?? "3202",
-    middlewareUrl: api.middleware?.url ?? "",
-    proxySecret: api.middleware?.secret ?? "",
   });
 
   const setApiField = <K extends keyof SapApi>(k: K, v: SapApi[K]) =>
@@ -343,9 +336,6 @@ export default function SAPApiEdit() {
                   onChange={(e) => setApiField("description", e.target.value)}
                 />
               </Field>
-              <Field label="Base URL *">
-                <Input value={api.baseUrl} onChange={(e) => setApiField("baseUrl", e.target.value)} />
-              </Field>
               <Field label="Endpoint Path">
                 <Input
                   value={api.endpoint}
@@ -442,12 +432,6 @@ export default function SAPApiEdit() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="SAP Client">
-                  <Input
-                    value={details.sapClient}
-                    onChange={(e) => setDetails((d) => ({ ...d, sapClient: e.target.value }))}
-                  />
-                </Field>
               </div>
 
               <Field label="Timeout (ms)">
@@ -456,79 +440,9 @@ export default function SAPApiEdit() {
                   onChange={(e) => setDetails((d) => ({ ...d, timeout: e.target.value }))}
                 />
               </Field>
-              <div />
-
-              <Field label="Connection Mode" hint="Route through a proxy server for on-premise SAP.">
-                <Select
-                  value={details.connectionMode}
-                  onValueChange={(v) =>
-                    setDetails((d) => ({
-                      ...d,
-                      connectionMode: v as "Direct" | "Via Proxy Server" | "VPN Tunnel",
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {["Direct", "Via Proxy Server", "VPN Tunnel"].map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {m}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Deployment Mode" hint="Direct LAN/Docker access. Default port: 3002">
-                <Select
-                  value={details.deploymentMode}
-                  onValueChange={(v) => setDetails((d) => ({ ...d, deploymentMode: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {["Self-Hosted (Client Server)", "Lovable Cloud Preview"].map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {m}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field label="Middleware Port" hint="Cloud=3000, Self-Hosted=3002">
-                <Input
-                  value={details.middlewarePort}
-                  onChange={(e) => setDetails((d) => ({ ...d, middlewarePort: e.target.value }))}
-                />
-              </Field>
-              <Field label="Node.js Middleware URL" hint="Base URL only (do not append /proxy).">
-                <Input
-                  value={details.middlewareUrl}
-                  onChange={(e) => setDetails((d) => ({ ...d, middlewareUrl: e.target.value }))}
-                />
-              </Field>
-
-              <Field label="Proxy Secret / Password" hint="Shared secret sent as x-proxy-secret header (optional).">
-                <div className="relative">
-                  <Input
-                    type={showSecret ? "text" : "password"}
-                    value={details.proxySecret}
-                    onChange={(e) => setDetails((d) => ({ ...d, proxySecret: e.target.value }))}
-                    placeholder="Optional"
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSecret((s) => !s)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  >
-                    {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </Field>
+              <div className="flex items-end text-xs text-muted-foreground">
+                Middleware URL, proxy secret and SAP client are managed in SAP API Settings → Connection &amp; Credentials. SAP login stays in middleware/.env.
+              </div>
             </div>
           </div>
         </TabsContent>
@@ -783,67 +697,6 @@ export default function SAPApiEdit() {
           </div>
         </TabsContent>
 
-        {/* ============ CREDENTIALS ============ */}
-        <TabsContent value="credentials" className="mt-5">
-          <div className="rounded-xl border bg-card p-6 shadow-card">
-            <div className="mb-5 flex items-center gap-2">
-              <Lock className="h-5 w-5 text-warning" />
-              <div>
-                <h2 className="font-display text-lg font-semibold">Credentials</h2>
-                <p className="text-sm text-muted-foreground">
-                  Authentication credentials for the SAP API ({api.auth} Auth)
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-5 md:grid-cols-2">
-              <Field label="SAP Username *">
-                <Input
-                  value={api.credentials?.user ?? ""}
-                  onChange={(e) =>
-                    setApiField("credentials", {
-                      ...(api.credentials ?? defaultCreds()),
-                      user: e.target.value,
-                    })
-                  }
-                />
-              </Field>
-              <Field label="SAP Password *">
-                <div className="relative">
-                  <Input
-                    type={showSapPwd ? "text" : "password"}
-                    value={api.credentials?.password ?? ""}
-                    onChange={(e) =>
-                      setApiField("credentials", {
-                        ...(api.credentials ?? defaultCreds()),
-                        password: e.target.value,
-                      })
-                    }
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSapPwd((s) => !s)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  >
-                    {showSapPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </Field>
-              <Field label="SAP Client (for auth header)" hint="Sent as sap-client header in Basic Auth requests">
-                <Input
-                  value={api.credentials?.sapClient ?? ""}
-                  onChange={(e) =>
-                    setApiField("credentials", {
-                      ...(api.credentials ?? defaultCreds()),
-                      sapClient: e.target.value,
-                    })
-                  }
-                />
-              </Field>
-            </div>
-          </div>
-        </TabsContent>
 
         {/* ============ SETTINGS ============ */}
         <TabsContent value="settings" className="mt-5">
@@ -949,25 +802,15 @@ export default function SAPApiEdit() {
               toast.error("Name and Endpoint Path are required");
               return;
             }
+            // Connection (middleware URL, secret, SAP client) is global; SAP login lives in middleware/.env.
+            const { credentials: _c, middleware: _m, ...rest } = api;
             const payload: SapApi = {
-              ...api,
-              tag: (api.tag ?? (details.connectionMode === "VPN Tunnel" ? "VPN Tunnel" : "Proxy")) as SapTag,
-              credentials: {
-                ...(api.credentials ?? defaultCreds()),
-                sapClient: details.sapClient || api.credentials?.sapClient || "100",
-              },
+              ...rest,
               advanced: {
                 ...(api.advanced ?? defaultAdvanced()),
                 timeoutMs: Number(details.timeout) || api.advanced?.timeoutMs || 30000,
               },
-              middleware: {
-                url: details.middlewareUrl.trim().replace(/\/$/, ""),
-                port: details.middlewarePort,
-                secret: details.proxySecret,
-                connectionMode: details.connectionMode,
-                deploymentMode: details.deploymentMode,
-              },
-            };
+            } as SapApi;
             if (isNew) {
               if (getSapApi(payload.name)) {
                 toast.error(`An API named "${payload.name}" already exists`);

@@ -51,7 +51,8 @@ const nav: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true, screen: "dashboard" },
   { to: "/ocr", label: "OCR Capture", icon: Camera, screen: "gate_entries" },
   { to: "/dmr/new", label: "Create DMR", icon: FileText, end: true, screen: "dmr" },
-  { to: "/dmr", label: "DMR", icon: FileText, screen: "dmr" },
+  { to: "/dmr", label: "DMR", icon: FileText, end: true, screen: "dmr" },
+  { to: "/dmr/sap-gate-entries", label: "SAP Gate Entries", icon: Database, end: true, screen: "dmr" },
   { to: "/grn", label: "GRN", icon: PackageCheck, screen: "grn" },
   { to: "/tracker", label: "SAP Tracker", icon: Database, screen: "sap_tracker" },
   {

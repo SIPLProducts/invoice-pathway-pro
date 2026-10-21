@@ -28,13 +28,20 @@ export interface UseSapProxyResult<T = Record<string, unknown>> {
 
 /**
  * Resolves the middleware base URL for a given API.
- * Priority: api.middleware.url -> VITE_SAP_PROXY_URL env -> "".
+ * Priority: global Connection tab -> api.middleware.url (legacy) -> VITE_SAP_PROXY_URL env -> "".
  */
 export function resolveProxyUrl(api?: SapApi | null): string {
+  const global = getSapConnection().middlewareUrl?.trim().replace(/\/$/, "") ?? "";
+  if (global) return global;
   const fromApi = api?.middleware?.url?.trim().replace(/\/$/, "") ?? "";
   if (fromApi) return fromApi;
   const fromEnv = (import.meta.env.VITE_SAP_PROXY_URL as string | undefined)?.trim().replace(/\/$/, "") ?? "";
   return fromEnv;
+}
+
+/** Shared proxy secret: global Connection tab first, then the API's own (legacy). */
+export function resolveProxySecret(api?: SapApi | null): string {
+  return getSapConnection().proxySecret || api?.middleware?.secret || "";
 }
 
 export function useSapProxy<T = Record<string, unknown>>(

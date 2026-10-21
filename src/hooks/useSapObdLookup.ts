@@ -80,7 +80,7 @@ export function useSapObdLookup(): UseSapObdLookupResult {
           "ngrok-skip-browser-warning": "true",
           ...getSapSessionHeaders(),
         };
-        if (api.middleware?.secret) headers["x-proxy-secret"] = api.middleware.secret;
+        { const s = resolveProxySecret(api); if (s) headers["x-proxy-secret"] = s; }
 
         const res = await fetch(`${proxyUrl}${path}`, { headers });
         const text = await res.text();

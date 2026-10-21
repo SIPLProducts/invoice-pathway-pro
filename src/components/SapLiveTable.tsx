@@ -262,9 +262,7 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
             <TableHeader>
               <TableRow className="bg-muted/40">
                 {selectable && (
-                  <TableHead className="w-10">
-                    <Checkbox checked={allOnPage} onCheckedChange={toggleAllOnPage} aria-label="Select all on this page" />
-                  </TableHead>
+                  <TableHead className="w-10" aria-label="Select row" />
                 )}
                 {columns.map((c) => (
                   <TableHead
@@ -320,10 +318,18 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
                 const editKey = keyFieldName ? row[keyFieldName] : undefined;
                 const canEdit = editKey !== undefined && editKey !== null && editKey !== "";
                 return (
-                  <TableRow key={key} className={cn("hover:bg-muted/30", onRowClick && "cursor-pointer")} onClick={onRowClick ? () => onRowClick(row) : undefined} title={onRowClick ? "Click to download PDF" : undefined} data-state={selected.has(key) ? "selected" : undefined}>
+                  <TableRow key={key} className={cn("hover:bg-muted/30", onRowClick && "cursor-pointer")} onClick={() => { setSelectedKey(key); onRowClick?.(row); }} title={onRowClick ? "Click to download PDF" : undefined} data-state={selectedKey === key ? "selected" : undefined}>
                     {selectable && (
                       <TableCell className="w-10">
-                        <Checkbox checked={selected.has(key)} onCheckedChange={() => toggleOne(key)} aria-label={`Select ${key}`} />
+                        <input
+                          type="radio"
+                          name="sap-row-select"
+                          className="h-4 w-4 cursor-pointer accent-primary"
+                          checked={selectedKey === key}
+                          onChange={() => setSelectedKey(key)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Select ${key}`}
+                        />
                       </TableCell>
                     )}
                     {columns.map((c) => (

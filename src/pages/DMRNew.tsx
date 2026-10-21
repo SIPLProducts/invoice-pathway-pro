@@ -126,7 +126,7 @@ export default function DMRNew() {
 
   const amountKeys = new Set<string>(GATE_AMOUNT_KEYS as readonly string[]);
   const plantField = headerFields.find((f) => f.key === "plant");
-  const poBoxNorms = new Set([normKey(PO_FIELD.key), normKey(OBD_FIELD.key)]);
+  const poBoxNorms = new Set([normKey(PO_NUMBER_FIELD.key), normKey(OBD_FIELD.key)]);
   const gridFields = headerFields.filter(
     (f) => !amountKeys.has(f.key) && f.key !== "plant" && !poBoxNorms.has(normKey(f.key)),
   );
@@ -245,8 +245,7 @@ export default function DMRNew() {
         for (const f of hidden) {
           const hk =
             headerNormToKey.get(normKey(f.key)) ?? (f.label ? headerNormToKey.get(normKey(f.label)) : undefined);
-          const v = hk ? header[hk] ?? header[PO_FIELD.key] : undefined;
-          if (out[f.key] === undefined || out[f.key] === "") out[f.key] = hk ? header[hk] : v;
+          if (hk && (out[f.key] === undefined || out[f.key] === "")) out[f.key] = header[hk];
         }
         return out;
       });

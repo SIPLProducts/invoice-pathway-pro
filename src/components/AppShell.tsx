@@ -49,8 +49,9 @@ type NavItem = {
 
 const nav: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true, screen: "dashboard" },
-  { to: "/dmr", label: "DMR", icon: FileText, screen: "dmr" },
   { to: "/ocr", label: "OCR Capture", icon: Camera, screen: "gate_entries" },
+  { to: "/dmr/new", label: "Create DMR", icon: FileText, end: true, screen: "dmr" },
+  { to: "/dmr", label: "DMR", icon: FileText, screen: "dmr" },
   { to: "/grn", label: "GRN", icon: PackageCheck, screen: "grn" },
   { to: "/tracker", label: "SAP Tracker", icon: Database, screen: "sap_tracker" },
   {

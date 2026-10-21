@@ -869,7 +869,16 @@ function ConnectionCard({ onTest, testing }: { onTest: () => void; testing: bool
   const [form, setForm] = useState(conn);
   const [saving, setSaving] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
-  useEffect(() => setForm(conn), [conn]);
+  const apisForSeed = useSapApis();
+  useEffect(() => {
+    // Prefill from an existing API the first time, so nothing has to be retyped.
+    const legacy = apisForSeed.find((a) => a.middleware?.url)?.middleware;
+    setForm({
+      ...conn,
+      middlewareUrl: conn.middlewareUrl || legacy?.url || "",
+      proxySecret: conn.proxySecret || legacy?.secret || "",
+    });
+  }, [conn, apisForSeed]);
 
   const save = async () => {
     setSaving(true);

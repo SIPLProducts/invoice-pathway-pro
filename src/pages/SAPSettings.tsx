@@ -1,5 +1,7 @@
 import { getSapTargetHeaders } from "@/lib/sapTarget";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSapConnection, saveSapConnection } from "@/lib/sapConnection";
+import { resolveProxyUrl, resolveProxySecret } from "@/hooks/useSapProxy";
 import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";

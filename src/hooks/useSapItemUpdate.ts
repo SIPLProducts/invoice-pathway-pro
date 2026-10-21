@@ -1,7 +1,7 @@
 import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useState } from "react";
 import type { SapApi, FieldDef } from "@/lib/sapApisStore";
-import { resolveProxyUrl } from "./useSapProxy";
+import { resolveProxyUrl, resolveProxySecret } from "./useSapProxy";
 import {
   getSapSessionHeaders,
   markSapSessionActive,

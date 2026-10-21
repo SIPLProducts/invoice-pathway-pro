@@ -51,17 +51,10 @@ function normKey(k: string): string {
   return k.toLowerCase().replace(/[\s_\-./]+/g, "");
 }
 
-function dedupeFields(fields: FieldDef[], exclude: Set<string> = new Set()): FieldDef[] {
-  const seen = new Set(exclude);
-  const out: FieldDef[] = [];
-  for (const f of fields) {
-    const nk = normKey(f.key);
-    const nl = f.label ? normKey(f.label) : nk;
-    if (seen.has(nk) || seen.has(nl)) continue;
-    seen.add(nk);
-    seen.add(nl);
-    out.push(f);
-  }
+/** Keep only configured keys from a row. */
+export function pickConfigured(row: Row, fields: FieldDef[]): Row {
+  const out: Row = {};
+  for (const f of fields) if (f.key in row) out[f.key] = row[f.key];
   return out;
 }
 
@@ -82,6 +75,8 @@ export default function DMRNew() {
   // New DMR is always Create_Gate_Service. No dropdown.
   // Fallback to any gate-shaped API if Create_Gate_Service isn't configured yet.
   const selectedName = useMemo(() => {
+    const dmr = apis.find((a) => /^\s*create[_ ]?dmr\s*$/i.test(a.name));
+    if (dmr) return dmr.name;
     const cgs = apis.find((a) => /create[_ ]?gate[_ ]?service/i.test(a.name));
     if (cgs) return cgs.name;
     const gate = apis.find((a) => /gate/i.test(a.name));
@@ -107,14 +102,9 @@ export default function DMRNew() {
     api?.requestItemFields ??
     []
   ).filter((f) => f.showInForm !== false && f.key);
-  // Show each field once: dedupe within header, then drop item fields already in the header.
-  const headerFields = dedupeFields(headerFieldsRaw);
-  const headerNormToKey = new Map<string, string>();
-  headerFields.forEach((f) => {
-    headerNormToKey.set(normKey(f.key), f.key);
-    if (f.label) headerNormToKey.set(normKey(f.label), f.key);
-  });
-  const itemFields = dedupeFields(itemFieldsRaw, new Set(headerNormToKey.keys()));
+  // Show every configured field exactly as set up on the API (no hiding).
+  const headerFields = headerFieldsRaw;
+  const itemFields = itemFieldsRaw;
 
   const [header, setHeader] = useState<Row>(() => ({
     ...emptyRowFromFields(headerFields),
@@ -125,10 +115,10 @@ export default function DMRNew() {
   );
 
   const amountKeys = new Set<string>(GATE_AMOUNT_KEYS as readonly string[]);
-  const plantField = headerFields.find((f) => f.key === "plant");
-  const poBoxNorms = new Set([normKey(PO_NUMBER_FIELD.key), normKey(OBD_FIELD.key)]);
+  const plantField = headerFields.find((f) => normKey(f.key) === "plant");
+  const poBoxKeys = new Set([PO_NUMBER_FIELD.key, OBD_FIELD.key]);
   const gridFields = headerFields.filter(
-    (f) => !amountKeys.has(f.key) && f.key !== "plant" && !poBoxNorms.has(normKey(f.key)),
+    (f) => !amountKeys.has(f.key) && f !== plantField && !poBoxKeys.has(f.key),
   );
   const amountFields = headerFields.filter((f) => amountKeys.has(f.key));
 
@@ -236,19 +226,10 @@ export default function DMRNew() {
       }
     }
     const childKey = api.childKey ?? "_Item";
-    const body: Record<string, unknown> = { ...header };
+    // Send only the fields configured on the API, with the values typed on screen.
+    const body: Record<string, unknown> = pickConfigured(header, headerFieldsRaw);
     if (itemFieldsRaw.length) {
-      // Item fields hidden as duplicates of header fields get the header value.
-      const hidden = itemFieldsRaw.filter((f) => !itemFields.some((i) => i.key === f.key));
-      body[childKey] = items.map((row) => {
-        const out = { ...row };
-        for (const f of hidden) {
-          const hk =
-            headerNormToKey.get(normKey(f.key)) ?? (f.label ? headerNormToKey.get(normKey(f.label)) : undefined);
-          if (hk && (out[f.key] === undefined || out[f.key] === "")) out[f.key] = header[hk];
-        }
-        return out;
-      });
+      body[childKey] = items.map((row) => pickConfigured(row, itemFieldsRaw));
     }
 
     if (!proxyConfigured) {

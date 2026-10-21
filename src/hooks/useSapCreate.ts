@@ -25,15 +25,21 @@ export interface SubmitOptions {
  * Strip empty / null / undefined keys and coerce values to types SAP OData v4 accepts.
  * SAP rejects empty strings on numeric/date/time properties with CX_SXML_PARSE_ERROR.
  */
-function sanitizeRow(row: Record<string, unknown>, fields: FieldDef[]): Record<string, unknown> {
+export function sanitizeRow(row: Record<string, unknown>, fields: FieldDef[]): Record<string, unknown> {
   const typeByKey = new Map(fields.map((f) => [f.key, f.type] as const));
   const out: Record<string, unknown> = {};
   for (const [k, raw] of Object.entries(row)) {
     if (raw === null || raw === undefined) continue;
+    if (fields.length && !typeByKey.has(k)) continue;
     const t = typeByKey.get(k);
     if (typeof raw === "string") {
       const v = raw.trim();
-      if (v === "") continue;
+      if (v === "") {
+        // Text fields go as "" (SAP accepts); blank number/date/time are rejected, so skip.
+        if (t === "number" || t === "date" || t === "time") continue;
+        out[k] = "";
+        continue;
+      }
       if (t === "number") {
         const n = Number(v);
         if (Number.isNaN(n)) continue;

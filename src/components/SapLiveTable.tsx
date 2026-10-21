@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +32,14 @@ interface Props {
   onEdit?: (row: Record<string, unknown>) => void;
   itemUpdateApi?: SapApi;
   onItemSaved?: () => void;
+  selectable?: boolean;
+  /** Reports loaded rows, the displayed columns and the selected rows. */
+  onDataChange?: (data: {
+    rows: Record<string, unknown>[];
+    selected: Record<string, unknown>[];
+    columns: ColumnDef[];
+    childColumns?: ColumnDef[];
+  }) => void;
 }
 
 function formatCell(value: unknown, col: ColumnDef): string {
@@ -45,7 +55,7 @@ function formatCell(value: unknown, col: ColumnDef): string {
   }
 }
 
-export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }: Props) {
+export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, selectable, onDataChange }: Props) {
   const { rows, loading, error, lastFetched, proxyConfigured, refresh } = useSapProxy(api, schema);
 
   const [openRow, setOpenRow] = useState<{
@@ -73,12 +83,54 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
   const viewSchema = useMemo(() => ({ ...schema, columns, childColumns }), [schema, columns, childColumns]);
   const hasChildren = Boolean(schema.childKey && childColumns?.length);
 
+  const allRows = rows as Record<string, unknown>[];
+  const keyOf = (row: Record<string, unknown>, idx: number) => String(getPath(row, schema.rowKey) ?? idx);
+  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const total = allRows.length;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const start = (safePage - 1) * pageSize;
+  const pageRows = allRows.slice(start, start + pageSize);
+
+  useEffect(() => {
+    if (!onDataChange) return;
+    onDataChange({
+      rows: allRows,
+      selected: allRows.filter((r, i) => selected.has(keyOf(r, i))),
+      columns,
+      childColumns,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRows, selected, columns, childColumns]);
+
+  const pageKeys = pageRows.map((r, i) => keyOf(r, start + i));
+  const allOnPage = pageKeys.length > 0 && pageKeys.every((k) => selected.has(k));
+  const toggleAllOnPage = () =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      pageKeys.forEach((k) => (allOnPage ? next.delete(k) : next.add(k)));
+      return next;
+    });
+  const toggleOne = (k: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(k) ? next.delete(k) : next.add(k);
+      return next;
+    });
+  const extraCols = (selectable ? 1 : 0) + (hasChildren ? 1 : 0) + (onEdit ? 1 : 0);
+
   return (
     <div className="rounded-xl border bg-card shadow-card">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold">{schema.label}</h3>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+            {total} record{total === 1 ? "" : "s"}
+            {selected.size > 0 && ` · ${selected.size} selected`}
+          </span>
           {proxyConfigured ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
               <Wifi className="h-3 w-3" /> Live
@@ -203,6 +255,11 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40">
+                {selectable && (
+                  <TableHead className="w-10">
+                    <Checkbox checked={allOnPage} onCheckedChange={toggleAllOnPage} aria-label="Select all on this page" />
+                  </TableHead>
+                )}
                 {columns.map((c) => (
                   <TableHead
                     key={c.path}
@@ -230,7 +287,7 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
               {loading && rows.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={columns.length + (hasChildren ? 1 : 0) + (onEdit ? 1 : 0)}
+                    colSpan={columns.length + extraCols}
                     className="py-8 text-center text-sm text-muted-foreground"
                   >
                     Loading…
@@ -240,15 +297,16 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
               {!loading && rows.length === 0 && !error && (
                 <TableRow>
                   <TableCell
-                    colSpan={columns.length + (hasChildren ? 1 : 0) + (onEdit ? 1 : 0)}
+                    colSpan={columns.length + extraCols}
                     className="py-8 text-center text-sm text-muted-foreground"
                   >
                     No records returned by SAP.
                   </TableCell>
                 </TableRow>
               )}
-              {rows.map((row, idx) => {
-                const key = String(getPath(row, schema.rowKey) ?? idx);
+              {pageRows.map((row, i) => {
+                const idx = start + i;
+                const key = keyOf(row, idx);
                 const children = hasChildren
                   ? ((getPath(row, schema.childKey!) as Record<string, unknown>[]) ?? [])
                   : [];
@@ -256,7 +314,12 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
                 const editKey = keyFieldName ? row[keyFieldName] : undefined;
                 const canEdit = editKey !== undefined && editKey !== null && editKey !== "";
                 return (
-                  <TableRow key={key} className="hover:bg-muted/30">
+                  <TableRow key={key} className="hover:bg-muted/30" data-state={selected.has(key) ? "selected" : undefined}>
+                    {selectable && (
+                      <TableCell className="w-10">
+                        <Checkbox checked={selected.has(key)} onCheckedChange={() => toggleOne(key)} aria-label={`Select ${key}`} />
+                      </TableCell>
+                    )}
                     {columns.map((c) => (
                       <TableCell
                         key={c.path}
@@ -302,6 +365,34 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved }
               })}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      {proxyConfigured && total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-xs text-muted-foreground">
+          <div>
+            Showing {start + 1}–{Math.min(start + pageSize, total)} of {total} entries
+          </div>
+          <div className="flex items-center gap-2">
+            <span>Rows per page</span>
+            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
+              <SelectTrigger className="h-8 w-20"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[10, 25, 50, 100].map((n) => (
+                  <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>
+              Previous
+            </Button>
+            <span className="px-1 font-medium text-foreground">
+              Page {safePage} of {pageCount}
+            </span>
+            <Button variant="outline" size="sm" disabled={safePage >= pageCount} onClick={() => setPage(safePage + 1)}>
+              Next
+            </Button>
+          </div>
         </div>
       )}
 

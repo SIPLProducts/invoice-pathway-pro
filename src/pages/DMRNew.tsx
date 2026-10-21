@@ -539,45 +539,6 @@ export default function DMRNew() {
               {!poLookup.loading && poLookup.error && (
                 <div className="mt-3 text-xs font-medium text-destructive">{poLookup.error}</div>
               )}
-              {!poLookup.loading && poLookup.lines.length > 0 && (
-                <div className="mt-4">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    PO Line Items
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                          {PO_LINE_FIELDS.map((f) => (
-                            <th
-                              key={f.key}
-                              className={`whitespace-nowrap py-2 pr-3 font-medium ${f.align === "right" ? "text-right" : ""}`}
-                            >
-                              {f.label || f.key}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {poLookup.lines.map((row, idx) => (
-                          <tr key={idx} className="border-b last:border-0">
-                            {PO_LINE_FIELDS.map((f) => (
-                              <td
-                                key={f.key}
-                                className={`whitespace-nowrap py-1.5 pr-3 ${f.align === "right" ? "text-right font-mono" : ""}`}
-                              >
-                                {row[f.key] === null || row[f.key] === undefined
-                                  ? "—"
-                                  : String(row[f.key])}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
             </Section>
 
             <Dialog open={obdOpen} onOpenChange={setObdOpen}>
@@ -642,7 +603,8 @@ export default function DMRNew() {
                         {itemFields.map((f) => (
                           <th
                             key={f.key}
-                            className={`py-2 pr-2 font-medium ${f.align === "right" ? "text-right" : ""}`}
+                            style={{ minWidth: itemColWidth(f) }}
+                            className={`whitespace-nowrap py-2 pr-2 font-medium ${f.align === "right" ? "text-right" : ""}`}
                           >
                             {f.label || f.key}
                             {f.required ? " *" : ""}
@@ -655,7 +617,7 @@ export default function DMRNew() {
                       {items.map((row, idx) => (
                         <tr key={idx} className="border-b last:border-0">
                           {itemFields.map((f) => (
-                            <td key={f.key} className="py-1.5 pr-2">
+                            <td key={f.key} className="py-1.5 pr-2" style={{ minWidth: itemColWidth(f) }}>
                               <FieldInput
                                 field={f}
                                 compact
@@ -702,6 +664,13 @@ export default function DMRNew() {
       )}
     </>
   );
+}
+
+function itemColWidth(f: FieldDef): number {
+  if (/desc|name|text|remark/i.test(f.key)) return 260;
+  if (f.type === "number") return 120;
+  if (f.type === "date" || f.type === "time") return 140;
+  return 160;
 }
 
 function FieldInput({

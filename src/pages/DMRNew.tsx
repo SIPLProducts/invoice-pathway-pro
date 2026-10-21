@@ -226,19 +226,10 @@ export default function DMRNew() {
       }
     }
     const childKey = api.childKey ?? "_Item";
-    const body: Record<string, unknown> = { ...header };
+    // Send only the fields configured on the API, with the values typed on screen.
+    const body: Record<string, unknown> = pickConfigured(header, headerFieldsRaw);
     if (itemFieldsRaw.length) {
-      // Item fields hidden as duplicates of header fields get the header value.
-      const hidden = itemFieldsRaw.filter((f) => !itemFields.some((i) => i.key === f.key));
-      body[childKey] = items.map((row) => {
-        const out = { ...row };
-        for (const f of hidden) {
-          const hk =
-            headerNormToKey.get(normKey(f.key)) ?? (f.label ? headerNormToKey.get(normKey(f.label)) : undefined);
-          if (hk && (out[f.key] === undefined || out[f.key] === "")) out[f.key] = header[hk];
-        }
-        return out;
-      });
+      body[childKey] = items.map((row) => pickConfigured(row, itemFieldsRaw));
     }
 
     if (!proxyConfigured) {

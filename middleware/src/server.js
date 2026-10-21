@@ -7,6 +7,7 @@ const morgan = require("morgan");
 
 const gateRoutes = require("./routes/gate");
 const healthRoutes = require("./routes/health");
+const sapTarget = require("./sapTarget");
 const { errorEnvelope } = require("./util/errors");
 
 const PORT = Number(process.env.PORT || 8080);
@@ -35,6 +36,9 @@ app.use(
       "ngrok-skip-browser-warning",
       "x-sap-jsessionid",
       "x-sap-vcap-id",
+      "x-sap-service-path",
+      "x-sap-header-entity",
+      "x-sap-item-entity",
     ],
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   }),
@@ -47,6 +51,7 @@ app.use((_req, res, next) => {
 });
 
 app.use(express.json({ limit: "2mb" }));
+app.use(sapTarget.middleware);
 app.use(
   morgan("tiny", {
     skip: (req) => req.path === "/api/health",

@@ -39,7 +39,6 @@ export function AddApiDialog() {
   const [form, setForm] = useState({
     name: "",
     description: "",
-    baseUrl: "http://10.10.6.115:8000",
     endpoint: "",
     method: "POST" as SapMethod,
     auth: "Basic" as SapAuth,
@@ -56,8 +55,7 @@ export function AddApiDialog() {
     setForm({
       name: "",
       description: "",
-      baseUrl: "http://10.10.6.115:8000",
-      endpoint: "",
+    endpoint: "",
       method: "POST",
       auth: "Basic",
       tag: "Proxy",
@@ -83,7 +81,6 @@ export function AddApiDialog() {
     const api: SapApi = {
       name: form.name.trim(),
       description: form.description.trim(),
-      baseUrl: form.baseUrl.trim(),
       endpoint: form.endpoint.trim(),
       method: form.method,
       auth: form.auth,
@@ -143,12 +140,7 @@ export function AddApiDialog() {
               onChange={(e) => set("description", e.target.value)}
             />
           </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Base URL</Label>
-            <Input value={form.baseUrl} onChange={(e) => set("baseUrl", e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 md:col-span-2">
             <Label className="text-xs font-medium">Endpoint Path *</Label>
             <Input
               placeholder="/mrb/..."

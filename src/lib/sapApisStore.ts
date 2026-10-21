@@ -62,7 +62,7 @@ export interface MiddlewareConfig {
 export interface SapApi {
   name: string;
   description: string;
-  baseUrl: string;
+  baseUrl?: string;
   endpoint: string;
   method: SapMethod;
   auth: SapAuth;

@@ -114,7 +114,7 @@ export default function SAPSyncMonitor() {
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">{a.description}</p>
                       <code className="mt-2 inline-block rounded bg-muted px-2 py-1 font-mono text-xs">
-                        {a.baseUrl}{a.endpoint}
+                        {a.endpoint}
                       </code>
                       {a.autoSync.lastSync && (
                         <div className="mt-2 text-xs text-muted-foreground">Last synced: {a.autoSync.lastSync}</div>

@@ -182,6 +182,8 @@ export default function DMRNew() {
       setItems(ocr.items.map((row) => ({ ...emptyRowFromFields(itemFields), ...row })));
     }
     setOcrApplied(true);
+    // Drop OCR data from history so refresh/back never re-fills a later blank form.
+    navigate(location.pathname, { replace: true, state: null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ocr, api, ocrApplied, itemFields.length]);
 

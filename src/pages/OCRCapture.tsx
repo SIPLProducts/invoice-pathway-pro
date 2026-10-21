@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Camera, FileScan, Keyboard, Upload } from "lucide-react";
+import { Keyboard } from "lucide-react";
 import { OcrCaptureCard } from "@/components/OcrCaptureCard";
 import { useSapApis, type FieldDef } from "@/lib/sapApisStore";
 
@@ -44,34 +44,6 @@ export default function OCRCapture() {
           navigate("/dmr/new", { state: { ocr: { header, items, confidence } } })
         }
       />
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Tip icon={Camera} title="Take Photo" text="Use the mobile camera to snap the invoice." />
-        <Tip icon={Upload} title="Upload PDF / Image" text="Pick a scanned PDF or image (max 20 MB)." />
-        <button
-          onClick={() => navigate("/dmr/new")}
-          className="group flex flex-col items-start rounded-xl border-2 border-dashed bg-card p-5 text-left transition-all hover:border-primary hover:shadow-elegant"
-        >
-          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground">
-            <Keyboard className="h-5 w-5" />
-          </div>
-          <div className="font-display font-semibold">Manual Entry</div>
-          <div className="mt-1 text-sm text-muted-foreground">Skip OCR and fill the DMR form yourself.</div>
-          <div className="mt-3 text-xs font-medium text-primary group-hover:underline">Open Create DMR →</div>
-        </button>
-      </div>
     </>
-  );
-}
-
-function Tip({ icon: Icon, title, text }: { icon: typeof FileScan; title: string; text: string }) {
-  return (
-    <div className="rounded-xl border bg-card p-5">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-        <Icon className="h-5 w-5 text-primary" />
-      </div>
-      <div className="font-display font-semibold">{title}</div>
-      <div className="mt-1 text-sm text-muted-foreground">{text}</div>
-    </div>
   );
 }

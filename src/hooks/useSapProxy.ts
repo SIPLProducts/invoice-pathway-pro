@@ -1,3 +1,4 @@
+import { getSapConnection, useSapConnection } from "@/lib/sapConnection";
 import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SapApiSchema } from "@/lib/sapApiSchemas";

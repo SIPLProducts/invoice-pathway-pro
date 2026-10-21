@@ -47,15 +47,3 @@ export default function OCRCapture() {
     </>
   );
 }
-
-function Tip({ icon: Icon, title, text }: { icon: typeof FileScan; title: string; text: string }) {
-  return (
-    <div className="rounded-xl border bg-card p-5">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-        <Icon className="h-5 w-5 text-primary" />
-      </div>
-      <div className="font-display font-semibold">{title}</div>
-      <div className="mt-1 text-sm text-muted-foreground">{text}</div>
-    </div>
-  );
-}

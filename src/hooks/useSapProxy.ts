@@ -1,3 +1,4 @@
+import { getSapConnection, useSapConnection } from "@/lib/sapConnection";
 import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SapApiSchema } from "@/lib/sapApiSchemas";
@@ -48,7 +49,9 @@ export function useSapProxy<T = Record<string, unknown>>(
   api: SapApi | null | undefined,
   schema: SapApiSchema,
 ): UseSapProxyResult<T> {
-  const proxyUrl = useMemo(() => resolveProxyUrl(api), [api]);
+  const conn = useSapConnection();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const proxyUrl = useMemo(() => resolveProxyUrl(api), [api, conn.middlewareUrl]);
   const proxyConfigured = Boolean(proxyUrl);
   const secret = api?.middleware?.secret ?? "";
   const session = useSapSession();

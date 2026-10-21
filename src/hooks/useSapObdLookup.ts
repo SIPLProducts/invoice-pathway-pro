@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { getPath } from "@/lib/getPath";
-import { resolveProxyUrl } from "@/hooks/useSapProxy";
+import { resolveProxyUrl, resolveProxySecret } from "@/hooks/useSapProxy";
 import { useSapApis, type SapApi } from "@/lib/sapApisStore";
 import {
   getSapSessionHeaders,

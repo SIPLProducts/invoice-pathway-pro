@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Send, Plus, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Send, Plus, Trash2, Loader2, CheckCircle2 } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useSapApis, GATE_AMOUNT_KEYS, type FieldDef, type SapApi } from "@/lib/sapApisStore";
 import { useSapCreate } from "@/hooks/useSapCreate";
@@ -259,6 +260,7 @@ export default function DMRNew() {
   }, [ocr, api, ocrApplied, itemFields.length]);
 
   const { submit, loading, proxyConfigured } = useSapCreate(api ?? null);
+  const [created, setCreated] = useState<{ id: string; data: Row } | null>(null);
   const poLookup = useSapPoLookup();
   const obdLookup = useSapObdLookup();
 
@@ -340,8 +342,69 @@ export default function DMRNew() {
     }
   };
 
+  const createdItems = created ? ((created.data[api?.childKey ?? "_Item"] as Row[] | undefined) ?? []) : [];
+  const createdFields = created
+    ? headerFieldsRaw
+        .filter((f) => f.sendToSap !== false)
+        .map((f) => ({ label: f.label || f.key, value: created.data[f.key] ?? header[f.key] }))
+        .filter((x) => x.value !== undefined && x.value !== null && x.value !== "")
+    : [];
+
   return (
     <>
+      <Dialog
+        open={!!created}
+        onOpenChange={(o) => {
+          if (!o) {
+            setCreated(null);
+            navigate("/dmr/sap-gate-entries");
+          }
+        }}
+      >
+        <DialogContent className="max-w-md text-center">
+          <div className="mx-auto mt-2 flex h-20 w-20 items-center justify-center rounded-full border-4 border-success/30 bg-success/10 animate-in zoom-in-50 duration-500">
+            <CheckCircle2 className="h-12 w-12 text-success" />
+          </div>
+          <DialogTitle className="text-2xl">DMR Created!</DialogTitle>
+          <p className="text-sm text-muted-foreground">Gate entry saved in SAP successfully.</p>
+          <div className="mx-auto rounded-lg border border-primary/30 bg-primary/5 px-5 py-3">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Gate ID</div>
+            <div className="font-mono text-2xl font-bold text-primary">{created?.id || "—"}</div>
+          </div>
+          <div className="max-h-60 overflow-y-auto rounded-md border text-left text-sm">
+            {createdFields.map((x) => (
+              <div key={x.label} className="flex justify-between gap-3 border-b px-3 py-1.5 last:border-b-0">
+                <span className="text-muted-foreground">{x.label}</span>
+                <span className="font-medium">{String(x.value)}</span>
+              </div>
+            ))}
+            <div className="flex justify-between gap-3 px-3 py-1.5">
+              <span className="text-muted-foreground">Line items</span>
+              <span className="font-medium">{createdItems.length || items.length}</span>
+            </div>
+          </div>
+          <div className="flex justify-center gap-2 pt-1">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCreated(null);
+                setHeader(emptyRowFromFields(headerFields));
+                setItems([emptyRowFromFields(itemFields)]);
+              }}
+            >
+              Create another
+            </Button>
+            <Button
+              onClick={() => {
+                setCreated(null);
+                navigate("/dmr/sap-gate-entries");
+              }}
+            >
+              OK
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Link
         to="/dmr/sap-gate-entries"
         className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"

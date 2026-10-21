@@ -140,6 +140,7 @@ export function FieldsEditor({
                 <>
                   <th className="px-3 py-2 text-center font-medium">Required</th>
                   <th className="px-3 py-2 text-center font-medium">In Form</th>
+                  <th className="px-3 py-2 text-center font-medium">Send to SAP</th>
                   <th className="px-3 py-2 text-left font-medium">Default</th>
                 </>
               ) : (
@@ -203,6 +204,12 @@ export function FieldsEditor({
                       <Switch
                         checked={f.showInForm !== false}
                         onCheckedChange={(v) => update(i, { showInForm: v })}
+                      />
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      <Switch
+                        checked={f.sendToSap !== false}
+                        onCheckedChange={(v) => update(i, { sendToSap: v })}
                       />
                     </td>
                     <td className="px-2 py-1.5">

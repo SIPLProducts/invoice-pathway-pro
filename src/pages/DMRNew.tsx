@@ -315,9 +315,11 @@ export default function DMRNew() {
 
     const res = await submit(body, { headerFields: headerFieldsRaw, itemFields: itemFieldsRaw, childKey });
     if (res.ok) {
-      const id = (res.data as Record<string, unknown> | undefined)?.[api.rowKey ?? "gate_id"] ?? "";
-      toast.success(`Created ${id || "record"} in SAP`);
-      navigate("/dmr/sap-gate-entries");
+      const d = (res.data as Record<string, unknown> | undefined) ?? {};
+      const norm = (k: string) => k.toLowerCase().replace(/_/g, "");
+      const want = norm(api.rowKey ?? "GateId");
+      const idKey = Object.keys(d).find((k) => norm(k) === want) ?? Object.keys(d).find((k) => norm(k) === "gateid");
+      setCreated({ id: idKey ? String(d[idKey] ?? "") : "", data: d });
     } else {
       const sapErr = (res.sapBody as { error?: { hint?: string; code?: string } } | undefined)
         ?.error;

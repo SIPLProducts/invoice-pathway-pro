@@ -33,6 +33,7 @@ interface Props {
   itemUpdateApi?: SapApi;
   onItemSaved?: () => void;
   selectable?: boolean;
+  onRowClick?: (row: Record<string, unknown>) => void;
   /** Reports loaded rows, the displayed columns and the selected rows. */
   onDataChange?: (data: {
     rows: Record<string, unknown>[];
@@ -55,7 +56,7 @@ function formatCell(value: unknown, col: ColumnDef): string {
   }
 }
 
-export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, selectable, onDataChange }: Props) {
+export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, selectable, onDataChange, onRowClick }: Props) {
   const { rows: rawRows, loading, error, lastFetched, proxyConfigured, refresh } = useSapProxy(api, schema);
   // Add a derived Total Quantity (sum of line-item Quantity) to each header row.
   const rows = useMemo(() => {
@@ -333,7 +334,7 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
                 const editKey = keyFieldName ? row[keyFieldName] : undefined;
                 const canEdit = editKey !== undefined && editKey !== null && editKey !== "";
                 return (
-                  <TableRow key={key} className="hover:bg-muted/30" data-state={selected.has(key) ? "selected" : undefined}>
+                  <TableRow key={key} className={cn("hover:bg-muted/30", onRowClick && "cursor-pointer")} onClick={onRowClick ? () => onRowClick(row) : undefined} title={onRowClick ? "Click to download PDF" : undefined} data-state={selected.has(key) ? "selected" : undefined}>
                     {selectable && (
                       <TableCell className="w-10">
                         <Checkbox checked={selected.has(key)} onCheckedChange={() => toggleOne(key)} aria-label={`Select ${key}`} />
@@ -357,7 +358,7 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
                           size="sm"
                           className="h-7 gap-1.5 text-xs"
                           disabled={children.length === 0}
-                          onClick={() => setOpenRow({ key, items: children, parent: row })}
+                          onClick={(e) => { e.stopPropagation(); setOpenRow({ key, items: children, parent: row }); }}
                         >
                           <Package className="h-3 w-3" />
                           {children.length} item{children.length === 1 ? "" : "s"}
@@ -371,7 +372,7 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
                           size="sm"
                           className="h-7 gap-1.5 text-xs"
                           disabled={!canEdit}
-                          onClick={() => onEdit(row)}
+                          onClick={(e) => { e.stopPropagation(); onEdit(row); }}
                           title={canEdit ? "Edit header" : `Missing ${String(keyFieldName)}`}
                         >
                           <Pencil className="h-3 w-3" />

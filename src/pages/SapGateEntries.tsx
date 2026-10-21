@@ -200,6 +200,24 @@ export default function SapGateEntries() {
           <>
             <Button
               variant="outline"
+              disabled={data.selected.length !== 1 || pdfBusy}
+              onClick={async () => {
+                const row = data.selected[0];
+                if (!row) return;
+                setPdfBusy(true);
+                try {
+                  await exportDmrPdf([row], data.columns, childKey, data.childColumns, logoUrl);
+                } catch (e) {
+                  toast.error("Could not create PDF", { description: String(e) });
+                } finally {
+                  setPdfBusy(false);
+                }
+              }}
+            >
+              <FileDown className="h-4 w-4" /> Download PDF
+            </Button>
+            <Button
+              variant="outline"
               disabled={data.rows.length === 0}
               onClick={() =>
                 exportDmrExcel(data.rows, data.columns, childKey, data.childColumns)

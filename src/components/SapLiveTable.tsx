@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -107,7 +106,7 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
   const keyOf = (row: Record<string, unknown>, idx: number) => String(getPath(row, schema.rowKey) ?? idx);
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const total = allRows.length;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(page, pageCount);
@@ -118,27 +117,14 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
     if (!onDataChange) return;
     onDataChange({
       rows: allRows,
-      selected: allRows.filter((r, i) => selected.has(keyOf(r, i))),
+      selected: selectedKey
+        ? allRows.filter((r, i) => keyOf(r, i) === selectedKey)
+        : [],
       columns,
       childColumns,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allRows, selected, columns, childColumns]);
-
-  const pageKeys = pageRows.map((r, i) => keyOf(r, start + i));
-  const allOnPage = pageKeys.length > 0 && pageKeys.every((k) => selected.has(k));
-  const toggleAllOnPage = () =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      pageKeys.forEach((k) => (allOnPage ? next.delete(k) : next.add(k)));
-      return next;
-    });
-  const toggleOne = (k: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      next.has(k) ? next.delete(k) : next.add(k);
-      return next;
-    });
+  }, [allRows, selectedKey, columns, childColumns]);
   const extraCols = (selectable ? 1 : 0) + (hasChildren ? 1 : 0) + (onEdit ? 1 : 0);
 
   return (
@@ -149,7 +135,7 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
           <h3 className="text-sm font-semibold">{schema.label}</h3>
           <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
             {total} record{total === 1 ? "" : "s"}
-            {selected.size > 0 && ` · ${selected.size} selected`}
+            {selectedKey && ` · 1 selected`}
           </span>
           {proxyConfigured ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
@@ -276,9 +262,7 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
             <TableHeader>
               <TableRow className="bg-muted/40">
                 {selectable && (
-                  <TableHead className="w-10">
-                    <Checkbox checked={allOnPage} onCheckedChange={toggleAllOnPage} aria-label="Select all on this page" />
-                  </TableHead>
+                  <TableHead className="w-10" aria-label="Select row" />
                 )}
                 {columns.map((c) => (
                   <TableHead
@@ -334,10 +318,18 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
                 const editKey = keyFieldName ? row[keyFieldName] : undefined;
                 const canEdit = editKey !== undefined && editKey !== null && editKey !== "";
                 return (
-                  <TableRow key={key} className={cn("hover:bg-muted/30", onRowClick && "cursor-pointer")} onClick={onRowClick ? () => onRowClick(row) : undefined} title={onRowClick ? "Click to download PDF" : undefined} data-state={selected.has(key) ? "selected" : undefined}>
+                  <TableRow key={key} className={cn("hover:bg-muted/30", onRowClick && "cursor-pointer")} onClick={() => { setSelectedKey(key); onRowClick?.(row); }} title={onRowClick ? "Click to download PDF" : undefined} data-state={selectedKey === key ? "selected" : undefined}>
                     {selectable && (
                       <TableCell className="w-10">
-                        <Checkbox checked={selected.has(key)} onCheckedChange={() => toggleOne(key)} aria-label={`Select ${key}`} />
+                        <input
+                          type="radio"
+                          name="sap-row-select"
+                          className="h-4 w-4 cursor-pointer accent-primary"
+                          checked={selectedKey === key}
+                          onChange={() => setSelectedKey(key)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Select ${key}`}
+                        />
                       </TableCell>
                     )}
                     {columns.map((c) => (

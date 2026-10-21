@@ -218,7 +218,8 @@ async function ensureCsrf(force = false, cookies = "") {
   if (csrfToken && !force && !stale) return csrfToken;
 
   const cfg = buildRequestConfig(cookies, { "x-csrf-token": "fetch" });
-  const res = await http.get(withClient(`/${sapTarget.current().headerEntity}?$top=0`), cfg);
+  // Fetch the token from the service document root: works for any OData service.
+  const res = await http.get(withClient(`/`), cfg);
   ensureJson(res, "CSRF fetch", Boolean(cookies));
   if (res.status >= 400) {
     const err = new Error(`CSRF fetch failed (${res.status})`);

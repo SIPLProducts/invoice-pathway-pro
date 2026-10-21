@@ -1,3 +1,4 @@
+import { pickRowValue } from "@/hooks/useSapUpdate";
 import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useState } from "react";
 import type { SapApi, FieldDef } from "@/lib/sapApisStore";
@@ -131,8 +132,8 @@ function resolveItemUrl(
   let url = template;
   for (const t of tokens) {
     const key = t[1];
-    let v: unknown = childRow[key];
-    if (v === undefined || v === null || v === "") v = parentRow[key];
+    let v: unknown = pickRowValue(childRow, key);
+    if (v === undefined || v === null || v === "") v = pickRowValue(parentRow, key);
     if (v === undefined || v === null || v === "") {
       return { url: null, missing: key };
     }

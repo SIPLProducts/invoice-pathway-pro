@@ -9,7 +9,7 @@
  *
  * Returns: { body: string, boundary: string }
  */
-function buildHeaderItemsBatch({ gateId, header, items = [], headerEntity = "GateHeader", itemEntity = "GateItem" }) {
+function buildHeaderItemsBatch({ gateId, header, items = [], headerPath, itemPath }) {
   const batchBoundary = "batch_" + Math.random().toString(36).slice(2);
   const changesetBoundary = "changeset_" + Math.random().toString(36).slice(2);
 
@@ -17,13 +17,11 @@ function buildHeaderItemsBatch({ gateId, header, items = [], headerEntity = "Gat
   let cid = 1;
 
   if (header && Object.keys(header).length) {
-    parts.push(buildChangePart(cid++, "PATCH", `${headerEntity}(gate_id='${gateId}')`, header));
+    parts.push(buildChangePart(cid++, "PATCH", headerPath(gateId), header));
   }
   for (const item of items) {
     const { item_no: itemNo, ...patch } = item;
-    parts.push(
-      buildChangePart(cid++, "PATCH", `${itemEntity}(gate_id='${gateId}',item_no='${itemNo}')`, patch),
-    );
+    parts.push(buildChangePart(cid++, "PATCH", itemPath(gateId, itemNo), patch));
   }
 
   const changeset =

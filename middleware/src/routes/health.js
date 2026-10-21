@@ -10,7 +10,7 @@ const router = express.Router();
 router.get("/sap", async (req, res) => {
   const cookies = buildCookieFromHeaders(req);
   try {
-    const data = await sapGet(`/${sapTarget.current().headerEntity}?$top=1`, cookies);
+    const data = await sapGet(`/${sapTarget.headerEntity()}?$top=1`, cookies);
     const rows = Array.isArray(data?.value) ? data.value.length : 0;
     // Re-read auth info AFTER the call so any auto-fallback is reflected.
     const info = getAuthInfo();
@@ -32,6 +32,7 @@ router.get("/sap", async (req, res) => {
       hint: e.hint || null,
       fixSteps: e.fixSteps || null,
       usedBrowserSession: Boolean(cookies),
+      target: sapTarget.current(),
     });
   }
 });

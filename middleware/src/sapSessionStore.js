@@ -65,7 +65,7 @@ async function loginToSap() {
     }
 
     const t = require("./sapTarget").current();
-    const url = `${SAP_BASE_URL}${t.servicePath}/${t.headerEntity}?$top=0&sap-client=${SAP_CLIENT}`;
+    const url = `${SAP_BASE_URL}${t.servicePath}/?sap-client=${SAP_CLIENT}`;
     const res = await axios.get(url, {
       auth: { username: SAP_USER, password: SAP_PASSWORD },
       headers: { Accept: "application/json" },

@@ -7,6 +7,7 @@ import {
   markSapSessionActive,
   markSapSessionExpired,
 } from "@/lib/sapSession";
+import { getSapTargetHeaders, fillSapPath } from "@/lib/sapTarget";
 
 export type ObdLine = Record<string, string | number | boolean | null>;
 
@@ -68,10 +69,16 @@ export function useSapObdLookup(): UseSapObdLookupResult {
         return;
       }
 
-      const template = api.proxyPath || api.listEndpoint || "/api/obd/{obd_number}";
-      const path = template.includes("{obd_number}")
-        ? template.replace("{obd_number}", encodeURIComponent(obd))
-        : `${template.replace(/\/$/, "")}/${encodeURIComponent(obd)}`;
+      // Prefer the SAP endpoint configured in SAP API Settings (sent as-is to the
+      // middleware's generic OData route). Fall back to a custom proxy path.
+      const sapEndpoint = (api.endpoint ?? "").trim();
+      const useOdata = sapEndpoint.startsWith("/sap/");
+      const template = api.proxyPath || api.listEndpoint || "";
+      const path = useOdata
+        ? "/api/odata"
+        : template.includes("{obd_number}")
+          ? template.replace("{obd_number}", encodeURIComponent(obd))
+          : `${template.replace(/\/$/, "")}/${encodeURIComponent(obd)}`;
 
       setLoading(true);
       try {
@@ -79,7 +86,9 @@ export function useSapObdLookup(): UseSapObdLookupResult {
           Accept: "application/json",
           "ngrok-skip-browser-warning": "true",
           ...getSapSessionHeaders(),
+          ...getSapTargetHeaders(api),
         };
+        if (useOdata) headers["x-sap-path"] = fillSapPath(sapEndpoint, { obd_number: obd });
         { const s = resolveProxySecret(api); if (s) headers["x-proxy-secret"] = s; }
 
         const res = await fetch(`${proxyUrl}${path}`, { headers });

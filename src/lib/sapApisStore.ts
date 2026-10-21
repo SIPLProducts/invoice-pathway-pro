@@ -280,9 +280,9 @@ const seed: SapApi[] = [
     name: "ZUI_Gate_Service",
     description:
       "SAP BTP Public Cloud - Gate Service (RAP). GET/POST GateHeader via Node middleware proxy. Configure VITE_SAP_PROXY_URL on the frontend.",
-    baseUrl: "https://fa530628-e5cb-4817-8c70-9991654babd5.abap-web.us10.hana.ondemand.com",
+    baseUrl: "https://dde5e873-b32e-4495-9700-5a705108a5a6.abap-web.us10.hana.ondemand.com",
     endpoint:
-      "/sap/opu/odata4/sap/zui_gate_service/srvd_a2x/sap/zui_gate_service/0001/GateHeader?$expand=_Item&sap-client=100",
+      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd/sap/zsd_gate_entry/0001/ZC_GateHeader?$expand=_Item",
     method: "GET",
     auth: "Basic",
     status: "Active",
@@ -329,9 +329,9 @@ const seed: SapApi[] = [
     name: "Get DMR List",
     description:
       "Lists all SAP Gate Header records (with line items expanded) via the Node middleware proxy. Used by the DMR → SAP Gate Entries tab.",
-    baseUrl: "https://fa530628-e5cb-4817-8c70-9991654babd5.abap-web.us10.hana.ondemand.com",
+    baseUrl: "https://dde5e873-b32e-4495-9700-5a705108a5a6.abap-web.us10.hana.ondemand.com",
     endpoint:
-      "/sap/opu/odata4/sap/zui_gate_service/srvd_a2x/sap/zui_gate_service/0001/GateHeader?$expand=_Item&sap-client=100",
+      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd/sap/zsd_gate_entry/0001/ZC_GateHeader?$expand=_Item",
     method: "GET",
     auth: "Basic",
     status: "Active",
@@ -359,9 +359,9 @@ const seed: SapApi[] = [
     name: "Update Header Data",
     description:
       "PATCHes header fields on a single Gate Entry (gate_id) via the Node middleware. Used by the Edit Header dialog on DMR → SAP Gate Entries.",
-    baseUrl: "https://fa530628-e5cb-4817-8c70-9991654babd5.abap-web.us10.hana.ondemand.com",
+    baseUrl: "https://dde5e873-b32e-4495-9700-5a705108a5a6.abap-web.us10.hana.ondemand.com",
     endpoint:
-      "/sap/opu/odata4/sap/zui_gate_service/srvd_a2x/sap/zui_gate_service/0001/GateHeader(gate_id='{gate_id}')",
+      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd/sap/zsd_gate_entry/0001/ZC_GateHeader(GateId='{gate_id}')",
     method: "PATCH",
     auth: "Basic",
     status: "Active",
@@ -387,9 +387,9 @@ const seed: SapApi[] = [
     name: "Update Selected Line Item Data",
     description:
       "PATCHes a single Gate line item (gate_id + item_no) via the Node middleware. Used by the per-row Edit/Update inside the Items popup on DMR → SAP Gate Entries.",
-    baseUrl: "https://fa530628-e5cb-4817-8c70-9991654babd5.abap-web.us10.hana.ondemand.com",
+    baseUrl: "https://dde5e873-b32e-4495-9700-5a705108a5a6.abap-web.us10.hana.ondemand.com",
     endpoint:
-      "/sap/opu/odata4/sap/zui_gate_service/srvd_a2x/sap/zui_gate_service/0001/GateItem(gate_id='{gate_id}',item_no='{item_no}')",
+      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd/sap/zsd_gate_entry/0001/ZC_GateItem(GateId='{gate_id}',ItemNo='{item_no}')",
     method: "PATCH",
     auth: "Basic",
     status: "Active",
@@ -415,9 +415,9 @@ const seed: SapApi[] = [
     name: "Get PO Details",
     description:
       "Fetches Purchase Order line items for a PO number via the Node middleware. Used by the Enter button on the DMR → New Entry → Purchase Order Details box.",
-    baseUrl: "https://fa530628-e5cb-4817-8c70-9991654babd5.abap-web.us10.hana.ondemand.com",
+    baseUrl: "https://dde5e873-b32e-4495-9700-5a705108a5a6.abap-web.us10.hana.ondemand.com",
     endpoint:
-      "/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/api_purchaseorder/0001/PurchaseOrderItem?$filter=PurchaseOrder eq '{po_number}'&sap-client=100",
+      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd/sap/zsd_gate_entry/0001/ZC_GateHeader/com.sap.gateway.srvd.zsd_gate_entry.v0001.getPoLines(PoNumber='{po_number}')",
     method: "GET",
     auth: "Basic",
     status: "Active",
@@ -441,7 +441,7 @@ const seed: SapApi[] = [
     name: "Get OBD Details",
     description:
       "Fetches Outbound Delivery (OBD) line items via the Node middleware. Used by the Enter button beside the OBD field on DMR → New Entry.",
-    baseUrl: "https://fa530628-e5cb-4817-8c70-9991654babd5.abap-web.us10.hana.ondemand.com",
+    baseUrl: "https://dde5e873-b32e-4495-9700-5a705108a5a6.abap-web.us10.hana.ondemand.com",
     endpoint:
       "/sap/opu/odata4/sap/api_outbound_delivery/srvd_a2x/sap/outbounddelivery/0001/OutbDeliveryItem?$filter=OutboundDelivery eq '{obd_number}'&sap-client=100",
     method: "GET",
@@ -671,6 +671,31 @@ async function bootstrapCloud(): Promise<void> {
       } catch (e) {
         console.warn("[sapApisStore] Item-template self-heal failed (non-fatal).", e);
       }
+    }
+
+    // Move configs still pointing at the retired default SAP service onto the
+    // current defaults. Only rows whose endpoint is still the old untouched
+    // default are changed; anything the user edited is left alone.
+    try {
+      const RETIRED = "/sap/opu/odata4/sap/zui_gate_service/";
+      const RETIRED_PO = "/api_purchaseorder_2/";
+      const bySeed = new Map(seed.map((s) => [s.name, s]));
+      const moved = cloud
+        .filter((a) => {
+          const e = a.endpoint ?? "";
+          return (e.includes(RETIRED) || e.includes(RETIRED_PO)) && bySeed.has(a.name);
+        })
+        .map((a) => {
+          const s = bySeed.get(a.name)!;
+          return { ...a, endpoint: s.endpoint, baseUrl: s.baseUrl };
+        });
+      if (moved.length > 0) {
+        await bulkUpsert(moved);
+        cloud = await fetchAllFromCloud();
+        console.info(`[sapApisStore] Moved ${moved.length} API(s) to the current SAP service endpoints.`);
+      }
+    } catch (e) {
+      console.warn("[sapApisStore] Endpoint refresh failed (non-fatal).", e);
     }
 
     // One-time (per version) refresh of the gate-header request form fields so

@@ -1,3 +1,4 @@
+import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SapApiSchema } from "@/lib/sapApiSchemas";
 import type { SapApi } from "@/lib/sapApisStore";
@@ -65,6 +66,7 @@ export function useSapProxy<T = Record<string, unknown>>(
           Accept: "application/json",
           "ngrok-skip-browser-warning": "true",
           ...getSapSessionHeaders(),
+          ...getSapTargetHeaders(api),
         };
         if (secret) headers["x-proxy-secret"] = secret;
         const res = await fetch(`${proxyUrl}${schema.proxyPath}`, { headers });

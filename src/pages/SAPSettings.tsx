@@ -1,3 +1,4 @@
+import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
@@ -143,6 +144,7 @@ export default function SAPSettings() {
           Accept: "application/json",
           "ngrok-skip-browser-warning": "true",
           ...getSapSessionHeaders(),
+          ...getSapTargetHeaders(apis.find((a) => /^\/sap\//.test(a.endpoint ?? "") && a.middleware?.url) ?? apis.find((a) => /^\/sap\//.test(a.endpoint ?? ""))),
         },
       });
       const data = await res.json().catch(() => null);

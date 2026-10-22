@@ -360,29 +360,29 @@ export default function DMRNew() {
           }
         }}
       >
-        <DialogContent className="max-w-md text-center">
-          <div className="mx-auto mt-2 flex h-20 w-20 items-center justify-center rounded-full border-4 border-success/30 bg-success/10 animate-in zoom-in-50 duration-500">
-            <CheckCircle2 className="h-12 w-12 text-success" />
+        <DialogContent className="flex max-h-[85vh] max-w-lg flex-col gap-3 p-5 text-center">
+          <div className="mx-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 border-success/30 bg-success/10 animate-in zoom-in-50 duration-500">
+            <CheckCircle2 className="h-8 w-8 text-success" />
           </div>
-          <DialogTitle className="text-2xl">DMR Created!</DialogTitle>
-          <p className="text-sm text-muted-foreground">Gate entry saved in SAP successfully.</p>
-          <div className="mx-auto rounded-lg border border-primary/30 bg-primary/5 px-5 py-3">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Gate ID</div>
-            <div className="font-mono text-2xl font-bold text-primary">{created?.id || "—"}</div>
+          <DialogTitle className="text-xl">DMR Created!</DialogTitle>
+          <p className="-mt-2 text-xs text-muted-foreground">Gate entry saved in SAP successfully.</p>
+          <div className="mx-auto shrink-0 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Gate ID</div>
+            <div className="font-mono text-xl font-bold text-primary">{created?.id || "—"}</div>
           </div>
-          <div className="max-h-60 overflow-y-auto rounded-md border text-left text-sm">
+          <div className="grid max-h-[40vh] min-h-0 grid-cols-1 overflow-y-auto rounded-md border text-left text-xs sm:grid-cols-2">
             {createdFields.map((x) => (
-              <div key={x.label} className="flex justify-between gap-3 border-b px-3 py-1.5 last:border-b-0">
+              <div key={x.label} className="flex justify-between gap-3 border-b px-3 py-1">
                 <span className="text-muted-foreground">{x.label}</span>
-                <span className="font-medium">{String(x.value)}</span>
+                <span className="truncate font-medium">{String(x.value)}</span>
               </div>
             ))}
-            <div className="flex justify-between gap-3 px-3 py-1.5">
+            <div className="flex justify-between gap-3 px-3 py-1">
               <span className="text-muted-foreground">Line items</span>
               <span className="font-medium">{createdItems.length || items.length}</span>
             </div>
           </div>
-          <div className="flex justify-center gap-2 pt-1">
+          <div className="flex shrink-0 justify-center gap-2 pt-1">
             <Button
               variant="outline"
               onClick={() => {

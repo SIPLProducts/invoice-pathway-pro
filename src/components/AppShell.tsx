@@ -274,7 +274,7 @@ export function AppShell() {
         </header>
 
         <main
-          className="px-4 py-6 lg:px-8 lg:py-8 animate-fade-in"
+          className="px-3 py-4 lg:px-5 lg:py-5 animate-fade-in"
           style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
         >
           <Outlet />

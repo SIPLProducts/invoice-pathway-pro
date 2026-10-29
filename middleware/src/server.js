@@ -66,6 +66,25 @@ app.use(
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "sap-gate-proxy" }));
 
+// Shared-secret guard: when PROXY_SECRET is set, every /api call except health
+// must send a matching x-proxy-secret header (constant-time compare).
+const PROXY_SECRET = (process.env.PROXY_SECRET || "").trim();
+if (PROXY_SECRET) {
+  const crypto = require("crypto");
+  const expected = Buffer.from(PROXY_SECRET);
+  app.use("/api", (req, res, next) => {
+    if (req.method === "OPTIONS" || req.path === "/health" || req.path.startsWith("/health/")) return next();
+    const got = Buffer.from(String(req.headers["x-proxy-secret"] || "").trim());
+    if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) {
+      return res.status(401).json(errorEnvelope("unauthorized", "Invalid or missing x-proxy-secret header"));
+    }
+    next();
+  });
+} else {
+  // eslint-disable-next-line no-console
+  console.warn("[security] PROXY_SECRET not set — middleware accepts unauthenticated requests");
+}
+
 app.use("/api/health", healthRoutes);
 app.use("/api/gate", gateRoutes);
 app.use("/api/odata", odataRoutes);

@@ -1,0 +1,18 @@
+[Unit]
+Description=DMR & GRN Portal SAP Middleware
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/dmr/middleware
+EnvironmentFile=/opt/dmr/middleware/.env
+ExecStart=/usr/bin/node src/server.js
+Restart=always
+RestartSec=5s
+SyslogIdentifier=dmr-sap-middleware
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

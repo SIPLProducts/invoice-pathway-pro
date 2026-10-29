@@ -1,18 +1,28 @@
+# Install: sudo cp dmr-sap-middleware.service /etc/systemd/system/ && sudo systemctl daemon-reload
+#          sudo systemctl enable --now dmr-sap-middleware
+# Check node path first: `command -v node` — change ExecStart if it is not /usr/bin/node (nvm installs are NOT usable by www-data).
+# Permissions: sudo chown -R www-data:www-data /opt/dmr/middleware && sudo chmod 600 /opt/dmr/middleware/.env
 [Unit]
 Description=DMR & GRN Portal SAP Middleware
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=www-data
+Group=www-data
 WorkingDirectory=/opt/dmr/middleware
 EnvironmentFile=/opt/dmr/middleware/.env
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
 ExecStart=/usr/bin/node src/server.js
 Restart=always
 RestartSec=5s
 SyslogIdentifier=dmr-sap-middleware
 NoNewPrivileges=true
 PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
 
 [Install]
 WantedBy=multi-user.target

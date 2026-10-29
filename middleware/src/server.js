@@ -80,6 +80,10 @@ if (PROXY_SECRET) {
     }
     next();
   });
+} else if (/^(1|true|yes)$/i.test(process.env.REQUIRE_PROXY_SECRET || "")) {
+  // eslint-disable-next-line no-console
+  console.error("[security] REQUIRE_PROXY_SECRET is on but PROXY_SECRET is empty — refusing to start");
+  process.exit(1);
 } else {
   // eslint-disable-next-line no-console
   console.warn("[security] PROXY_SECRET not set — middleware accepts unauthenticated requests");
@@ -112,7 +116,8 @@ app.use((err, _req, res, _next) => {
     );
 });
 
-app.listen(PORT, () => {
+const HOST = (process.env.HOST || "127.0.0.1").trim();
+app.listen(PORT, HOST, () => {
   // eslint-disable-next-line no-console
-  console.log(`SAP proxy listening on http://localhost:${PORT}`);
+  console.log(`SAP proxy listening on http://${HOST}:${PORT}`);
 });

@@ -32,12 +32,30 @@ export interface UseSapProxyResult<T = Record<string, unknown>> {
  * Priority: global Connection tab -> api.middleware.url (legacy) -> VITE_SAP_PROXY_URL env -> "".
  */
 export function resolveProxyUrl(api?: SapApi | null): string {
-  const global = getSapConnection().middlewareUrl?.trim().replace(/\/$/, "") ?? "";
-  if (global) return global;
-  const fromApi = api?.middleware?.url?.trim().replace(/\/$/, "") ?? "";
-  if (fromApi) return fromApi;
-  const fromEnv = (import.meta.env.VITE_SAP_PROXY_URL as string | undefined)?.trim().replace(/\/$/, "") ?? "";
-  return fromEnv;
+  const candidates = [
+    getSapConnection().middlewareUrl,
+    api?.middleware?.url,
+    import.meta.env.VITE_SAP_PROXY_URL as string | undefined,
+  ];
+  for (const c of candidates) {
+    const n = normalizeProxyBase(c);
+    if (n) return n;
+  }
+  return "";
+}
+
+/**
+ * Callers append paths that already start with `/api/...`, so the base must be
+ * the server root. A same-origin value like "/api" (Nginx reverse proxy) or
+ * "/" maps to the current site origin; a trailing "/api" is stripped.
+ */
+export function normalizeProxyBase(raw: string | undefined | null, origin?: string): string {
+  let v = (raw ?? "").trim().replace(/\/+$/, "");
+  if (!v && !(raw ?? "").trim()) return "";
+  v = v.replace(/\/api$/i, "");
+  if (/^https?:\/\//i.test(v)) return v;
+  const o = origin ?? (typeof window !== "undefined" ? window.location.origin : "");
+  return `${o}${v}`.replace(/\/+$/, "");
 }
 
 /** Shared proxy secret: global Connection tab first, then the API's own (legacy). */

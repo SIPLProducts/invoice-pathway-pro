@@ -7,6 +7,7 @@ import { inr } from "@/lib/format";
 import type { SAPEntry } from "@/lib/types";
 import { Download, Filter, Search, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import * as XLSX from "xlsx";
 
 const tabs = ["All", "Site Fields", "Accounts / HO Fields"] as const;
 type Tab = (typeof tabs)[number];
@@ -154,6 +155,38 @@ const columns: Col[] = [
   { key: "billStatus", header: "Bill Status", group: "extra", render: (e) => <StatusBadge status={e.billStatus} /> },
 ];
 
+const rawValue: Record<string, (e: SAPEntry) => unknown> = {
+  sapDocNo: (e) => e.sapRef,
+  miro: (e) => e.miroDocNo,
+  billsStatus: (e) => e.billStatus,
+  billStatus: (e) => e.billStatus,
+  days: (e) => e.ageingDays,
+  vendorName: (e) => e.vendor,
+  totalInvoiceAmount: (e) => e.invoiceAmount,
+  tds: (e) => e.tdsAmount,
+  rm: (e) => e.rmAmount,
+  netAmount: (e) => e.netPayable,
+  dms: (e) => e.dmsAttachmentStatus,
+  checklist: (e) => (e.checklistComplete ? "Yes" : "No"),
+};
+
+function exportTracker(cols: Col[], rows: SAPEntry[]) {
+  const data = rows.map((e) => {
+    const r: Record<string, unknown> = {};
+    for (const c of cols) {
+      const v = rawValue[c.key] ? rawValue[c.key](e) : (e as unknown as Record<string, unknown>)[c.key];
+      r[c.header] = v ?? "";
+    }
+    return r;
+  });
+  const ws = XLSX.utils.json_to_sheet(data, { header: cols.map((c) => c.header) });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "SAP Tracker");
+  const d = new Date();
+  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  XLSX.writeFile(wb, `SAP_Tracker_${stamp}.xlsx`);
+}
+
 function columnsFor(tab: Tab): Col[] {
   if (tab === "Site Fields") return columns.filter((c) => c.group === "site");
   if (tab === "Accounts / HO Fields") return columns.filter((c) => c.group === "ho");
@@ -180,7 +213,7 @@ export default function Tracker() {
         actions={
           <>
             <Button variant="outline" size="sm"><Filter className="h-4 w-4" />Advanced</Button>
-            <Button size="sm" className="bg-gradient-primary"><Download className="h-4 w-4" />Export</Button>
+            <Button size="sm" className="bg-gradient-primary" onClick={() => exportTracker(cols, filtered)} disabled={!filtered.length}><Download className="h-4 w-4" />Export</Button>
           </>
         }
       />

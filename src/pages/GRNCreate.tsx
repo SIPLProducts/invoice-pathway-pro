@@ -99,7 +99,7 @@ export default function GRNCreate() {
       <div className="rounded-xl border bg-card p-4 shadow-card">
         <div className="flex flex-wrap items-center gap-3">
           <select className={`${sel} w-48`} value={h.action} onChange={(e) => set("action", e.target.value)}>
-            {["A01 Goods Receipt", "A02 Return Delivery", "A04 Display", "A07 Goods Issue"].map((o) => <option key={o}>{o}</option>)}
+            {["A01 Goods Receipt", "A02 Change", "A03 Display", "A04 Cancel"].map((o) => <option key={o}>{o}</option>)}
           </select>
           <select className={`${sel} w-48`} value={h.ref} onChange={(e) => set("ref", e.target.value)}>
             {["R01 Purchase Order", "R02 Material Document", "R05 Outbound Delivery"].map((o) => <option key={o}>{o}</option>)}

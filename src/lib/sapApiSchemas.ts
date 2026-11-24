@@ -103,16 +103,22 @@ export function mergeColumnsWithData(
   rows: Record<string, unknown>[],
   hiddenKeys: string[] = [],
 ): ColumnDef[] {
-  const seen = new Set(
-    [...configured.map((c) => c.path), ...hiddenKeys].map((k) => k.toLowerCase()),
-  );
+  const norm = (k: string) => k.toLowerCase().replace(/_/g, "");
+  const seen = new Set(hiddenKeys.map(norm));
+  const kept: ColumnDef[] = [];
+  for (const c of configured) {
+    const n = norm(c.path);
+    if (seen.has(n)) continue;
+    seen.add(n);
+    kept.push(c);
+  }
   const extra: ColumnDef[] = [];
   for (const row of rows) {
     if (!row || typeof row !== "object") continue;
     for (const [k, v] of Object.entries(row)) {
       if (k.startsWith("@") || k.startsWith("__") || k.includes("@odata")) continue;
       if (!isScalar(v)) continue;
-      const lk = k.toLowerCase();
+      const lk = norm(k);
       if (seen.has(lk)) continue;
       seen.add(lk);
       extra.push({
@@ -123,5 +129,24 @@ export function mergeColumnsWithData(
       });
     }
   }
-  return [...configured, ...extra];
+  return [...kept, ...extra];
+}
+
+/** Sort SAP rows newest first: Gate Date + Gate Time desc, fallback Gate ID desc. */
+export function sortNewestFirst<T>(rows: T[]): T[] {
+  const pick = (r: unknown, name: string): string => {
+    if (!r || typeof r !== "object") return "";
+    const k = Object.keys(r).find((x) => x.toLowerCase().replace(/_/g, "") === name);
+    const v = k ? (r as Record<string, unknown>)[k] : undefined;
+    return v == null ? "" : String(v);
+  };
+  return [...rows].sort((a, b) => {
+    const ka = pick(a, "gatedate") + "T" + pick(a, "gatetime");
+    const kb = pick(b, "gatedate") + "T" + pick(b, "gatetime");
+    if (ka !== kb) return ka < kb ? 1 : -1;
+    const ga = pick(a, "gateid"), gb = pick(b, "gateid");
+    const na = Number(ga), nb = Number(gb);
+    if (!Number.isNaN(na) && !Number.isNaN(nb) && ga && gb) return nb - na;
+    return gb.localeCompare(ga);
+  });
 }

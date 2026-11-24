@@ -18,7 +18,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useSapProxy } from "@/hooks/useSapProxy";
-import { mergeColumnsWithData, type ColumnDef, type SapApiSchema } from "@/lib/sapApiSchemas";
+import { mergeColumnsWithData, sortNewestFirst, type ColumnDef, type SapApiSchema } from "@/lib/sapApiSchemas";
 import type { SapApi } from "@/lib/sapApisStore";
 import { getPath } from "@/lib/getPath";
 import { RefreshCw, AlertCircle, Wifi, WifiOff, Package, KeyRound, Pencil } from "lucide-react";
@@ -59,8 +59,9 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
   const { rows: rawRows, loading, error, lastFetched, proxyConfigured, refresh } = useSapProxy(api, schema);
   // Add a derived Total Quantity (sum of line-item Quantity) to each header row.
   const rows = useMemo(() => {
-    if (!schema.childKey) return rawRows;
-    return (rawRows as Record<string, unknown>[]).map((r) => {
+    const sorted = sortNewestFirst(rawRows as Record<string, unknown>[]);
+    if (!schema.childKey) return sorted;
+    return sorted.map((r) => {
       const items = (getPath(r, schema.childKey!) as Record<string, unknown>[]) ?? [];
       if (!Array.isArray(items) || !items.length) return r;
       let sum = 0;

@@ -129,14 +129,43 @@ app.use((err, _req, res, _next) => {
     );
 });
 
-const HOST = (process.env.HOST || "127.0.0.1").trim();
-app.listen(PORT, HOST, () => {
+// HOST = local listen address only (e.g. 127.0.0.1). The public address
+// (ngrok / LAN / Nginx) belongs in APP_BASE_URL, same as the other SAP middleware.
+let HOST = (process.env.HOST || "127.0.0.1").trim();
+let APP_BASE_URL = (process.env.APP_BASE_URL || "").trim();
+if (/:\/\/|\//.test(HOST)) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[config] HOST="${HOST}" looks like a URL. HOST must be a local address like 127.0.0.1. ` +
+      `Put the public URL in APP_BASE_URL instead. Listening on 127.0.0.1.`,
+  );
+  if (!APP_BASE_URL) APP_BASE_URL = HOST;
+  HOST = "127.0.0.1";
+}
+const server = app.listen(PORT, HOST, () => {
   // eslint-disable-next-line no-console
   console.log(`SAP proxy listening on http://${HOST}:${PORT}`);
+  if (APP_BASE_URL) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `Public URL (paste into SAP API Settings -> Node.js Middleware URL): ${APP_BASE_URL.replace(/\/+$/, "")}`,
+    );
+  }
   // eslint-disable-next-line no-console
   console.log(
     `SAP target: ${(process.env.SAP_BASE_URL || "(not set)").trim()} | proxy secret: ${
       (process.env.PROXY_SECRET || "").trim() ? "required" : "not required"
     }`,
   );
+});
+server.on("error", (err) => {
+  const msg =
+    err.code === "EADDRINUSE"
+      ? `Port ${PORT} is already in use. Stop the other process or change PORT in .env.`
+      : err.code === "ENOTFOUND" || err.code === "EADDRNOTAVAIL"
+        ? `Cannot listen on HOST="${HOST}". Use HOST=127.0.0.1 and put public URLs in APP_BASE_URL.`
+        : `Server failed to start: ${err.message}`;
+  // eslint-disable-next-line no-console
+  console.error(`[startup] ${msg}`);
+  process.exit(1);
 });

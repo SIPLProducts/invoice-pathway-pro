@@ -1,5 +1,5 @@
 import { logTag } from "@/lib/sapCallLog";
-import { getSapConnection, useSapConnection } from "@/lib/sapConnection";
+import { ensureSapConnectionLoaded, getSapConnection, useSapConnection } from "@/lib/sapConnection";
 import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SapApiSchema } from "@/lib/sapApiSchemas";
@@ -133,13 +133,17 @@ export function useSapProxy<T = Record<string, unknown>>(
       setLoading(true);
       setError(null);
       try {
+        // Make sure the shared proxy secret is loaded for this signed-in user first.
+        await ensureSapConnectionLoaded();
+        if (cancelled) return;
+        const liveSecret = resolveProxySecret(api) || secret;
         const headers: Record<string, string> = {
           Accept: "application/json",
           "ngrok-skip-browser-warning": "true",
           ...getSapSessionHeaders(),
           ...getSapTargetHeaders(api),
         };
-        if (secret) headers["x-proxy-secret"] = secret;
+        if (liveSecret) headers["x-proxy-secret"] = liveSecret;
         Object.assign(headers, logTag(api?.name, "fetch"));
         const res = await fetch(`${proxyUrl}${schema.proxyPath}`, { headers });
         const text = await res.text();

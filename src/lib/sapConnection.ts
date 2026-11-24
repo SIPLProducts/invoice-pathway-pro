@@ -43,7 +43,9 @@ function setState(next: SapConnection) {
   listeners.forEach((l) => l());
 }
 
-async function load() {
+async function load(): Promise<boolean> {
+  const { data: sess } = await supabase.auth.getSession();
+  if (!sess.session) return false;
   const { data, error } = await supabase
     .from("sap_api_configs")
     .select("config")
@@ -51,16 +53,32 @@ async function load() {
     .maybeSingle();
   if (error) {
     console.warn("[sapConnection] load failed", error);
-    return;
+    return false;
   }
   if (data?.config) setState({ ...empty, ...(data.config as unknown as SapConnection) });
+  return !!data;
 }
 
-let loaded = false;
-export function ensureSapConnectionLoaded() {
-  if (loaded || typeof window === "undefined") return;
-  loaded = true;
-  load();
+let loadPromise: Promise<boolean> | null = null;
+let authHooked = false;
+/** Loads settings once a user is signed in; retries after sign-in if it failed. */
+export function ensureSapConnectionLoaded(): Promise<boolean> {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  if (!authHooked) {
+    authHooked = true;
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
+        setTimeout(() => { loadPromise = load().catch(() => false); }, 0);
+      }
+    });
+  }
+  if (!loadPromise) {
+    loadPromise = load().catch(() => false).then((ok) => {
+      if (!ok) setTimeout(() => { loadPromise = null; }, 0);
+      return ok;
+    });
+  }
+  return loadPromise;
 }
 
 export function getSapConnection(): SapConnection {

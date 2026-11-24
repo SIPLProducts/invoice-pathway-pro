@@ -2,7 +2,7 @@ import { logTag } from "@/lib/sapCallLog";
 import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useEffect, useState } from "react";
 import { useSapConnection, saveSapConnection } from "@/lib/sapConnection";
-import { resolveProxyUrl, resolveProxySecret, describeFetchError } from "@/hooks/useSapProxy";
+import { resolveProxyUrl, resolveProxySecret, describeFetchError, checkMiddlewareHealth, normalizeProxyBase } from "@/hooks/useSapProxy";
 import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -141,6 +141,13 @@ export default function SAPSettings() {
     }
     setTesting(true);
     try {
+      const health = await checkMiddlewareHealth(base);
+      window.dispatchEvent(new CustomEvent("middleware-health", { detail: health }));
+      if (!health.ok) {
+        toast.error(`Step 1 failed — middleware not reachable`, { description: health.message, duration: 10000 });
+        return;
+      }
+      toast.message("Step 1 OK — middleware reachable. Step 2: asking SAP…");
       const res = await fetch(`${base}/api/health/sap`, {
         headers: {
           Accept: "application/json",
@@ -882,10 +889,30 @@ function ConnectionCard({ onTest, testing }: { onTest: () => void; testing: bool
     });
   }, [conn, apisForSeed]);
 
+  const [health, setHealth] = useState<{ ok: boolean; message: string } | null>(null);
+  const [checking, setChecking] = useState(false);
+  const runHealth = async (url: string) => {
+    const base = normalizeProxyBase(url);
+    if (!base) { setHealth(null); return; }
+    setChecking(true);
+    setHealth(await checkMiddlewareHealth(base));
+    setChecking(false);
+  };
+  useEffect(() => {
+    void runHealth(conn.middlewareUrl);
+    const h = (e: Event) => setHealth((e as CustomEvent).detail);
+    window.addEventListener("middleware-health", h);
+    return () => window.removeEventListener("middleware-health", h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conn.middlewareUrl]);
+  const isLocalUrl = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|\/|$)/i.test(form.middlewareUrl.trim());
+  const appIsLocal = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+
   const save = async () => {
     setSaving(true);
     try {
       await saveSapConnection(form);
+      void runHealth(form.middlewareUrl);
       toast.success("Connection saved. All APIs now use these settings.");
     } catch (e) {
       toast.error("Couldn't save connection", { description: String((e as Error).message ?? e) });
@@ -911,6 +938,18 @@ function ConnectionCard({ onTest, testing }: { onTest: () => void; testing: bool
             onChange={(e) => setForm({ ...form, middlewareUrl: e.target.value })}
           />
           <p className="text-[11px] text-muted-foreground">Base URL only, no path.</p>
+          {form.middlewareUrl.trim() && (
+            <div className={`flex items-start gap-1.5 text-[11px] ${checking ? "text-muted-foreground" : health?.ok ? "text-success" : "text-destructive"}`}>
+              <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${checking ? "bg-muted-foreground" : health?.ok ? "bg-success" : "bg-destructive"}`} />
+              <span>{checking ? "Checking middleware…" : health ? (health.ok ? "Reachable" : `Not reachable — ${health.message}`) : "Not checked yet"}</span>
+            </div>
+          )}
+          {isLocalUrl && !appIsLocal && (
+            <p className="rounded-md border border-warning/40 bg-warning/10 p-2 text-[11px] text-foreground">
+              This app is running online, so the browser can't reach <code>localhost</code>/<code>127.0.0.1</code> on your PC.
+              Use your ngrok address (start it with <code>ngrok http 127.0.0.1:8080</code>) or the server URL instead.
+            </p>
+          )}
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Proxy Secret (optional)</Label>

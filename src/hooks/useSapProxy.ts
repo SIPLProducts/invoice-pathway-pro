@@ -67,6 +67,38 @@ export function describeFetchError(e: unknown, proxyUrl?: string): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+export interface MiddlewareHealth { ok: boolean; message: string }
+/** Step 1 of every connection check: can the browser reach the middleware's /api/health? */
+export async function checkMiddlewareHealth(base: string): Promise<MiddlewareHealth> {
+  if (!base) return { ok: false, message: "No middleware URL set." };
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const res = await fetch(`${base}/api/health`, {
+      headers: { Accept: "application/json", "ngrok-skip-browser-warning": "true" },
+      signal: ctrl.signal,
+    });
+    const ngrokErr = res.headers.get("ngrok-error-code");
+    const text = await res.text();
+    if (ngrokErr === "ERR_NGROK_8012" || /ERR_NGROK_8012/.test(text)) {
+      return { ok: false, message: "ngrok is online but can't reach the middleware on your PC — start the middleware and run ngrok with: ngrok http 127.0.0.1:8080" };
+    }
+    if (ngrokErr) return { ok: false, message: `ngrok error ${ngrokErr} — check the ngrok window.` };
+    let data: { ok?: boolean } | null = null;
+    try { data = JSON.parse(text); } catch { /* not json */ }
+    if (res.ok && data?.ok) return { ok: true, message: "Middleware reachable" };
+    return { ok: false, message: `Middleware answered HTTP ${res.status} but not as expected — check the URL points to the middleware.` };
+  } catch (e) {
+    if ((e as Error)?.name === "AbortError") return { ok: false, message: `No answer from ${base} within 5 s.` };
+    if (/ngrok/i.test(base)) {
+      return { ok: false, message: "ngrok didn't pass the call through. Check the middleware is running and start ngrok with: ngrok http 127.0.0.1:8080 — then open " + base + "/api/health in a new tab; it should show {\"ok\":true}." };
+    }
+    return { ok: false, message: describeFetchError(e, base) };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 /** Shared proxy secret: global Connection tab first, then the API's own (legacy). */
 export function resolveProxySecret(api?: SapApi | null): string {
   return getSapConnection().proxySecret || api?.middleware?.secret || "";

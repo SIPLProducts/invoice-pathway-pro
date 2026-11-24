@@ -59,6 +59,14 @@ export function normalizeProxyBase(raw: string | undefined | null, origin?: stri
   return `${o}${v}`.replace(/\/+$/, "");
 }
 
+/** Turns a network-level fetch failure into a clear "middleware unreachable" message. */
+export function describeFetchError(e: unknown, proxyUrl?: string): string {
+  if (e instanceof TypeError) {
+    return `Can't reach the middleware${proxyUrl ? ` at ${proxyUrl}` : ""}. Check it is running, the app is open in its own browser tab (local access allowed), and the Proxy Secret matches.`;
+  }
+  return e instanceof Error ? e.message : String(e);
+}
+
 /** Shared proxy secret: global Connection tab first, then the API's own (legacy). */
 export function resolveProxySecret(api?: SapApi | null): string {
   return getSapConnection().proxySecret || api?.middleware?.secret || "";

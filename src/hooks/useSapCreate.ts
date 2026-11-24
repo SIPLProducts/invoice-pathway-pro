@@ -2,7 +2,7 @@ import { logTag } from "@/lib/sapCallLog";
 import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useState } from "react";
 import type { SapApi, FieldDef } from "@/lib/sapApisStore";
-import { resolveProxyUrl, resolveProxySecret } from "./useSapProxy";
+import { resolveProxyUrl, resolveProxySecret, describeFetchError } from "./useSapProxy";
 import {
   getSapSessionHeaders,
   markSapSessionActive,
@@ -148,7 +148,7 @@ export function useSapCreate(api: SapApi | null | undefined, proxyPathOverride?:
       markSapSessionActive();
       return { ok: true, data };
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      return { ok: false, error: describeFetchError(e, proxyUrl) };
     } finally {
       setLoading(false);
     }

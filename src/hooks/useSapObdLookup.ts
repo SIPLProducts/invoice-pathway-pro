@@ -1,7 +1,7 @@
 import { logTag } from "@/lib/sapCallLog";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { getPath } from "@/lib/getPath";
-import { resolveProxyUrl, resolveProxySecret } from "@/hooks/useSapProxy";
+import { resolveProxyUrl, resolveProxySecret, describeFetchError } from "@/hooks/useSapProxy";
 import { useSapApis, type SapApi } from "@/lib/sapApisStore";
 import {
   getSapSessionHeaders,
@@ -136,7 +136,7 @@ export function useSapObdLookup(): UseSapObdLookupResult {
         if (collection.length === 0) setNotFound(true);
         else setLines(collection as ObdLine[]);
       } catch (e) {
-        if (id === reqId.current) setError(e instanceof Error ? e.message : String(e));
+        if (id === reqId.current) setError(describeFetchError(e, resolveProxyUrl(api)));
       } finally {
         if (id === reqId.current) setLoading(false);
       }

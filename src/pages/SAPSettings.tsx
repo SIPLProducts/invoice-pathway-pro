@@ -2,7 +2,7 @@ import { logTag } from "@/lib/sapCallLog";
 import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useEffect, useState } from "react";
 import { useSapConnection, saveSapConnection } from "@/lib/sapConnection";
-import { resolveProxyUrl, resolveProxySecret } from "@/hooks/useSapProxy";
+import { resolveProxyUrl, resolveProxySecret, describeFetchError } from "@/hooks/useSapProxy";
 import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -181,7 +181,7 @@ export default function SAPSettings() {
         }
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      toast.error(describeFetchError(e, base));
     } finally {
       setTesting(false);
     }

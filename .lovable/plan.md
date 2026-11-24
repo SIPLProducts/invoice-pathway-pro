@@ -1,28 +1,26 @@
-# Fix: middleware crashes with "getaddrinfo ENOTFOUND https://liberty-rerun-greedless.ngrok-free.dev"
+# Fix: middleware crash "getaddrinfo ENOTFOUND https://...ngrok-free.dev" — follow the other project's .env style
 
 ## Cause
-In `middleware\.env`, `HOST` is set to the ngrok address. `HOST` is only the local network address the middleware listens on (on your PC). It must not be a website address. Node tries to look up "https://liberty-rerun-greedless.ngrok-free.dev" as a computer name, fails, and stops.
+In your other project, the ngrok address goes in `APP_BASE_URL`. This middleware has no `APP_BASE_URL`, so the ngrok address was put in `HOST`. `HOST` means "which local address to listen on", so Node tried to find a computer named "https://liberty-rerun-greedless.ngrok-free.dev" and crashed.
 
-The ngrok address belongs in the app instead: **SAP Module → API Settings → Middleware & SAP Connection → Node.js Middleware URL** (it is already saved there).
+## What I will change (same style as your other project)
+1. **Add `APP_BASE_URL`** to this middleware: the public ngrok / LAN / Nginx address. On startup it prints:
+   `Public URL (paste into SAP API Settings → Node.js Middleware URL): https://liberty-rerun-greedless.ngrok-free.dev`
+2. **`HOST` stays local only.** If a URL is found in `HOST` (contains `://` or `/`), print a clear warning, treat it as `APP_BASE_URL`, and listen on `127.0.0.1` instead of crashing.
+3. **Readable start-up errors**: "port already in use" or bad address show a one-line message instead of a Node stack trace.
+4. **Update `middleware/.env.example`** with the same comments as your other project (PORT = local port, APP_BASE_URL = public address).
+5. Your existing SAP settings, Basic Auth (no cookies), and proxy secret stay exactly as they are.
 
-## Fix you can do now (no code change)
-1. Open `D:\RR\DMR & GRN\invoice-pathway-pro\middleware\.env` and set:
-   ```text
-   HOST=127.0.0.1
-   PORT=8080
-   ```
-2. Start the middleware from the `middleware` folder: `npm start`
-   You should see: `SAP proxy listening on http://127.0.0.1:8080`
-3. In a second window: `ngrok http 127.0.0.1:8080`
-4. Check in a browser: `https://liberty-rerun-greedless.ngrok-free.dev/api/health` should show `{"ok":true,"service":"sap-gate-proxy"}`
-5. In the app, click **Test** in API Settings, then open All DMR.
+## Your .env after the change
+```text
+HOST=127.0.0.1
+PORT=8080
+APP_BASE_URL=https://liberty-rerun-greedless.ngrok-free.dev
+```
+Then: `npm start` in the `middleware` folder, and `ngrok http 127.0.0.1:8080` in another window.
 
-## Code change (protects against this mistake)
-In `middleware/src/server.js`, before starting:
-- If `HOST` contains `://`, `/` or looks like a URL, print a clear message such as
-  "HOST must be a local address like 127.0.0.1 — put the ngrok URL in the app's Middleware URL, not in .env" and use `127.0.0.1` instead of crashing.
-- Add a listen error handler so problems like "port 8080 already in use" or a bad address print a readable message instead of the raw Node stack trace.
-- Add a comment in `middleware/.env.example` next to `HOST` explaining the same.
+## Quick fix right now (before the change)
+Remove the ngrok address from `HOST` and set `HOST=127.0.0.1`. The middleware will start.
 
 ## Not changed
-No SAP settings, app screens, proxy secret logic or Ubuntu server files.
+Screens, SAP endpoints, Ubuntu server files. (Multi-environment DEV/QUALITY/PROD settings from the other project are not added unless you ask.)

@@ -11,7 +11,7 @@ Replace the options with:
 
 ## 2. All DMR (Get DMR List)
 - **Newest first:** sort rows by Gate Date + Gate Time descending (fallback: Gate ID descending) after loading from SAP.
-- **Remove duplicate columns:** SAP sends `VehicleNo`, the setting has `vehicle_no`, so both "Vehicle" and "VehicleNo" appear. When adding extra columns from SAP data, skip any SAP field that matches a configured column ignoring case and underscores. Same for line-item columns.
+- **Remove duplicate columns:** SAP sends `VehicleNo`, the setting has `vehicle_no`, so both "Vehicle" and "VehicleNo" appear (same for Gate ID/GateId, Plant, Gate Date, Gate Time, Vendor, Vendor Name, Driver Name and any other field). This applies to every column, not just Vehicle. When adding extra columns from SAP data, skip any SAP field that matches a configured column ignoring case and underscores. Same for line-item columns.
 
 ## Technical details
 - `src/pages/GRNCreate.tsx`: option list.

@@ -19,6 +19,15 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "*")
 
 const app = express();
 
+// Chrome Private Network Access: allow web pages (Lovable preview, Ubuntu site)
+// to call a middleware on localhost / LAN. Must be set on the preflight.
+app.use((req, res, next) => {
+  if (req.headers["access-control-request-private-network"]) {
+    res.setHeader("Access-Control-Allow-Private-Network", "true");
+  }
+  next();
+});
+
 app.use(
   cors({
     origin: (origin, cb) => {
@@ -86,7 +95,11 @@ if (PROXY_SECRET) {
   process.exit(1);
 } else {
   // eslint-disable-next-line no-console
-  console.warn("[security] PROXY_SECRET not set — middleware accepts unauthenticated requests");
+  console.warn(
+    "[security] PROXY_SECRET not set — OK for local testing (no shared secret required). " +
+      "To enable it: set PROXY_SECRET=... in middleware/.env and enter the same value in " +
+      "SAP API Settings → Connection & Credentials → Proxy Secret.",
+  );
 }
 
 app.use("/api/health", healthRoutes);

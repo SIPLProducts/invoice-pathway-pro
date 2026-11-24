@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FileSpreadsheet, FileDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -88,7 +88,13 @@ export default function SapGateEntries() {
       ? apis.find((a) => a.status === "Active" && isItemApi(a)) ?? null
       : null;
 
-  const childKey = selectedApi ? buildSchemaFromApi(selectedApi).childKey : undefined;
+  // Build the table schema once per selected API. Rebuilding it on every render
+  // gave SapLiveTable new column arrays each time and caused an endless render loop.
+  const selectedSchema = useMemo(
+    () => (selectedApi ? buildSchemaFromApi(selectedApi) : null),
+    [selectedApi],
+  );
+  const childKey = selectedSchema?.childKey;
   const body = 
         (() => {
           if (!selectedApi) {
@@ -109,7 +115,7 @@ export default function SapGateEntries() {
               <SapLiveTable
                 key={refreshKey}
                 api={selectedApi}
-                schema={buildSchemaFromApi(selectedApi)}
+                schema={selectedSchema!}
                 onEdit={updateApi ? (row) => setEditing({ row }) : undefined}
                 itemUpdateApi={itemUpdateApi ?? undefined}
                 onItemSaved={() => setRefreshKey((k) => k + 1)}

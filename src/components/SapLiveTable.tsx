@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -113,8 +113,19 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
   const start = (safePage - 1) * pageSize;
   const pageRows = allRows.slice(start, start + pageSize);
 
+  // Only notify the parent when the data really changed (guards against render loops).
+  const lastReported = useRef<{ rows: unknown; selectedKey: string | null; columns: unknown; childColumns: unknown } | null>(null);
   useEffect(() => {
     if (!onDataChange) return;
+    const prev = lastReported.current;
+    if (
+      prev &&
+      prev.rows === allRows &&
+      prev.selectedKey === selectedKey &&
+      JSON.stringify(prev.columns) === JSON.stringify(columns) &&
+      JSON.stringify(prev.childColumns) === JSON.stringify(childColumns)
+    ) return;
+    lastReported.current = { rows: allRows, selectedKey, columns, childColumns };
     onDataChange({
       rows: allRows,
       selected: selectedKey

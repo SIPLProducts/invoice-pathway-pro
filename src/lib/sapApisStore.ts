@@ -282,9 +282,9 @@ const seed: SapApi[] = [
     name: "ZUI_Gate_Service",
     description:
       "SAP BTP Public Cloud - Gate Service (RAP). GET/POST GateHeader via Node middleware proxy. Configure VITE_SAP_PROXY_URL on the frontend.",
-    baseUrl: "https://dde5e873-b32e-4495-9700-5a705108a5a6.abap-web.us10.hana.ondemand.com",
+    baseUrl: "https://1f674db9-07aa-4869-885b-435d1624cc4c.abap.us10.hana.ondemand.com",
     endpoint:
-      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd/sap/zsd_gate_entry/0001/ZC_GateHeader?$expand=_Item",
+      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd_a2x/sap/zsd_gate_entry/0001/GateHeader?$expand=_Item",
     method: "GET",
     auth: "Basic",
     status: "Active",
@@ -331,9 +331,9 @@ const seed: SapApi[] = [
     name: "Get DMR List",
     description:
       "Lists all SAP Gate Header records (with line items expanded) via the Node middleware proxy. Used by the DMR → SAP Gate Entries tab.",
-    baseUrl: "https://dde5e873-b32e-4495-9700-5a705108a5a6.abap-web.us10.hana.ondemand.com",
+    baseUrl: "https://1f674db9-07aa-4869-885b-435d1624cc4c.abap.us10.hana.ondemand.com",
     endpoint:
-      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd/sap/zsd_gate_entry/0001/ZC_GateHeader?$expand=_Item",
+      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd_a2x/sap/zsd_gate_entry/0001/GateHeader?$expand=_Item",
     method: "GET",
     auth: "Basic",
     status: "Active",
@@ -361,9 +361,9 @@ const seed: SapApi[] = [
     name: "Update Header Data",
     description:
       "PATCHes header fields on a single Gate Entry (gate_id) via the Node middleware. Used by the Edit Header dialog on DMR → SAP Gate Entries.",
-    baseUrl: "https://dde5e873-b32e-4495-9700-5a705108a5a6.abap-web.us10.hana.ondemand.com",
+    baseUrl: "https://1f674db9-07aa-4869-885b-435d1624cc4c.abap.us10.hana.ondemand.com",
     endpoint:
-      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd/sap/zsd_gate_entry/0001/ZC_GateHeader(GateId='{gate_id}')",
+      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd_a2x/sap/zsd_gate_entry/0001/GateHeader(GateId='{gate_id}')",
     method: "PATCH",
     auth: "Basic",
     status: "Active",
@@ -389,9 +389,9 @@ const seed: SapApi[] = [
     name: "Update Selected Line Item Data",
     description:
       "PATCHes a single Gate line item (gate_id + item_no) via the Node middleware. Used by the per-row Edit/Update inside the Items popup on DMR → SAP Gate Entries.",
-    baseUrl: "https://dde5e873-b32e-4495-9700-5a705108a5a6.abap-web.us10.hana.ondemand.com",
+    baseUrl: "https://1f674db9-07aa-4869-885b-435d1624cc4c.abap.us10.hana.ondemand.com",
     endpoint:
-      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd/sap/zsd_gate_entry/0001/ZC_GateItem(GateId='{gate_id}',ItemNo='{item_no}')",
+      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd_a2x/sap/zsd_gate_entry/0001/GateItem(GateId='{gate_id}',ItemNo='{item_no}')",
     method: "PATCH",
     auth: "Basic",
     status: "Active",
@@ -417,9 +417,9 @@ const seed: SapApi[] = [
     name: "Get PO Details",
     description:
       "Fetches Purchase Order line items for a PO number via the Node middleware. Used by the Enter button on the DMR → New Entry → Purchase Order Details box.",
-    baseUrl: "https://dde5e873-b32e-4495-9700-5a705108a5a6.abap-web.us10.hana.ondemand.com",
+    baseUrl: "https://1f674db9-07aa-4869-885b-435d1624cc4c.abap.us10.hana.ondemand.com",
     endpoint:
-      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd/sap/zsd_gate_entry/0001/ZC_GateHeader/com.sap.gateway.srvd.zsd_gate_entry.v0001.getPoLines(PoNumber='{po_number}')",
+      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd_a2x/sap/zsd_gate_entry/0001/GateHeader/com.sap.gateway.srvd_a2x.zsd_gate_entry.v0001.getPoLines(PoNumber='{po_number}')",
     method: "GET",
     auth: "Basic",
     status: "Active",
@@ -681,11 +681,13 @@ async function bootstrapCloud(): Promise<void> {
     try {
       const RETIRED = "/sap/opu/odata4/sap/zui_gate_service/";
       const RETIRED_PO = "/api_purchaseorder_2/";
+      // Old (non-a2x) gate-entry service: SAP now only answers on srvd_a2x.
+      const RETIRED_GATE = "/zsb_gate_entry_o4/srvd/sap/zsd_gate_entry/0001/ZC_Gate";
       const bySeed = new Map(seed.map((s) => [s.name, s]));
       const moved = cloud
         .filter((a) => {
           const e = a.endpoint ?? "";
-          return (e.includes(RETIRED) || e.includes(RETIRED_PO)) && bySeed.has(a.name);
+          return (e.includes(RETIRED) || e.includes(RETIRED_PO) || e.includes(RETIRED_GATE)) && bySeed.has(a.name);
         })
         .map((a) => {
           const s = bySeed.get(a.name)!;

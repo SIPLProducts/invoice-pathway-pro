@@ -56,6 +56,14 @@ const ITEM_ALIASES: Record<string, string[]> = {
   openqty: ["OpenQuantity"],
   quantity: ["OpenQuantity", "PoQuantity"],
   poquantity: ["PoQuantity"],
+  materialscode: ["Material"],
+  materialcode: ["Material"],
+  materialsdescription: ["MaterialDesc"],
+  materialdescription: ["MaterialDesc"],
+  uom: ["Unit"],
+  goodsreceiptquantity: ["GrQuantity"],
+  grquantity: ["GrQuantity"],
+  profitcenterplant: ["Plant"],
 };
 const HEADER_ALIASES: Record<string, string[]> = {
   vendor: ["vendor", "Vendor"],

@@ -17,3 +17,17 @@ describe("mapPoLine", () => {
     expect(r).toEqual({ Material: "452", OpenQty: 20, PoItem: "10", Unit: "EA", Quantity: 20 });
   });
 });
+
+describe("mapPoLine – DMR form columns", () => {
+  it("fills Materials Code, Description, UOM, PO Quantity and GR Quantity from the SAP PO line", () => {
+    const r = mapPoLine({ ...line, GrQuantity: 5 }, [
+      { key: "materials_code", type: "string" }, { key: "materials_description", type: "string" },
+      { key: "uom", type: "string" }, { key: "po_quantity", type: "number" },
+      { key: "goods_receipt_quantity", type: "number" }, { key: "po_number", type: "string" },
+    ] as never);
+    expect(r).toEqual({
+      materials_code: "452", materials_description: "TRANSPORT", uom: "EA",
+      po_quantity: 20, goods_receipt_quantity: 5, po_number: "400000001",
+    });
+  });
+});

@@ -133,4 +133,10 @@ const HOST = (process.env.HOST || "127.0.0.1").trim();
 app.listen(PORT, HOST, () => {
   // eslint-disable-next-line no-console
   console.log(`SAP proxy listening on http://${HOST}:${PORT}`);
+  // eslint-disable-next-line no-console
+  console.log(
+    `SAP target: ${(process.env.SAP_BASE_URL || "(not set)").trim()} | proxy secret: ${
+      (process.env.PROXY_SECRET || "").trim() ? "required" : "not required"
+    }`,
+  );
 });

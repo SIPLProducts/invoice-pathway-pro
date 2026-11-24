@@ -72,7 +72,9 @@ export function useSapProxy<T = Record<string, unknown>>(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const proxyUrl = useMemo(() => resolveProxyUrl(api), [api, conn.middlewareUrl]);
   const proxyConfigured = Boolean(proxyUrl);
-  const secret = api?.middleware?.secret ?? "";
+  // Global Connection & Credentials secret first (same as create/update/test).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const secret = useMemo(() => resolveProxySecret(api), [api, conn.proxySecret]);
   const session = useSapSession();
   const sessionKey = session ? `${session.jsessionid}|${session.vcapId}` : "";
 
@@ -149,7 +151,15 @@ export function useSapProxy<T = Record<string, unknown>>(
         }
       } catch (e) {
         if (!cancelled) {
-          if (e && typeof e === "object" && "message" in (e as object)) {
+          if (e instanceof TypeError) {
+            // Network-level failure: the browser could not reach the middleware at all.
+            setError({
+              code: "middleware_unreachable",
+              message: `Can't reach the middleware at ${proxyUrl}`,
+              hint:
+                "Check: 1) the middleware is running (npm start) · 2) the app is open in its own browser tab (not inside the editor) and Chrome's \"access other apps on this device\" prompt was allowed · 3) Proxy Secret in Connection & Credentials matches PROXY_SECRET in middleware .env.",
+            });
+          } else if (e && typeof e === "object" && "message" in (e as object)) {
             setError(e as SapProxyError);
           } else {
             setError({ message: e instanceof Error ? e.message : String(e) });

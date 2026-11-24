@@ -47,6 +47,7 @@ const TABS = [
   { id: "details", label: "API Details" },
   { id: "request", label: "Request Fields" },
   { id: "response", label: "Response Fields" },
+  { id: "scripts", label: "Scripts" },
   { id: "scheduler", label: "Scheduler" },
   { id: "settings", label: "Settings" },
 ];
@@ -697,6 +698,60 @@ export default function SAPApiEdit() {
           <ApiCallHistory apiName={api.name} />
         </TabsContent>
 
+
+        {/* ============ SCRIPTS (Postman-style before-request) ============ */}
+        <TabsContent value="scripts" className="mt-5">
+          <div className="rounded-xl border bg-card p-6 shadow-card space-y-5">
+            <div className="flex items-center gap-2">
+              <Cog className="h-5 w-5 text-primary" />
+              <div>
+                <h2 className="font-display text-lg font-semibold">Scripts &amp; Authorization</h2>
+                <p className="text-sm text-muted-foreground">
+                  Same as Postman: fetch a CSRF token before the request, and send Basic Auth.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border bg-muted/20 p-4">
+              <div>
+                <div className="text-sm font-semibold">Before request: fetch CSRF token</div>
+                <div className="text-xs text-muted-foreground">
+                  Sends GET to the service root with <code>x-csrf-token: fetch</code>, then puts the token on this
+                  request. Needed for Create / Update. Not needed for GET.
+                </div>
+              </div>
+              <Switch
+                checked={api.scripts?.csrfFetch ?? api.method !== "GET"}
+                onCheckedChange={(v) =>
+                  setApi((p) => ({ ...p, scripts: { ...(p.scripts ?? { csrfFetch: true }), csrfFetch: v } }))
+                }
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Authorization type</Label>
+                <Input value="Basic Auth" disabled />
+              </div>
+              <div className="space-y-2">
+                <Label>SAP user name</Label>
+                <Input
+                  placeholder="ZGATE_POSTMAN (default from middleware .env)"
+                  value={api.scripts?.authUser ?? ""}
+                  onChange={(e) =>
+                    setApi((p) => ({
+                      ...p,
+                      scripts: { csrfFetch: p.scripts?.csrfFetch ?? p.method !== "GET", authUser: e.target.value },
+                    }))
+                  }
+                />
+              </div>
+            </div>
+            <p className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground">
+              The password is never saved in the app. It is read from <code>middleware\.env</code>:
+              <code> SAP_PASSWORD</code> for the default user, or <code>SAP_PASSWORD_&lt;USER&gt;</code> for another
+              user (e.g. <code>SAP_PASSWORD_ZGATE_POSTMAN</code>).
+            </p>
+          </div>
+        </TabsContent>
 
         {/* ============ SETTINGS ============ */}
         <TabsContent value="settings" className="mt-5">

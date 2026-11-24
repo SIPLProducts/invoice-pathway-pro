@@ -53,6 +53,8 @@ app.use(
       "x-sap-item-keys",
       "x-sap-item-nav",
       "x-sap-path",
+      "x-sap-csrf",
+      "x-sap-user",
       "If-Match",
     ],
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],

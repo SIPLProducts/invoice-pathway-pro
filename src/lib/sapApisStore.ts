@@ -59,6 +59,13 @@ export interface MiddlewareConfig {
   deploymentMode?: string;
 }
 
+export interface ScriptsConfig {
+  /** Fetch an x-csrf-token before the request (needed for POST/PATCH/DELETE). */
+  csrfFetch: boolean;
+  /** Basic Auth user; its password must be in middleware .env (SAP_PASSWORD or SAP_PASSWORD_<USER>). */
+  authUser?: string;
+}
+
 export interface SapApi {
   name: string;
   description: string;
@@ -97,6 +104,9 @@ export interface SapApi {
 
   /** Optional middleware path the proxy exposes. e.g. "/api/gate/headers" */
   proxyPath?: string;
+
+  /** Postman-style "Scripts" tab: CSRF before-request + Basic Auth user name. */
+  scripts?: ScriptsConfig;
 
   /** Per-API middleware connection (overrides VITE_SAP_PROXY_URL when set). */
   middleware?: MiddlewareConfig;

@@ -203,10 +203,33 @@ function buildRequestConfig(cookies, extraHeaders = {}) {
       cfg.auth = null;
       cfg.headers.Authorization = undefined;
     }
-  } else if (effectiveBasicStateless && SAP_USER && SAP_PASSWORD) {
-    cfg.auth = { username: SAP_USER, password: SAP_PASSWORD };
+  } else if (effectiveBasicStateless) {
+    const cred = resolveBasicCredentials();
+    if (cred) cfg.auth = cred;
   }
   return cfg;
+}
+
+/**
+ * Basic Auth user for this request. The API's Scripts tab may name a SAP user
+ * (x-sap-user); its password must live in middleware/.env as SAP_PASSWORD_<USER>
+ * (or SAP_PASSWORD when it is the default SAP_USER). Passwords never come from the browser.
+ */
+function resolveBasicCredentials() {
+  const wanted = sapTarget.current().authUser;
+  if (wanted && wanted !== SAP_USER) {
+    const envKey = `SAP_PASSWORD_${wanted.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`;
+    const pw = process.env[envKey];
+    if (pw) return { username: wanted, password: pw };
+    console.warn(`[sapClient] ${envKey} not set in .env - using default SAP_USER`);
+  }
+  return SAP_USER && SAP_PASSWORD ? { username: SAP_USER, password: SAP_PASSWORD } : null;
+}
+
+/** Turn Set-Cookie headers into a Cookie header value (used only within one write). */
+function setCookieToHeader(setCookie) {
+  const list = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+  return list.map((c) => String(c).split(";")[0]).filter(Boolean).join("; ");
 }
 
 function ensureJson(res, path, hadCookies = false) {
@@ -313,16 +336,41 @@ async function sapWrite(method, path, body, extraHeaders = {}, extraCookies = ""
   const serialized = body === undefined || body === null ? undefined : JSON.stringify(body);
 
   return withAutoSession(method, path, extraCookies, async ({ cookies }) => {
+    const csrfMode = sapTarget.current().csrf; // "on" | "off" | ""
+    const stateless = !cookies;
     const doRequest = async () => {
-      const token = await ensureCsrf(false, cookies);
-      const cfg = buildRequestConfig(cookies, {
-        "x-csrf-token": token,
+      let token;
+      let writeCookies = cookies;
+      if (csrfMode === "off") {
+        token = undefined;
+      } else if (stateless) {
+        // Same as the Postman "Before request" script: GET the service root with
+        // x-csrf-token: fetch, then send that token on the POST. SAP binds the token
+        // to the cookies it returns, so those cookies go on this one POST only
+        // (never cached or reused).
+        const fcfg = buildRequestConfig("", { "x-csrf-token": "fetch" });
+        const fres = await http.get(withClient(`/`), fcfg);
+        ensureJson(fres, "CSRF fetch", false);
+        token = fres.headers["x-csrf-token"] || undefined;
+        writeCookies = setCookieToHeader(fres.headers["set-cookie"]);
+        console.log(`[SAP] CSRF fetch ${fres.status} token=${token ? "received" : "missing"}`);
+      } else {
+        token = await ensureCsrf(false, cookies);
+      }
+      const cfg = buildRequestConfig("", {
+        ...(token ? { "x-csrf-token": token } : {}),
         "If-Match": "*",
         ...extraHeaders,
         // Force these LAST so callers/extras cannot override them.
         "Content-Type": "application/json",
         Accept: "application/json",
       });
+      if (writeCookies) cfg.headers.Cookie = writeCookies;
+      if (!stateless && useBasic) cfg.auth = null;
+      if (stateless) {
+        const cred = resolveBasicCredentials();
+        if (cred) cfg.auth = cred;
+      }
       return http.request({
         method,
         url: withClient(path),

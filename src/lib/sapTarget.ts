@@ -86,6 +86,13 @@ export function getSapTargetHeaders(api?: SapApi | null): Record<string, string>
   if (ik) h["x-sap-item-keys"] = ik.join(",");
   const nav = all.find((t) => t.nav)?.nav ?? api?.childKey;
   if (nav && NAME.test(nav)) h["x-sap-item-nav"] = nav;
+  // Scripts tab: CSRF before-request and Basic Auth user (password stays in middleware .env).
+  const sc = api?.scripts;
+  if (sc) {
+    if (typeof sc.csrfFetch === "boolean") h["x-sap-csrf"] = sc.csrfFetch ? "on" : "off";
+    const u = sc.authUser?.trim();
+    if (u && /^[A-Za-z0-9_.@-]{1,64}$/.test(u)) h["x-sap-user"] = u;
+  }
   return h;
 }
 

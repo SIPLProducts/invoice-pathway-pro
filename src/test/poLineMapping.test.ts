@@ -14,7 +14,7 @@ describe("mapPoLine", () => {
       { key: "PoItem", type: "string" }, { key: "Unit", type: "string" },
       { key: "Quantity", type: "number" },
     ] as never);
-    expect(r).toEqual({ Material: "452", OpenQty: 20, PoItem: "10", Unit: "EA", Quantity: 20 });
+    expect(r).toMatchObject({ Material: "452", OpenQty: 20, PoItem: "10", Unit: "EA", Quantity: 20 });
   });
 });
 
@@ -25,7 +25,7 @@ describe("mapPoLine – DMR form columns", () => {
       { key: "uom", type: "string" }, { key: "po_quantity", type: "number" },
       { key: "goods_receipt_quantity", type: "number" }, { key: "po_number", type: "string" },
     ] as never);
-    expect(r).toEqual({
+    expect(r).toMatchObject({
       materials_code: "452", materials_description: "TRANSPORT", uom: "EA",
       po_quantity: 20, goods_receipt_quantity: 5, po_number: "400000001",
     });

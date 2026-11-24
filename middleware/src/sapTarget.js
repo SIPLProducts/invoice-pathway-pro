@@ -41,7 +41,7 @@ function safeList(v) {
   return l.every((n) => SAFE_NAME.test(n)) ? l : [];
 }
 
-function build({ servicePath, headerEntity, itemEntity, headerKeys, itemKeys, itemNav }) {
+function build({ servicePath, headerEntity, itemEntity, headerKeys, itemKeys, itemNav, csrf = "", authUser = "" }) {
   const header = headerEntity || DEFAULTS.headerEntity;
   const hk = headerKeys && headerKeys.length ? headerKeys : DEFAULTS.headerKeys;
   let ik = itemKeys && itemKeys.length ? itemKeys : DEFAULTS.itemKeys;
@@ -52,6 +52,9 @@ function build({ servicePath, headerEntity, itemEntity, headerKeys, itemKeys, it
     headerKeys: hk,
     itemKeys: ik,
     itemNav: itemNav || DEFAULTS.itemNav,
+    // Per-API "Scripts" tab: CSRF before-request on/off and Basic Auth user name.
+    csrf,
+    authUser,
   };
 }
 
@@ -72,6 +75,8 @@ function fromRequest(req) {
     headerKeys: safeList(h["x-sap-header-keys"]),
     itemKeys: safeList(h["x-sap-item-keys"]),
     itemNav,
+    csrf: /^(on|off)$/i.test(String(h["x-sap-csrf"] || "")) ? String(h["x-sap-csrf"]).toLowerCase() : "",
+    authUser: /^[A-Za-z0-9_.@-]{1,64}$/.test(String(h["x-sap-user"] || "")) ? String(h["x-sap-user"]) : "",
   });
 }
 

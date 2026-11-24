@@ -1,3 +1,4 @@
+import { buildGateCreatePayload, isGateCreate } from "@/lib/gateCreatePayload";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
@@ -89,6 +90,11 @@ export function mapPoLine(src: Row, fields: FieldDef[]): Row {
     if (v === undefined || v === null) continue;
     out[f.key] = f.type === "number" ? Number(v) || 0 : (v as Row[string]);
   }
+  // Keep PO item / open qty for the SAP create body even when not shown as columns.
+  const poItem = lookupAlias(src, "PoItem", {});
+  if (poItem !== undefined && !("po_item" in out)) out.po_item = poItem as Row[string];
+  const openQty = lookupAlias(src, "OpenQuantity", {});
+  if (openQty !== undefined && !("open_quantity" in out)) out.open_quantity = openQty as Row[string];
   return out;
 }
 
@@ -308,8 +314,12 @@ export default function DMRNew() {
     }
     const childKey = api.childKey ?? "_Item";
     // Send only the fields configured on the API, with the values typed on screen.
-    const body: Record<string, unknown> = pickConfigured(header, headerFieldsRaw);
-    if (itemFieldsRaw.length) {
+    const gate = isGateCreate(api.endpoint, childKey);
+    // GateHeader create: send exactly the Postman-proven body. Other APIs: configured fields.
+    const body: Record<string, unknown> = gate
+      ? buildGateCreatePayload(header, items, childKey)
+      : pickConfigured(header, headerFieldsRaw);
+    if (!gate && itemFieldsRaw.length) {
       body[childKey] = items.map((row) => pickConfigured(row, itemFieldsRaw));
     }
 
@@ -322,7 +332,10 @@ export default function DMRNew() {
       return;
     }
 
-    const res = await submit(body, { headerFields: headerFieldsRaw, itemFields: itemFieldsRaw, childKey });
+    const res = await submit(
+      body,
+      gate ? { headerFields: [], itemFields: [], childKey } : { headerFields: headerFieldsRaw, itemFields: itemFieldsRaw, childKey },
+    );
     if (res.ok) {
       const d = (res.data as Record<string, unknown> | undefined) ?? {};
       const norm = (k: string) => k.toLowerCase().replace(/_/g, "");

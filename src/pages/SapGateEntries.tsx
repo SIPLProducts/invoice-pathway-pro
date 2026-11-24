@@ -11,6 +11,7 @@ import { SapLiveTable } from "@/components/SapLiveTable";
 import { EditHeaderDialog } from "@/components/EditHeaderDialog";
 import { buildSchemaFromApi } from "@/lib/sapApiSchemas";
 import { useSapApis } from "@/lib/sapApisStore";
+import { pickSameService } from "@/lib/sapTarget";
 
 export default function SapGateEntries() {
   const [editing, setEditing] = useState<{ row: Record<string, unknown> } | null>(null);
@@ -53,7 +54,10 @@ export default function SapGateEntries() {
     !!tpl && !/\{item_no\}|\{item[_-]?id\}/i.test(tpl) && !/\/items?\//i.test(tpl);
 
   // 1) Best match: configured template AND looks like a header API by name AND template is header-shaped.
-  const headerByName = apis.find(
+  // Prefer APIs on the same SAP service as the list API, so leftover configs
+  // for an old service are never used to save changes.
+  const listService = selectedApi?.endpoint;
+  const headerByName = pickSameService(apis, listService,
     (a) =>
       a.status === "Active" &&
       isHeaderTpl(a.updateEndpoint) &&
@@ -61,7 +65,7 @@ export default function SapGateEntries() {
       headerNameRe.test(`${a.name} ${a.endpoint} ${a.proxyPath ?? ""}`),
   );
   // 2) Fallback: any active API with a header-shaped template that is NOT an item API.
-  const headerByTpl = apis.find(
+  const headerByTpl = pickSameService(apis, listService,
     (a) => a.status === "Active" && isHeaderTpl(a.updateEndpoint) && !isItemApi(a),
   );
   // 3) Surface a "configure me" banner if we found something by name but the template is empty/wrong.
@@ -80,7 +84,7 @@ export default function SapGateEntries() {
   const isItemTpl = (tpl: string | undefined) =>
     !!tpl && (/\{item_no\}|\{item[_-]?id\}/i.test(tpl) || /\/items?\//i.test(tpl));
   const itemUpdateApi =
-    apis.find(
+    pickSameService(apis, listService,
       (a) => a.status === "Active" && isItemApi(a) && isItemTpl(a.updateEndpoint),
     ) ?? null;
   const itemUpdateNeedsConfig =

@@ -98,3 +98,21 @@ export function fillSapPath(endpoint: string, values: Record<string, string>): s
     encodeURIComponent(String(values[k] ?? "").replace(/'/g, "''")),
   ).replace(/ /g, "%20");
 }
+
+/**
+ * First API matching `pred`, preferring one whose SAP service path equals the
+ * service of `refEndpoint`. Falls back to the first match on any service.
+ */
+export function pickSameService<T extends { endpoint?: string }>(
+  apis: T[],
+  refEndpoint: string | undefined | null,
+  pred: (a: T) => boolean,
+): T | undefined {
+  const ref = parseEndpoint(refEndpoint)?.servicePath;
+  const matches = apis.filter(pred);
+  if (ref) {
+    const same = matches.find((a) => parseEndpoint(a.endpoint)?.servicePath === ref);
+    if (same) return same;
+  }
+  return matches[0];
+}

@@ -37,7 +37,10 @@ const useBasic = !useBearer && !useOauthCc && !configuredBasicStateless;
 
 // Runtime fallback: if cookie-based login returns sap_no_cookies, we flip this
 // flag for the rest of the process and switch to per-request Basic auth.
-let effectiveBasicStateless = configuredBasicStateless;
+// COOKIES DISABLED (Nov 2026): SAP now accepts plain Basic auth on every request.
+// The cookie/session code below is kept but bypassed. Set SAP_USE_COOKIES=true to re-enable.
+const COOKIES_DISABLED = String(process.env.SAP_USE_COOKIES || "").toLowerCase() !== "true";
+let effectiveBasicStateless = configuredBasicStateless || (COOKIES_DISABLED && !useBearer && !useOauthCc);
 function isStatelessActive() {
   return effectiveBasicStateless;
 }
@@ -113,8 +116,7 @@ if (useBearer && SAP_BEARER_TOKEN) {
   baseHeaders.Authorization = `Bearer ${SAP_BEARER_TOKEN}`;
 }
 
-const http = wrapper(
-  axios.create({
+const axiosOpts = {
     baseURL: `${SAP_BASE_URL}`,
     // NOTE: No instance-level Basic auth. We auto-login via sapSessionStore
     // and forward JSESSIONID/__VCAP_ID__ cookies on every request instead.
@@ -124,8 +126,12 @@ const http = wrapper(
     maxRedirects: 0,
     validateStatus: () => true,
     headers: baseHeaders,
-  }),
-);
+};
+if (COOKIES_DISABLED) {
+  delete axiosOpts.jar;
+  axiosOpts.withCredentials = false;
+}
+const http = COOKIES_DISABLED ? axios.create(axiosOpts) : wrapper(axios.create(axiosOpts));
 
 // Inject fresh oauth_cc bearer on every request
 http.interceptors.request.use(async (config) => {
@@ -148,6 +154,7 @@ const CSRF_TTL_MS = 25 * 60 * 1000;
  *   2. Auto-managed session from sapSessionStore (auto-login when missing/expired)
  */
 async function resolveCookies(extraCookies) {
+  if (COOKIES_DISABLED) return { cookies: "", source: "stateless" };
   if (extraCookies && String(extraCookies).trim()) {
     return { cookies: String(extraCookies).trim(), source: "manual" };
   }

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Printer, Save, Search, Trash2, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Printer, Save, Search, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 type Row = Record<string, string | boolean>;
@@ -215,6 +215,109 @@ export default function GRNCreate() {
           </table>
         </div>
       </div>
+      {rows.length > 0 && (() => {
+        const di = Math.min(selected ?? 0, rows.length - 1);
+        const r = rows[di];
+        const v = (k: string) => String(r[k] ?? "");
+        const ed = (k: string, cls = "") => <Input className={cls} value={v(k)} onChange={(e) => setCell(di, k, e.target.value)} />;
+        const ro = (k: string, cls = "") => <Input readOnly className={`bg-muted ${cls}`} value={v(k)} />;
+        const pair = (a: React.ReactNode, b: React.ReactNode) => <div className="grid grid-cols-[1fr_100px] gap-2">{a}{b}</div>;
+        return (
+          <div className="mt-5 rounded-xl border bg-card shadow-card">
+            <Tabs defaultValue="material" className="p-4">
+              <TabsList className="flex-wrap h-auto">
+                {[["material","Material"],["quantity","Quantity"],["where","Where"],["po","Purchase Order Data"],["partner","Partner"],["acct","Account Assignment"],["custom","Custom Fields"]].map(([k,l]) => <TabsTrigger key={k} value={k}>{l}</TabsTrigger>)}
+              </TabsList>
+              <TabsContent value="material" className="pt-4">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="space-y-3">
+                    <Field label="Material">{pair(ro("matText"), ro("material", "font-mono"))}</Field>
+                    <Field label="Supplier Mat. No.">{ro("vendorMaterial")}</Field>
+                    <Field label="Material Group">{ro("materialGroup", "w-40 font-mono")}</Field>
+                  </div>
+                  <div className="space-y-3 lg:pt-24">
+                    <Field label="EAN in Order Unit">{ed("ean")}</Field>
+                    <Field label="EAN Check">{pair(ed("eanCheck"), ed("eanCheckFlag"))}</Field>
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent value="quantity" className="pt-4">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="space-y-3">
+                    <Field label="Qty in Unit of Entry">{pair(ed("qty"), ed("eun"))}</Field>
+                    <Field label="Qty in SKU">{pair(ro("qtySku"), ro("eun"))}</Field>
+                    <Field label="Qty in Delivery Note">{pair(ed("qtyDelNote"), ed("delNoteUnit"))}</Field>
+                    <Field label="Quantity Ordered">{pair(ro("orderQty"), ro("orderUnit"))}</Field>
+                  </div>
+                  <div className="space-y-3 lg:pt-36">
+                    <Field label="No. Containers">{pair(ed("containers"), ed("containerUnit"))}</Field>
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent value="where" className="pt-4">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="space-y-3">
+                    <Field label="Movement Type">
+                      <div className="flex items-center gap-2">{ed("movementType", "w-20 font-mono")}<span className="text-sm text-muted-foreground">{v("direction") || "+"} GR goods receipt</span></div>
+                    </Field>
+                    <Field label="Plant">{pair(ro("plantName"), ro("plant", "font-mono"))}</Field>
+                    <Field label="Storage Location">{pair(ed("slocName"), ro("sloc", "font-mono"))}</Field>
+                    <Field label="Goods Recipient">{ed("goodsRecipient", "w-48")}</Field>
+                    <Field label="Unloading Point">{ed("unloadingPoint", "w-72")}</Field>
+                    <Field label="Text">{ed("itemText")}</Field>
+                  </div>
+                  <div className="space-y-3">
+                    <Field label="Stock type">
+                      <select className={sel} value={v("stockType")} onChange={(e) => setCell(di, "stockType", e.target.value)}>
+                        {["Unrestricted-Use", "Quality Inspection", "Blocked Stock"].map((o) => <option key={o}>{o}</option>)}
+                      </select>
+                    </Field>
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent value="po" className="pt-4">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="space-y-3">
+                    <Field label="Purchase Order">{pair(ro("purchaseOrder", "font-mono"), ro("poItem", "font-mono"))}</Field>
+                    <Field label='"Del.Completed" Ind.'>
+                      <select className={sel} value={v("delComplInd")} onChange={(e) => setCell(di, "delComplInd", e.target.value)}>
+                        {["1 Set automatically", "2 Set", "3 Do not set"].map((o) => <option key={o}>{o}</option>)}
+                      </select>
+                    </Field>
+                  </div>
+                  <div className="space-y-3">
+                    <Field label="Item Category"><span className="text-sm">{v("itemCategory") || "Standard"}</span></Field>
+                    <div className="flex items-center gap-2 pl-[142px] text-sm text-muted-foreground">
+                      <Checkbox disabled checked={!!r.delivered} /> Del. Compl. Ind. PO Item
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent value="partner" className="pt-4">
+                <div className="max-w-2xl"><Field label="Vendor">{pair(ro("vendorName"), ro("vendor", "font-mono"))}</Field></div>
+              </TabsContent>
+              <TabsContent value="acct" className="pt-4">
+                <div className="max-w-md"><Field label="Profit Ctrs">{ro("profitCenter", "font-mono")}</Field></div>
+              </TabsContent>
+              <TabsContent value="custom" className="pt-4">
+                <p className="text-sm text-muted-foreground">No custom fields configured.</p>
+              </TabsContent>
+            </Tabs>
+            <div className="flex items-center gap-4 border-t bg-muted/30 px-4 py-2">
+              <div className="flex gap-1">
+                <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Previous line" disabled={di === 0} onClick={() => setSelected(di - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Next line" disabled={di >= rows.length - 1} onClick={() => setSelected(di + 1)}><ChevronRight className="h-4 w-4" /></Button>
+              </div>
+              <label className="flex items-center gap-2 text-sm"><Checkbox checked={!!r.ok} onCheckedChange={(x) => setCell(di, "ok", !!x)} />Item OK</label>
+              <div className="ml-8 flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Line:</span>
+                <Input type="number" min={1} max={rows.length} className="h-8 w-20" value={di + 1}
+                  onChange={(e) => { const n = Number(e.target.value); if (n >= 1 && n <= rows.length) setSelected(n - 1); }} />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }

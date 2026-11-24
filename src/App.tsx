@@ -10,6 +10,7 @@ import { AuthProvider } from "@/lib/auth";
 import Dashboard from "./pages/Dashboard";
 import DMRDetail from "./pages/DMRDetail";
 import SapGateEntries from "./pages/SapGateEntries";
+import DMRUpdate from "./pages/DMRUpdate";
 import DMRNew from "./pages/DMRNew";
 import OCRCapture from "./pages/OCRCapture";
 import GRN from "./pages/GRN";
@@ -42,6 +43,7 @@ const App = () => (
               <Route path="/dmr" element={<Navigate to="/dmr/sap-gate-entries" replace />} />
               <Route path="/dmr/sap-gate-entries" element={<RequirePermission screen="dmr" label="DMR"><SapGateEntries /></RequirePermission>} />
               <Route path="/dmr/new" element={<RequirePermission screen="dmr" action="create" label="DMR"><DMRNew /></RequirePermission>} />
+              <Route path="/dmr/update" element={<RequirePermission screen="dmr" action="edit" label="DMR"><DMRUpdate /></RequirePermission>} />
               <Route path="/dmr/:id" element={<RequirePermission screen="dmr" label="DMR"><DMRDetail /></RequirePermission>} />
               <Route path="/ocr" element={<RequirePermission screen="gate_entries" label="Gate Entries"><OCRCapture /></RequirePermission>} />
               <Route path="/grn" element={<RequirePermission screen="grn" label="GRN"><GRN /></RequirePermission>} />

@@ -1,3 +1,4 @@
+import { logTag } from "@/lib/sapCallLog";
 import { getSapConnection, useSapConnection } from "@/lib/sapConnection";
 import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -97,6 +98,7 @@ export function useSapProxy<T = Record<string, unknown>>(
           ...getSapTargetHeaders(api),
         };
         if (secret) headers["x-proxy-secret"] = secret;
+        Object.assign(headers, logTag(api?.name, "fetch"));
         const res = await fetch(`${proxyUrl}${schema.proxyPath}`, { headers });
         const text = await res.text();
         const ct = res.headers.get("content-type") ?? "";

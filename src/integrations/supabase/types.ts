@@ -140,6 +140,57 @@ export type Database = {
         }
         Relationships: []
       }
+      sap_api_call_logs: {
+        Row: {
+          action: string
+          api_name: string
+          bytes: number
+          created_at: string
+          duration_ms: number | null
+          http_status: number | null
+          id: string
+          message: string | null
+          method: string | null
+          ok: boolean
+          record_count: number
+          response_preview: Json | null
+          url: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action?: string
+          api_name: string
+          bytes?: number
+          created_at?: string
+          duration_ms?: number | null
+          http_status?: number | null
+          id?: string
+          message?: string | null
+          method?: string | null
+          ok?: boolean
+          record_count?: number
+          response_preview?: Json | null
+          url?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          api_name?: string
+          bytes?: number
+          created_at?: string
+          duration_ms?: number | null
+          http_status?: number | null
+          id?: string
+          message?: string | null
+          method?: string | null
+          ok?: boolean
+          record_count?: number
+          response_preview?: Json | null
+          url?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       sap_api_configs: {
         Row: {
           config: Json

@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1795499875509,
+      "tag": "0000_sap_api_call_logs",
+      "breakpoints": true
+    }
+  ]
+}

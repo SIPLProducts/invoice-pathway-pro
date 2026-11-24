@@ -1,3 +1,4 @@
+import { logTag } from "@/lib/sapCallLog";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { getPath } from "@/lib/getPath";
 import { resolveProxyUrl, resolveProxySecret } from "@/hooks/useSapProxy";
@@ -90,6 +91,7 @@ export function useSapObdLookup(): UseSapObdLookupResult {
         };
         if (useOdata) headers["x-sap-path"] = fillSapPath(sapEndpoint, { obd_number: obd });
         { const s = resolveProxySecret(api); if (s) headers["x-proxy-secret"] = s; }
+        Object.assign(headers, logTag(api?.name, "lookup"));
 
         const res = await fetch(`${proxyUrl}${path}`, { headers });
         const text = await res.text();

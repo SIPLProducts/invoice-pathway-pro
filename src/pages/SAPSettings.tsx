@@ -1,3 +1,4 @@
+import { logTag } from "@/lib/sapCallLog";
 import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useEffect, useState } from "react";
 import { useSapConnection, saveSapConnection } from "@/lib/sapConnection";
@@ -145,6 +146,7 @@ export default function SAPSettings() {
           Accept: "application/json",
           "ngrok-skip-browser-warning": "true",
           ...(secret ? { "x-proxy-secret": secret } : {}),
+          ...logTag("Connection Test", "test"),
           ...getSapSessionHeaders(),
           ...getSapTargetHeaders(apis.find((a) => /^\/sap\//.test(a.endpoint ?? "") && a.middleware?.url) ?? apis.find((a) => /^\/sap\//.test(a.endpoint ?? ""))),
         },

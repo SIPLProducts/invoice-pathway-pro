@@ -1,3 +1,4 @@
+import { logTag } from "@/lib/sapCallLog";
 import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useState } from "react";
 import type { SapApi, FieldDef } from "@/lib/sapApisStore";
@@ -185,6 +186,7 @@ export function useSapUpdate(api: SapApi | null | undefined) {
           ...getSapTargetHeaders(api),
       };
       if (secret) headers["x-proxy-secret"] = secret;
+      Object.assign(headers, logTag(api?.name));
 
       const res = await fetch(`${proxyUrl}${resolvedPath}`, {
         method,

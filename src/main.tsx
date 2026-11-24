@@ -1,6 +1,9 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { installSapCallLogger } from "./lib/sapCallLog";
+
+installSapCallLogger();
 
 // --- PWA service-worker handling ---------------------------------------------
 // Inside the Lovable editor preview (iframe / preview hostnames) we MUST NOT

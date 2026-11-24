@@ -1,3 +1,4 @@
+import { ApiCallHistory } from "@/components/ApiCallHistory";
 import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -693,6 +694,7 @@ export default function SAPApiEdit() {
               </div>
             </div>
           </div>
+          <ApiCallHistory apiName={api.name} />
         </TabsContent>
 
 

@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { getPath, resolveKey } from "@/lib/getPath";
 import { normalizeForCompare } from "@/lib/changedPayload";
+import { isEditableItemField } from "@/lib/itemEditable";
 
 interface Props {
   schema: SapApiSchema;
@@ -50,7 +51,7 @@ const KEY_COLS = new Set(["gate_id", "item_no"]);
 // Server-managed; not user-editable.
 const READONLY_COLS = new Set(["lastchangedat", "createdat", "lastchangedby", "createdby", "gateid", "itemno"]);
 const nk = (p: string) => p.replace(/_/g, "").toLowerCase();
-const isReadOnlyCol = (p: string) => READONLY_COLS.has(nk(p));
+const isReadOnlyCol = (p: string) => READONLY_COLS.has(nk(p)) || !isEditableItemField(p);
 
 /** PATCH body with only the item fields the user changed, under SAP's own names. Keys never included. */
 export function buildChangedItemPayload(

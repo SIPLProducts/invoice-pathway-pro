@@ -2,6 +2,7 @@ import { logTag } from "@/lib/sapCallLog";
 import { pickRowValue } from "@/hooks/useSapUpdate";
 import { getSapTargetHeaders } from "@/lib/sapTarget";
 import { useState } from "react";
+import { isEditableItemField } from "@/lib/itemEditable";
 import type { SapApi, FieldDef } from "@/lib/sapApisStore";
 import { resolveProxyUrl, resolveProxySecret, describeFetchError } from "./useSapProxy";
 import {
@@ -26,11 +27,10 @@ export function sanitizeItemRow(
   // configured fields use snake_case (vendor_name).
   const nk = (x: string) => x.replace(/_/g, "").toLowerCase();
   const typeByKey = new Map(fields.map((f) => [nk(f.key), f.type] as const));
-  const allowed = fields.length > 0 ? new Set(fields.map((f) => nk(f.key))) : null;
   const liveByNk = new Map(Object.entries(liveRow).map(([lk, lv]) => [nk(lk), lv] as const));
   const out: Record<string, unknown> = {};
   for (const [k, raw] of Object.entries(body)) {
-    if (allowed && !allowed.has(nk(k))) continue;
+    if (!isEditableItemField(k)) continue;
     if (raw === null || raw === undefined) continue;
     if (k.startsWith("@") || k === "SAP__Messages") continue;
     // Skip SAP server-managed audit fields when null/empty

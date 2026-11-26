@@ -195,6 +195,8 @@ export default function GRNCreate() {
       return;
     }
     const body = buildGrnPostPayload(h.postDate, rows as Record<string, unknown>[]);
+    if (!body.PostingDate) { await alertError("Posting Date is required"); return; }
+    if (!body.StorageLocations) { await alertError("Storage Location is required", "Enter SLoc on a line item."); return; }
     if (!(await confirmAction(`Post GRN for Gate ${id}?`, `Posting date ${body.PostingDate ?? "-"}`))) return;
     const r = await grnPost.post(id, body);
     resetScreen();

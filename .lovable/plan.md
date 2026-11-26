@@ -16,6 +16,7 @@
 | Items table (full width, unchanged)                             |
 ```
 - Right panel: Gate ID first and highlighted (accent border, icon), then the other dropdowns/inputs stacked one per row; sticky on scroll.
+- Gate ID dropdown options show only the Gate ID (no vendor name).
 - When a Gate ID is chosen, show a small summary chip (Gate ID, vendor) and a "Clear" button; Reference/PO/Item stay hidden as today.
 - Left panel: General tab fields in 2 columns instead of 3 so they fit the narrower width; Vendor/Partner tabs fill width.
 - Both panels as matching cards with section titles ("Document Header", "Selection"), consistent label sizes and spacing.

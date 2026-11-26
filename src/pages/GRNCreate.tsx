@@ -66,14 +66,14 @@ const emptyRow = (): Row => ({ movementType: "101", direction: "+", stockType: "
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[110px_1fr] items-center gap-2">
+    <div className="grid grid-cols-[90px_1fr] items-center gap-2 sm:grid-cols-[110px_1fr] [&>*]:min-w-0">
       <Label className="text-right text-xs text-muted-foreground">{label}</Label>
       {children}
     </div>
   );
 }
 
-const cardCls = "overflow-hidden rounded-xl border border-primary/15 bg-card shadow-card";
+const cardCls = "min-w-0 max-w-full overflow-hidden rounded-xl border border-primary/15 bg-card shadow-card";
 const stripCls = "bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground";
 const tabCls = "[&_[data-state=active]]:bg-gradient-primary [&_[data-state=active]]:text-primary-foreground";
 const sel = "h-9 w-full rounded-md border border-input bg-background px-2 text-sm";
@@ -130,7 +130,7 @@ export default function GRNCreate() {
   const setCell = (i: number, k: string, v: string | boolean) => setRows((r) => r.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
 
   return (
-    <>
+    <div className="min-w-0 max-w-full">
       <PageHeader
         title="Create GRN — Post Mat Doc Against DMR"
         description="Post goods receipt against a purchase order (MIGO-style)."
@@ -142,10 +142,10 @@ export default function GRNCreate() {
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-12 [&_input]:h-8 [&_select]:h-8">
-        <div className="space-y-4 lg:col-span-9">
+      <div className="grid min-w-0 gap-4 md:grid-cols-12 [&_input]:h-8 [&_select]:h-8">
+        <div className="min-w-0 space-y-4 md:col-span-8 lg:col-span-9">
           <div className={cardCls}>
-            <div className="grid grid-cols-2 gap-2 p-3 md:grid-cols-3 xl:grid-cols-6">
+            <div className="grid grid-cols-2 gap-2 p-3 [&>*]:min-w-0 sm:grid-cols-3 xl:grid-cols-6">
           <div className="space-y-1"><Label className="text-xs text-muted-foreground">Action</Label>
             <select className={sel} value={h.action} onChange={(e) => set("action", e.target.value)}>
               {["A01 Goods Receipt", "A02 Change", "A03 Display", "A04 Cancel"].map((o) => <option key={o}>{o}</option>)}
@@ -157,7 +157,7 @@ export default function GRNCreate() {
               </select></div>
             <div className="space-y-1"><Label className="text-xs text-muted-foreground">PO Number</Label>
               <div className="flex gap-1">
-                <Input className="font-mono" placeholder="PO Number" value={h.poNumber} onChange={(e) => set("poNumber", e.target.value)} />
+                <Input className="min-w-0 font-mono" placeholder="PO Number" value={h.poNumber} onChange={(e) => set("poNumber", e.target.value)} />
                 <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" aria-label="Search PO" onClick={() => toast.info("PO lookup is not connected yet")}><Search className="h-4 w-4" /></Button>
               </div></div>
             <div className="space-y-1"><Label className="text-xs text-muted-foreground">Item</Label>
@@ -173,13 +173,13 @@ export default function GRNCreate() {
             <div className={stripCls}>Document Header</div>
             <div className="p-3">
         <Tabs defaultValue="general" >
-          <TabsList className={tabCls}>
+          <TabsList className={`max-w-full overflow-x-auto ${tabCls}`}>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="vendor">Vendor</TabsTrigger>
             <TabsTrigger value="partner" aria-label="Partner"><Users className="h-4 w-4" /></TabsTrigger>
           </TabsList>
           <TabsContent value="general" className="pt-3">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <div className="space-y-2">
                 <Field label="Document Date"><Input type="date" value={h.docDate} onChange={(e) => set("docDate", e.target.value)} /></Field>
                 <Field label="Posting Date"><Input type="date" value={h.postDate} onChange={(e) => set("postDate", e.target.value)} /></Field>
@@ -226,8 +226,8 @@ export default function GRNCreate() {
             </div>
           </div>
         </div>
-        <div className="order-first lg:order-last lg:col-span-3">
-          <div className="rounded-xl bg-gradient-primary p-4 text-primary-foreground shadow-card lg:sticky lg:top-4">
+        <div className="order-first min-w-0 md:order-last md:col-span-4 lg:col-span-3">
+          <div className="rounded-xl bg-gradient-primary p-4 text-primary-foreground shadow-card md:sticky md:top-4">
             <h3 className="mb-2 font-display text-base font-semibold">Selection</h3>
             <p className="mb-3 text-xs text-primary-foreground/80">Pick a Gate ID from All DMR to fill this GRN.</p>
           <div className="space-y-1.5 "><Label className="text-xs font-semibold text-primary-foreground/90">Gate ID</Label>
@@ -298,24 +298,24 @@ export default function GRNCreate() {
           <div className={`mt-4 ${cardCls}`}>
             <div className={stripCls}>Item Detail — Line {di + 1}</div>
             <Tabs defaultValue="material" className="p-3">
-              <TabsList className={`flex-wrap h-auto ${tabCls}`}>
+              <TabsList className={`h-auto max-w-full justify-start overflow-x-auto ${tabCls}`}>
                 {[["material","Material"],["quantity","Quantity"],["where","Where"],["po","Purchase Order Data"],["partner","Partner"],["acct","Account Assignment"],["custom","Custom Fields"]].map(([k,l]) => <TabsTrigger key={k} value={k}>{l}</TabsTrigger>)}
               </TabsList>
               <TabsContent value="material" className="pt-4">
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid gap-4 xl:grid-cols-2">
                   <div className="space-y-3">
                     <Field label="Material">{pair(ro("matText"), ro("material", "font-mono"))}</Field>
                     <Field label="Supplier Mat. No.">{ro("vendorMaterial")}</Field>
                     <Field label="Material Group">{ro("materialGroup", "w-40 font-mono")}</Field>
                   </div>
-                  <div className="space-y-3 lg:pt-24">
+                  <div className="space-y-3 xl:pt-24">
                     <Field label="EAN in Order Unit">{ed("ean")}</Field>
                     <Field label="EAN Check">{pair(ed("eanCheck"), ed("eanCheckFlag"))}</Field>
                   </div>
                 </div>
               </TabsContent>
               <TabsContent value="quantity" className="pt-4">
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid gap-4 xl:grid-cols-2">
                   <div className="space-y-3">
                     <Field label="Qty in Unit of Entry">{pair(ed("qty"), ed("eun"))}</Field>
                     <Field label="Qty in SKU">{pair(ro("qtySku"), ro("eun"))}</Field>
@@ -328,7 +328,7 @@ export default function GRNCreate() {
                 </div>
               </TabsContent>
               <TabsContent value="where" className="pt-4">
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid gap-4 xl:grid-cols-2">
                   <div className="space-y-3">
                     <Field label="Movement Type">
                       <div className="flex items-center gap-2">{ed("movementType", "w-20 font-mono")}<span className="text-sm text-muted-foreground">{v("direction") || "+"} GR goods receipt</span></div>
@@ -349,7 +349,7 @@ export default function GRNCreate() {
                 </div>
               </TabsContent>
               <TabsContent value="po" className="pt-4">
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid gap-4 xl:grid-cols-2">
                   <div className="space-y-3">
                     <Field label="Purchase Order">{pair(ro("purchaseOrder", "font-mono"), ro("poItem", "font-mono"))}</Field>
                     <Field label='"Del.Completed" Ind.'>
@@ -391,6 +391,6 @@ export default function GRNCreate() {
           </div>
         );
       })()}
-    </>
+    </div>
   );
 }

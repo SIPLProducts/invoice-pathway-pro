@@ -1,3 +1,4 @@
+import { alertError, alertSuccess } from "@/lib/alerts";
 import { useMemo, useState } from "react";
 import {
   Dialog,
@@ -127,10 +128,10 @@ export function EditHeaderDialog({ api, row, onClose, onSaved }: Props) {
 
     const result = await submit(row, body);
     if (!result.ok) {
-      toast.error(result.error ?? "Update failed");
+      void alertError("Update failed", result.error);
       return;
     }
-    toast.success(`Updated ${keyField} = ${previewKey}`);
+    void alertSuccess("DMR updated", `Updated ${keyField} = ${previewKey}`);
     onSaved?.();
     onClose();
   };

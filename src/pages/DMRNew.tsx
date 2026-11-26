@@ -1,5 +1,6 @@
 import { buildGateCreatePayload, isGateCreate } from "@/lib/gateCreatePayload";
 import { useEffect, useMemo, useState } from "react";
+import { alertError, alertSuccess } from "@/lib/alerts";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -342,6 +343,7 @@ export default function DMRNew() {
       const want = norm(api.rowKey ?? "GateId");
       const idKey = Object.keys(d).find((k) => norm(k) === want) ?? Object.keys(d).find((k) => norm(k) === "gateid");
       setCreated({ id: idKey ? String(d[idKey] ?? "") : "", data: d });
+      void alertSuccess("DMR created", idKey ? `Gate ID ${String(d[idKey] ?? "")}` : undefined);
     } else {
       const sapErr = (res.sapBody as { error?: { hint?: string; code?: string } } | undefined)
         ?.error;
@@ -354,10 +356,7 @@ export default function DMRNew() {
           duration: 10000,
         });
       } else {
-        toast.error(res.error ?? "Failed to create", {
-          description: hint,
-          duration: hint ? 10000 : 5000,
-        });
+        void alertError("Create failed", [res.error ?? "Failed to create", hint].filter(Boolean).join(" — "));
       }
     }
   };

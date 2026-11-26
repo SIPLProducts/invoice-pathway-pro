@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { alertError, alertSuccess } from "@/lib/alerts";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -113,10 +114,10 @@ export function EditableItemsTable({
     }
     const result = await submit(parentRow, row, body);
     if (!result.ok) {
-      toast.error(result.error ?? "Update failed");
+      void alertError("Update failed", result.error);
       return;
     }
-    toast.success(`Updated item ${String(getPath(row, "item_no") ?? "")}`);
+    void alertSuccess("Item updated", `Updated item ${String(getPath(row, "item_no") ?? "")}`);
     onSaved?.((result.data as Record<string, unknown>) ?? { ...row, ...body }, idx);
     cancel();
   };

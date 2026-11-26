@@ -11,6 +11,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronLeft, ChevronRight, Plus, Printer, Save, Search, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
+import { useSapGrnPost } from "@/hooks/useSapGrnPost";
+import { buildGrnPostPayload } from "@/lib/grnPostPayload";
+import { alertError, alertSuccess, confirmAction } from "@/lib/alerts";
 
 type Row = Record<string, string | boolean>;
 
@@ -23,6 +26,7 @@ const COLUMNS: { key: string; label: string; type?: "check" | "select"; options?
   { key: "sloc", label: "SLoc" },
   { key: "profitCenter", label: "Profit Center" },
   { key: "batch", label: "Batch" },
+  { key: "serial", label: "Serial No." },
   { key: "valuationType", label: "Valuation Type" },
   { key: "movementType", label: "Movement Type" },
   { key: "direction", label: "Direction" },
@@ -87,7 +91,9 @@ export default function GRNCreate() {
   });
   const [rows, setRows] = useState<Row[]>([emptyRow()]);
   const [selected, setSelected] = useState<number | null>(null);
-  const { selectedApi } = useGateApis();
+  const { selectedApi, apis } = useGateApis();
+  const postApi = useMemo(() => apis.find((a) => a.status === "Active" && /postgoodsreceipt/i.test(a.endpoint ?? "")) ?? null, [apis]);
+  const grnPost = useSapGrnPost(postApi);
   const schema = useMemo(() => (selectedApi ? buildSchemaFromApi(selectedApi) : null), [selectedApi]);
   const proxy = useSapProxy<Record<string, unknown>>(selectedApi, schema ?? ({ proxyPath: "", columns: [] } as never));
   const dmrs = useMemo(() => sortNewestFirst(proxy.rows as Record<string, unknown>[]), [proxy.rows]);
@@ -126,6 +132,16 @@ export default function GRNCreate() {
       poItem: str(it, "po_item"), item: str(it, "item_no"), vendor, supplier: vendor,
     })) : [emptyRow()]);
   };
+  const onPost = async () => {
+    if (!gateId) return;
+    const body = buildGrnPostPayload(h.postDate, rows as Record<string, unknown>[]);
+    if (!(await confirmAction(`Post GRN for Gate ${gateId}?`, `Posting date ${body.PostingDate ?? "-"}`))) return;
+    const r = await grnPost.post(gateId, body);
+    if (!r.ok) { await alertError("Post failed", r.error); return; }
+    const d = r.data ?? {};
+    const doc = str(d, "material_doc"); const yr = str(d, "material_doc_year");
+    await alertSuccess("GRN posted", doc ? `Material Document ${doc} / ${yr} posted for Gate ${gateId}` : `Posted for Gate ${gateId}`);
+  };
   const set = (k: keyof typeof h, v: string | boolean) => setH((p) => ({ ...p, [k]: v }));
   const setCell = (i: number, k: string, v: string | boolean) => setRows((r) => r.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
 
@@ -137,7 +153,7 @@ export default function GRNCreate() {
         actions={
           <>
             <Button variant="outline" size="sm" className="border-primary/40 text-primary hover:bg-primary/10" onClick={() => toast.info("Check completed — no errors found")}>Check</Button>
-            <Button size="sm" className="bg-gradient-primary shadow-card hover:opacity-90" onClick={() => toast.info("GRN posting to SAP is not connected yet")}><Save className="h-4 w-4" />Post</Button>
+            <Button size="sm" className="bg-gradient-primary shadow-card hover:opacity-90" disabled={!gateId || grnPost.loading} onClick={onPost}><Save className="h-4 w-4" />{grnPost.loading ? "Posting…" : "Post"}</Button>
           </>
         }
       />

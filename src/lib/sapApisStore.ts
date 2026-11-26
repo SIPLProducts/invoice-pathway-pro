@@ -276,68 +276,6 @@ export const DEFAULT_GATE_RESPONSE_ITEM = GATE_ITEM_RESPONSE;
 
 const seed: SapApi[] = [
   {
-    name: "ZMRB_Inward_Inspection",
-    description:
-      "ZMRB01/ZMRB04 - Inward Inspection Report. Fetches inspection lots with vendor, PO, batch and quantity details. Use ART=01 for ZMRB01, ART=04 for ZMRB04.",
-    baseUrl: "http://10.10.6.115:8000",
-    endpoint: "/mrb/inward/report?sap-client=234",
-    method: "POST",
-    auth: "Basic",
-    status: "Active",
-    tag: "VPN Tunnel",
-    type: "sync",
-    autoSync: { enabled: true, frequencyMinutes: 5, lastSync: "22/4/2026, 10:52:03 am" },
-  },
-  {
-    name: "ZUI_Gate_Service",
-    description:
-      "SAP BTP Public Cloud - Gate Service (RAP). GET/POST GateHeader via Node middleware proxy. Configure VITE_SAP_PROXY_URL on the frontend.",
-    baseUrl: "https://1f674db9-07aa-4869-885b-435d1624cc4c.abap.us10.hana.ondemand.com",
-    endpoint:
-      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd_a2x/sap/zsd_gate_entry/0001/GateHeader?$expand=_Item",
-    method: "GET",
-    auth: "Basic",
-    status: "Active",
-    tag: "Direct",
-    type: "live",
-    autoSync: { enabled: false, frequencyMinutes: 5 },
-    rowsPath: "value",
-    rowKey: "gate_id",
-    childKey: "_Item",
-    requestHeaderFields: GATE_HEADER_REQUEST,
-    requestItemFields: GATE_ITEM_REQUEST,
-    responseHeaderFields: GATE_HEADER_RESPONSE,
-    responseItemFields: GATE_ITEM_RESPONSE,
-    scheduler: {
-      enabled: false,
-      frequency: "manual",
-      retryCount: 3,
-      retryDelayMs: 5000,
-      plants: [{ code: "1300", name: "HBL Plant 1300", selected: false }],
-    },
-    credentials: { user: "DEV00", password: "", sapClient: "100" },
-    advanced: {
-      active: true,
-      logging: true,
-      maxRecords: 1000,
-      timeoutMs: 30000,
-      customHeaders: "{}",
-    },
-    listEndpoint: "/api/gate/headers",
-    createEndpoint: "/api/gate/headers",
-    updateEndpoint: "/api/gate/headers/{gate_id}",
-    updateMethod: "PATCH",
-    keyField: "gate_id",
-    proxyPath: "/api/gate/headers",
-    middleware: {
-      url: "",
-      port: "3202",
-      secret: "",
-      connectionMode: "Via Proxy Server",
-      deploymentMode: "Self-Hosted (Client Server)",
-    },
-  },
-  {
     name: "Get DMR List",
     description:
       "Lists all SAP Gate Header records (with line items expanded) via the Node middleware proxy. Used by the DMR → SAP Gate Entries tab.",

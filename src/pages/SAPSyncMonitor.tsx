@@ -26,10 +26,10 @@ const methodColor: Record<string, string> = {
 };
 
 const history = [
-  { api: "ZMRB_Inward_Inspection", time: "22/4/2026, 10:52:03 am", duration: "1.4s", records: 247, status: "Success" },
-  { api: "ZMRB_Inward_Inspection", time: "22/4/2026, 10:47:03 am", duration: "1.2s", records: 241, status: "Success" },
-  { api: "ZMRB_Inward_Inspection", time: "22/4/2026, 10:42:02 am", duration: "1.7s", records: 239, status: "Success" },
-  { api: "ZMRB_Inward_Inspection", time: "22/4/2026, 10:37:01 am", duration: "1.1s", records: 238, status: "Success" },
+  { api: "Get DMR List", time: "22/4/2026, 10:52:03 am", duration: "1.4s", records: 247, status: "Success" },
+  { api: "Get DMR List", time: "22/4/2026, 10:47:03 am", duration: "1.2s", records: 241, status: "Success" },
+  { api: "Get DMR List", time: "22/4/2026, 10:42:02 am", duration: "1.7s", records: 239, status: "Success" },
+  { api: "Get DMR List", time: "22/4/2026, 10:37:01 am", duration: "1.1s", records: 238, status: "Success" },
   { api: "MB52_Stock_Report", time: "22/4/2026, 10:30:11 am", duration: "2.3s", records: 1430, status: "Success" },
 ];
 
@@ -190,7 +190,7 @@ export default function SAPSyncMonitor() {
         <TabsContent value="preview" className="mt-5">
           <div className="overflow-x-auto rounded-xl border bg-card shadow-card">
             <div className="flex items-center justify-between border-b p-4">
-              <div className="font-display font-semibold">ZMRB_Inward_Inspection · Latest Records</div>
+              <div className="font-display font-semibold">Get DMR List · Latest Records</div>
               <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
                 247 rows
               </Badge>

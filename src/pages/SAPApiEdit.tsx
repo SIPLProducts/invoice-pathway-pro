@@ -107,7 +107,7 @@ export default function SAPApiEdit() {
   const setApiField = <K extends keyof SapApi>(k: K, v: SapApi[K]) =>
     setApi((p) => ({ ...p, [k]: v }));
 
-  const isGate = api.name === "ZUI_Gate_Service";
+  const isGate = /gate/i.test(api.name) && /gateheader/i.test(api.endpoint);
 
   const applyPasteSample = () => {
     try {

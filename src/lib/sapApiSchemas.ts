@@ -40,7 +40,7 @@ function fieldToColumn(f: FieldDef): ColumnDef {
 
 /**
  * Build a SapApiSchema for SapLiveTable from a configured SapApi record.
- * For gate-shaped APIs (Get_DMR, Create_Gate_Service, ZUI_Gate_Service…)
+ * For gate-shaped APIs (Get_DMR, Create_Gate_Service…)
  * fall back to standard gate fields so the table renders even when the
  * user hasn't configured response fields yet.
  */

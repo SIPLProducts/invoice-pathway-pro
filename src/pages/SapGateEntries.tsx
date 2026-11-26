@@ -58,7 +58,7 @@ export default function SapGateEntries() {
                 </Link>{" "}
                 and add an Active GET API named{" "}
                 <code className="font-mono text-xs">GET DMR LIST</code> (or{" "}
-                <code className="font-mono text-xs">ZUI_Gate_Service</code>) pointing at the gate header endpoint.
+                <code className="font-mono text-xs">Get DMR List</code>) pointing at the gate header endpoint.
               </div>
             );
           }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useGateApis } from "@/hooks/useGateApis";
 import { useSapProxy } from "@/hooks/useSapProxy";
 import { buildSchemaFromApi, sortNewestFirst } from "@/lib/sapApiSchemas";
@@ -82,6 +82,50 @@ const stripCls = "bg-gradient-primary px-4 py-2 text-sm font-semibold text-prima
 const tabCls = "[&_[data-state=active]]:bg-gradient-primary [&_[data-state=active]]:text-primary-foreground";
 const sel = "h-9 w-full rounded-md border border-input bg-background px-2 text-sm";
 
+function GateSearch({ ids, value, loading, onPick }: { ids: string[]; value: string; loading: boolean; onPick: (id: string) => void }) {
+  const [q, setQ] = useState(value);
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(0);
+  useEffect(() => setQ(value), [value]);
+  const list = useMemo(() => ids.filter((id) => id.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 50), [ids, q]);
+  const choose = (id: string) => { onPick(id); setQ(id); setOpen(false); };
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setOpen(true); setHi((i) => Math.min(i + 1, list.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setHi((i) => Math.max(i - 1, 0)); }
+    else if (e.key === "Escape") setOpen(false);
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      const exact = ids.find((id) => id === q.trim());
+      const pick = exact ?? (open ? list[hi] : undefined);
+      if (pick) choose(pick); else if (q.trim()) toast.error(`Gate ID ${q.trim()} not found`);
+    }
+  };
+  return (
+    <div className="relative">
+      <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        className="h-9 bg-background pl-8 font-mono text-foreground"
+        placeholder={loading ? "Loading Gate IDs…" : "Search or enter Gate ID"}
+        value={q}
+        disabled={loading}
+        onChange={(e) => { setQ(e.target.value); setOpen(true); setHi(0); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={onKey}
+      />
+      {open && !loading && (
+        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-lg">
+          {list.length === 0 ? <p className="px-2 py-1.5 text-xs text-muted-foreground">No matching Gate ID</p> :
+            list.map((id, i) => (
+              <button key={id} type="button" onMouseDown={(e) => { e.preventDefault(); choose(id); }} onMouseEnter={() => setHi(i)}
+                className={`block w-full rounded px-2 py-1.5 text-left font-mono text-sm ${i === hi ? "bg-accent text-accent-foreground" : ""}`}>{id}</button>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GRNCreate() {
   const [h, setH] = useState({
     action: "", ref: "R01 Purchase Order", poNumber: "", poItem: "", plant: "", movementType: "101",
@@ -102,6 +146,7 @@ export default function GRNCreate() {
   const proxy = useSapProxy<Record<string, unknown>>(selectedApi, schema ?? ({ proxyPath: "", columns: [] } as never));
   const dmrs = useMemo(() => sortNewestFirst(proxy.rows as Record<string, unknown>[]), [proxy.rows]);
   const [gateId, setGateId] = useState("");
+  const gateIds = useMemo(() => dmrs.map((r) => { const v = getPath(r, "gate_id"); return v == null ? "" : String(v); }).filter(Boolean), [dmrs]);
   const str = (r: Record<string, unknown>, ...keys: string[]) => {
     for (const k of keys) { const v = getPath(r, k); if (v !== undefined && v !== null && v !== "") return String(v); }
     return "";
@@ -264,10 +309,7 @@ export default function GRNCreate() {
             <h3 className="mb-2 font-display text-base font-semibold">Selection</h3>
             <p className="mb-3 text-xs text-primary-foreground/80">Pick a Gate ID from All DMR to fill this GRN.</p>
           <div className="space-y-1.5 "><Label className="text-xs font-semibold text-primary-foreground/90">Gate ID</Label>
-            <select className={`${sel} font-mono text-foreground`} value={gateId} onChange={(e) => pickGate(e.target.value)} disabled={proxy.loading}>
-              <option value="">{proxy.loading ? "Loading Gate IDs…" : "Select Gate ID"}</option>
-              {dmrs.map((r) => { const id = str(r, "gate_id"); return id ? <option key={id} value={id}>{id}</option> : null; })}
-            </select>
+            <GateSearch ids={gateIds} value={gateId} loading={proxy.loading} onPick={pickGate} />
             {gateId && (<div className="flex items-center justify-between gap-2 pt-1"><span className="truncate rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs text-primary-foreground">{gateId}{h.vendorName ? ` · ${h.vendorName}` : ""}</span><Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground" onClick={() => pickGate("")}>Clear</Button></div>)}
             {proxy.error && <p className="text-xs text-primary-foreground">Could not load DMRs from SAP</p>}
           </div>

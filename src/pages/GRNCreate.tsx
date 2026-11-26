@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronLeft, ChevronRight, Plus, Printer, Save, Search, Trash2, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Printer, RotateCcw, Save, Search, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useSapGrnPost } from "@/hooks/useSapGrnPost";
 import { buildGrnPostPayload, missingSerialRows } from "@/lib/grnPostPayload";
@@ -189,8 +189,8 @@ export default function GRNCreate() {
     if (isCancel) {
       if (!(await confirmAction(`Cancel GRN for Gate ${id}?`, "This reverses the material document in SAP.", "Yes, cancel"))) return;
       const r = await grnCancel.post(id, {});
-      resetScreen();
       if (!r.ok) { await alertError("Cancel failed", r.error); return; }
+      resetScreen();
       const d = r.data ?? {};
       await alertSuccess("GRN cancelled", `Material Document ${str(d, "cancel_ref_doc")} / ${str(d, "cancel_ref_year")} cancelled by ${str(d, "material_doc")} / ${str(d, "material_doc_year")} for Gate ${id}`);
       return;
@@ -210,8 +210,8 @@ export default function GRNCreate() {
     if (!body.StorageLocations) { await alertError("Storage Location is required", "Enter SLoc on a line item."); return; }
     if (!(await confirmAction(`Post GRN for Gate ${id}?`, `Posting date ${body.PostingDate ?? "-"}`))) return;
     const r = await grnPost.post(id, body);
-    resetScreen();
     if (!r.ok) { await alertError("Post failed", r.error); return; }
+    resetScreen();
     const d = r.data ?? {};
     const doc = str(d, "material_doc"); const yr = str(d, "material_doc_year");
     await alertSuccess("GRN posted", doc ? `Material Document ${doc} / ${yr} posted for Gate ${id}` : `Posted for Gate ${id}`);
@@ -228,6 +228,7 @@ export default function GRNCreate() {
         actions={
           <>
             <Button variant="outline" size="sm" className="border-primary/40 text-primary hover:bg-primary/10" onClick={() => toast.info("Check completed — no errors found")}>Check</Button>
+            <Button variant="outline" size="sm" disabled={busy} onClick={async () => { if (await confirmAction("Reset the screen?", "All entered data will be cleared.", "Yes, reset")) resetScreen(); }}><RotateCcw className="h-4 w-4" />Reset</Button>
             <Button size="sm" className="bg-gradient-primary shadow-card hover:opacity-90" disabled={!gateId || !h.action || busy} onClick={onPost}><Save className="h-4 w-4" />{busy ? "Working…" : isCancel ? "Cancel GRN" : "Post"}</Button>
           </>
         }

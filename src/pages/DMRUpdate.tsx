@@ -9,7 +9,7 @@ import { EditableItemsTable } from "@/components/EditableItemsTable";
 import { EditHeaderDialog } from "@/components/EditHeaderDialog";
 import { useGateApis } from "@/hooks/useGateApis";
 import { useSapProxy } from "@/hooks/useSapProxy";
-import { buildSchemaFromApi } from "@/lib/sapApiSchemas";
+import { buildSchemaFromApi, mergeColumnsWithData } from "@/lib/sapApiSchemas";
 import { getPath } from "@/lib/getPath";
 
 type Row = Record<string, unknown>;
@@ -42,6 +42,16 @@ export default function DMRUpdate() {
   };
 
   const items = found && schema?.childKey ? ((getPath(found, schema.childKey) as Row[]) ?? []) : [];
+  // Show every field SAP returns (header + item), not only the configured ones.
+  const viewSchema = useMemo(() => {
+    if (!schema || !found) return schema;
+    const hide = schema.childKey ? [schema.childKey] : [];
+    return {
+      ...schema,
+      columns: mergeColumnsWithData(schema.columns, [found], hide),
+      childColumns: schema.childColumns || items.length ? mergeColumnsWithData(schema.childColumns ?? [], items) : undefined,
+    };
+  }, [schema, found, items]);
 
   return (
     <>
@@ -80,7 +90,7 @@ export default function DMRUpdate() {
                   </Button>
                 </CardHeader>
                 <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {schema.columns.map((c) => (
+                  {(viewSchema ?? schema).columns.map((c) => (
                     <div key={c.path}>
                       <div className="text-xs text-muted-foreground">{c.header}</div>
                       <div className="text-sm font-medium">{show(getPath(found, c.path))}</div>
@@ -89,11 +99,11 @@ export default function DMRUpdate() {
                   {!updateApi && <div className="col-span-full text-xs text-muted-foreground">No Update Header API configured in SAP Settings.</div>}
                 </CardContent>
               </Card>
-              {schema.childColumns && items.length > 0 && (
+              {viewSchema?.childColumns && items.length > 0 && (
                 <Card>
                   <CardHeader><CardTitle className="text-base">Line items</CardTitle></CardHeader>
                   <CardContent>
-                    <EditableItemsTable schema={schema} parentRow={found} items={items} itemUpdateApi={itemUpdateApi ?? undefined} onSaved={() => proxy.refresh()} />
+                    <EditableItemsTable schema={viewSchema ?? schema} parentRow={found} items={items} itemUpdateApi={itemUpdateApi ?? undefined} onSaved={() => proxy.refresh()} />
                     {!itemUpdateApi && <div className="mt-2 text-xs text-muted-foreground">No Update Item API configured — set one in <Link to="/sap/settings" className="font-semibold text-primary hover:underline">SAP Settings</Link> to edit line items.</div>}
                   </CardContent>
                 </Card>

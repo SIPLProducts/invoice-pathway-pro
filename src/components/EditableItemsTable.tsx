@@ -16,6 +16,7 @@ import { Pencil, Save, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { getPath, resolveKey } from "@/lib/getPath";
+import { normalizeForCompare } from "@/lib/changedPayload";
 
 interface Props {
   schema: SapApiSchema;
@@ -47,7 +48,29 @@ function toInputValue(v: unknown): string {
 
 const KEY_COLS = new Set(["gate_id", "item_no"]);
 // Server-managed; not user-editable.
-const READONLY_COLS = new Set(["last_changed_at", "created_at", "last_changed_by", "created_by"]);
+const READONLY_COLS = new Set(["lastchangedat", "createdat", "lastchangedby", "createdby", "gateid", "itemno"]);
+const nk = (p: string) => p.replace(/_/g, "").toLowerCase();
+const isReadOnlyCol = (p: string) => READONLY_COLS.has(nk(p));
+
+/** PATCH body with only the item fields the user changed, under SAP's own names. Keys never included. */
+export function buildChangedItemPayload(
+  cols: ColumnDef[],
+  initial: Record<string, string>,
+  draft: Record<string, string>,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  for (const c of cols) {
+    if (isReadOnlyCol(c.path)) continue;
+    const after = draft[c.path];
+    if (after === undefined) continue;
+    const live = getPath(row, c.path);
+    const t = typeof live === "number" ? "number" : "text";
+    if (normalizeForCompare(initial[c.path] ?? "", t) === normalizeForCompare(after, t)) continue;
+    body[resolveKey(row, c.path)] = t === "number" && after !== "" ? Number(after) : after;
+  }
+  return body;
+}
 
 export function EditableItemsTable({
   schema,
@@ -62,6 +85,7 @@ export function EditableItemsTable({
 
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [initialDraft, setInitialDraft] = useState<Record<string, string>>({});
 
   const startEdit = (idx: number, row: Record<string, unknown>) => {
     const initial: Record<string, string> = {};
@@ -70,6 +94,7 @@ export function EditableItemsTable({
     });
     // Make sure we keep parent gate_id available for URL building (display only).
     setDraft(initial);
+    setInitialDraft(initial);
     setEditingIdx(idx);
   };
 
@@ -80,14 +105,11 @@ export function EditableItemsTable({
 
   const onUpdate = async (idx: number, row: Record<string, unknown>) => {
     if (!itemUpdateApi) return;
-    const body: Record<string, unknown> = {};
-    cols.forEach((c) => {
-      if (KEY_COLS.has(c.path) || READONLY_COLS.has(c.path)) return;
-      const raw = draft[c.path];
-      if (raw === undefined) return;
-      const live = getPath(row, c.path);
-      body[resolveKey(row, c.path)] = typeof live === "number" && raw !== "" ? Number(raw) : raw;
-    });
+    const body = buildChangedItemPayload(cols, initialDraft, draft, row);
+    if (Object.keys(body).length === 0) {
+      toast.info("Nothing changed");
+      return;
+    }
     const result = await submit(parentRow, row, body);
     if (!result.ok) {
       toast.error(result.error ?? "Update failed");
@@ -128,7 +150,7 @@ export function EditableItemsTable({
                   const liveVal = getPath(child, c.path);
                   const t = effectiveType(c, liveVal);
                   const isKey = KEY_COLS.has(c.path) || ["gateid","itemno","poitem","ponumber"].includes(c.path.replace(/_/g, "").toLowerCase());
-                  const isReadOnly = READONLY_COLS.has(c.path);
+                  const isReadOnly = isReadOnlyCol(c.path);
                   if (isEditing && !isKey && !isReadOnly) {
                     return (
                       <TableCell key={c.path} className="whitespace-nowrap p-1">

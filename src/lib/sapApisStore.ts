@@ -335,9 +335,9 @@ const seed: SapApi[] = [
     },
   },
   {
-    name: "Update Selected Line Item Data",
+    name: "Update DMR Item Based on Gate ID and ItemNo",
     description:
-      "PATCHes a single Gate line item (gate_id + item_no) via the Node middleware. Used by the per-row Edit/Update inside the Items popup on DMR → SAP Gate Entries.",
+      "PATCHes only the changed fields of one DMR line item. Gate ID and Item No go in the URL as GateItem(GateId='<id>',ItemNo='<no>'). Used by Update DMR and the All DMR items popup.",
     baseUrl: "https://1f674db9-07aa-4869-885b-435d1624cc4c.abap.us10.hana.ondemand.com",
     endpoint:
       "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd_a2x/sap/zsd_gate_entry/0001/GateItem(GateId='{gate_id}',ItemNo='{item_no}')",
@@ -354,6 +354,7 @@ const seed: SapApi[] = [
     updateMethod: "PATCH",
     keyField: "item_no",
     proxyPath: "/api/gate/items/{gate_id}/{item_no}",
+    scripts: { csrfFetch: true },
     middleware: {
       url: "",
       port: "3202",
@@ -653,7 +654,7 @@ async function bootstrapCloud(): Promise<void> {
 
     // Retire the old "Update Header Data" API; "Update DMR Based on Gate ID" replaces it.
     try {
-      const old = cloud.filter((a) => a.name === "Update Header Data");
+      const old = cloud.filter((a) => a.name === "Update Header Data" || a.name === "Update Selected Line Item Data");
       if (old.length > 0) {
         for (const a of old) await deleteOne(a.name);
         cloud = await fetchAllFromCloud();

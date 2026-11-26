@@ -37,8 +37,8 @@ describe("pickSameService", () => {
   const OLD = "/sap/opu/odata4/sap/zui_gate_service/srvd_a2x/sap/zui_gate_service/0001/GateItem(gate_id='1',item_no='1')";
   const NEW = "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd_a2x/sap/zsd_gate_entry/0001/GateItem(GateId='{gate_id}',ItemNo='{item_no}')";
   const LIST = "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd_a2x/sap/zsd_gate_entry/0001/GateHeader";
-  const apis = [{ name: "DMR header Update", endpoint: OLD }, { name: "Update Selected Line Item Data", endpoint: NEW }];
+  const apis = [{ name: "DMR header Update", endpoint: OLD }, { name: "Update DMR Item Based on Gate ID and ItemNo", endpoint: NEW }];
   it("uses the line-item API on the same SAP service as Get DMR List, not an old one listed first", () => {
-    expect(pickSameService(apis, LIST, () => true)?.name).toBe("Update Selected Line Item Data");
+    expect(pickSameService(apis, LIST, () => true)?.name).toBe("Update DMR Item Based on Gate ID and ItemNo");
   });
 });

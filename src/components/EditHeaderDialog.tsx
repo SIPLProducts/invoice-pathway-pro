@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { useSapUpdate, resolveUrlTemplate } from "@/hooks/useSapUpdate";
 import type { SapApi, FieldDef } from "@/lib/sapApisStore";
 import { toast } from "sonner";
-import { getPath, resolveKey } from "@/lib/getPath";
+import { getPath } from "@/lib/getPath";
+import { buildChangedPayload } from "@/lib/changedPayload";
 import { Loader2, Save, AlertCircle } from "lucide-react";
 
 interface Props {
@@ -51,15 +52,6 @@ function toInputValue(v: unknown, type: FieldDef["type"]): string {
     return v.length >= 5 ? v.slice(0, 5) : v;
   }
   return String(v);
-}
-
-function coerce(v: string, type: FieldDef["type"]): string | number | boolean {
-  if (type === "number") {
-    const n = Number(v);
-    return Number.isNaN(n) ? 0 : n;
-  }
-  if (type === "boolean") return v === "true" || v === "1";
-  return v;
 }
 
 /**
@@ -123,13 +115,15 @@ export function EditHeaderDialog({ api, row, onClose, onSaved }: Props) {
     );
   }
 
+  const changed = buildChangedPayload(fields, initial, values, row, {
+    keyFields: [keyField, "gate_id"],
+    typeOf: (f) => effectiveType(f, getPath(row, f.key)),
+  });
+  const changedCount = Object.keys(changed).length;
+
   const onSubmit = async () => {
-    const body: Record<string, string | number | boolean> = {};
-    fields.forEach((f) => {
-      const raw = values[f.key];
-      if (raw === undefined || raw === "") return;
-      body[resolveKey(row, f.key)] = coerce(raw, effectiveType(f, getPath(row, f.key)));
-    });
+    const body = changed;
+    if (!changedCount) return;
 
     const result = await submit(row, body);
     if (!result.ok) {
@@ -211,13 +205,24 @@ export function EditHeaderDialog({ api, row, onClose, onSaved }: Props) {
           })}
         </div>
 
+        <div className="rounded-md border bg-muted/40 p-2 text-xs">
+          {changedCount ? (
+            <>
+              <div className="mb-1 font-semibold">Will send ({changedCount} changed):</div>
+              <pre className="whitespace-pre-wrap font-mono text-[11px]">{JSON.stringify(changed, null, 2)}</pre>
+            </>
+          ) : (
+            <span className="text-muted-foreground">No changes to send.</span>
+          )}
+        </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
           <Button
             onClick={onSubmit}
-            disabled={loading || !proxyConfigured || !updateConfigured || !!missing}
+            disabled={loading || !changedCount || !proxyConfigured || !updateConfigured || !!missing}
             className="gap-1.5"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

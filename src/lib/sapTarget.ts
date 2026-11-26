@@ -16,6 +16,8 @@ export interface SapTarget {
   entity?: string;
   keys?: string[];
   nav?: string;
+  /** Key predicate without names, e.g. GateHeader('X'). */
+  positional?: boolean;
 }
 
 export function parseEndpoint(endpoint?: string | null): SapTarget | null {
@@ -37,6 +39,7 @@ export function parseEndpoint(endpoint?: string | null): SapTarget | null {
     if (m[2]) {
       const keys = Array.from(m[2].matchAll(/([A-Za-z_][A-Za-z0-9_]*)\s*=/g)).map((k) => k[1]);
       if (keys.length) out.keys = keys;
+      else out.positional = true;
     }
   }
   const exp = decodeURIComponent(query).match(/\$expand=([A-Za-z_][A-Za-z0-9_]*)/);
@@ -82,7 +85,9 @@ export function getSapTargetHeaders(api?: SapApi | null): Record<string, string>
 
   const hk = all.find((t) => t.entity === headerEntity && t.keys?.length)?.keys;
   const ik = all.find((t) => t.entity === itemEntity && t.keys?.length)?.keys;
-  if (hk) h["x-sap-header-keys"] = hk.join(",");
+  // GateHeader('{gate_id}') style: let the middleware build ('id') — no key names.
+  const headerPositional = own.entity === headerEntity && own.positional;
+  if (hk && !headerPositional) h["x-sap-header-keys"] = hk.join(",");
   if (ik) h["x-sap-item-keys"] = ik.join(",");
   const nav = all.find((t) => t.nav)?.nav ?? api?.childKey;
   if (nav && NAME.test(nav)) h["x-sap-item-nav"] = nav;

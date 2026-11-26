@@ -368,12 +368,12 @@ const seed: SapApi[] = [
     },
   },
   {
-    name: "Update Header Data",
+    name: "Update DMR Based on Gate ID",
     description:
-      "PATCHes header fields on a single Gate Entry (gate_id) via the Node middleware. Used by the Edit Header dialog on DMR → SAP Gate Entries.",
+      "PATCHes only the changed header fields of one DMR. Gate ID goes in the URL as GateHeader('<id>'). Used by Update DMR and the All DMR edit popup.",
     baseUrl: "https://1f674db9-07aa-4869-885b-435d1624cc4c.abap.us10.hana.ondemand.com",
     endpoint:
-      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd_a2x/sap/zsd_gate_entry/0001/GateHeader(GateId='{gate_id}')",
+      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd_a2x/sap/zsd_gate_entry/0001/GateHeader('{gate_id}')",
     method: "PATCH",
     auth: "Basic",
     status: "Active",
@@ -387,6 +387,7 @@ const seed: SapApi[] = [
     updateMethod: "PATCH",
     keyField: "gate_id",
     proxyPath: "/api/gate/headers/{gate_id}",
+    scripts: { csrfFetch: true },
     middleware: {
       url: "",
       port: "3202",
@@ -710,6 +711,18 @@ async function bootstrapCloud(): Promise<void> {
       }
     } catch (e) {
       console.warn("[sapApisStore] Endpoint refresh failed (non-fatal).", e);
+    }
+
+    // Retire the old "Update Header Data" API; "Update DMR Based on Gate ID" replaces it.
+    try {
+      const old = cloud.filter((a) => a.name === "Update Header Data");
+      if (old.length > 0) {
+        for (const a of old) await deleteOne(a.name);
+        cloud = await fetchAllFromCloud();
+        console.info("[sapApisStore] Removed retired 'Update Header Data' API.");
+      }
+    } catch (e) {
+      console.warn("[sapApisStore] Retiring old header API failed (non-fatal).", e);
     }
 
     // One-time (per version) refresh of the gate-header request form fields so

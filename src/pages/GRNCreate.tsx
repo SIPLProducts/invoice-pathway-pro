@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronLeft, ChevronRight, Plus, Printer, Save, Search, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useSapGrnPost } from "@/hooks/useSapGrnPost";
-import { buildGrnPostPayload } from "@/lib/grnPostPayload";
+import { buildGrnPostPayload, missingSerialRows } from "@/lib/grnPostPayload";
 import { alertError, alertSuccess, confirmAction } from "@/lib/alerts";
 
 type Row = Record<string, string | boolean>;
@@ -134,6 +134,7 @@ export default function GRNCreate() {
     purchasingGroup: "", orderedBy: "",
   });
   const [rows, setRows] = useState<Row[]>([emptyRow()]);
+  const [missingSerials, setMissingSerials] = useState<Set<number>>(new Set());
   const [selected, setSelected] = useState<number | null>(null);
   const { selectedApi, apis } = useGateApis();
   const postApi = useMemo(() => apis.find((a) => a.status === "Active" && /postgoodsreceipt/i.test(a.endpoint ?? "")) ?? null, [apis]);
@@ -181,7 +182,7 @@ export default function GRNCreate() {
       poItem: str(it, "po_item"), item: str(it, "item_no"), vendor, supplier: vendor,
     })) : [emptyRow()]);
   };
-  const resetScreen = () => { pickGate(""); setH((p) => ({ ...p, action: "", postDate: today })); };
+  const resetScreen = () => { setMissingSerials(new Set()); pickGate(""); setH((p) => ({ ...p, action: "", postDate: today })); };
   const onPost = async () => {
     if (!gateId || !h.action) return;
     const id = gateId;
@@ -192,6 +193,16 @@ export default function GRNCreate() {
       if (!r.ok) { await alertError("Cancel failed", r.error); return; }
       const d = r.data ?? {};
       await alertSuccess("GRN cancelled", `Material Document ${str(d, "cancel_ref_doc")} / ${str(d, "cancel_ref_year")} cancelled by ${str(d, "material_doc")} / ${str(d, "material_doc_year")} for Gate ${id}`);
+      return;
+    }
+    const missing = missingSerialRows(rows as Record<string, unknown>[]);
+    if (missing.length) {
+      setMissingSerials(new Set(missing));
+      setTimeout(() => {
+        const el = document.querySelector<HTMLInputElement>(`[data-serial-row="${missing[0]}"]`);
+        el?.scrollIntoView({ block: "center", inline: "center" }); el?.focus();
+      }, 50);
+      await alertError("Serial No. required", `Enter Serial No. for item ${missing.map((i) => String(rows[i].item ?? i + 1)).join(", ")} and post again.`);
       return;
     }
     const body = buildGrnPostPayload(h.postDate, rows as Record<string, unknown>[]);
@@ -206,7 +217,8 @@ export default function GRNCreate() {
     await alertSuccess("GRN posted", doc ? `Material Document ${doc} / ${yr} posted for Gate ${id}` : `Posted for Gate ${id}`);
   };
   const set = (k: keyof typeof h, v: string | boolean) => setH((p) => ({ ...p, [k]: v }));
-  const setCell = (i: number, k: string, v: string | boolean) => setRows((r) => r.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const setCell = (i: number, k: string, v: string | boolean) => { if (k === "serial") setMissingSerials((m) => { if (!m.has(i)) return m; const n = new Set(m); n.delete(i); return n; }); setRowsCell(i, k, v); };
+  const setRowsCell = (i: number, k: string, v: string | boolean) => setRows((r) => r.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
 
   return (
     <div className="min-w-0 max-w-full">
@@ -354,7 +366,7 @@ export default function GRNCreate() {
                           {c.options!.map((o) => <option key={o}>{o}</option>)}
                         </select>
                       ) : (
-                        <Input className={`h-8 ${c.w ?? "min-w-[110px]"}`} value={String(r[c.key] ?? "")} onChange={(e) => setCell(i, c.key, e.target.value)} />
+                        <Input data-serial-row={c.key === "serial" ? i : undefined} className={`h-8 ${c.w ?? "min-w-[110px]"} ${c.key === "serial" && missingSerials.has(i) ? "border-destructive bg-destructive/10 ring-1 ring-destructive" : ""}`} value={String(r[c.key] ?? "")} onChange={(e) => setCell(i, c.key, e.target.value)} />
                       )}
                     </td>
                   ))}

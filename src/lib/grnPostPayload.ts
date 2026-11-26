@@ -8,3 +8,9 @@ export function buildGrnPostPayload(
   const serials = rows.filter((r) => s(r.item) && s(r.serial)).map((r) => `${s(r.item)}:${s(r.serial)}`);
   return { PostingDate: s(postingDate).slice(0, 10), StorageLocations: sloc, Serials: serials.join(",") };
 }
+
+/** Indexes of lines that have an item number but no serial number. */
+export function missingSerialRows(rows: { item?: unknown; serial?: unknown }[]): number[] {
+  const s = (v: unknown) => (v == null ? "" : String(v).trim());
+  return rows.map((r, i) => (s(r.item) && !s(r.serial) ? i : -1)).filter((i) => i >= 0);
+}

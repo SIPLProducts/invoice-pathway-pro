@@ -59,6 +59,7 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         // Don't try to serve cached HTML for OAuth or backend / proxy routes
         navigateFallbackDenylist: [/^\/~oauth/, /^\/api/, /^\/functions\//],
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],

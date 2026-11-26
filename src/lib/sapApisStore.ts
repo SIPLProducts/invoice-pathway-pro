@@ -379,16 +379,16 @@ const seed: SapApi[] = [
     rowKey: "gate_id",
     requestHeaderFields: [
       { key: "PostingDate", label: "Posting Date", type: "date" },
-      { key: "StorageLocations", label: "Storage Locations", type: "text" },
-      { key: "Serials", label: "Serials", type: "text" },
+      { key: "StorageLocations", label: "Storage Locations", type: "string" },
+      { key: "Serials", label: "Serials", type: "string" },
     ],
     responseHeaderFields: [
-      { key: "GateId", label: "Gate ID", type: "text" },
-      { key: "MaterialDoc", label: "Material Doc", type: "text" },
-      { key: "MaterialDocYear", label: "Material Doc Year", type: "text" },
+      { key: "GateId", label: "Gate ID", type: "string" },
+      { key: "MaterialDoc", label: "Material Doc", type: "string" },
+      { key: "MaterialDocYear", label: "Material Doc Year", type: "string" },
       { key: "PostingDate", label: "Posting Date", type: "date" },
-      { key: "CancelRefDoc", label: "Cancel Ref Doc", type: "text" },
-      { key: "CancelRefYear", label: "Cancel Ref Year", type: "text" },
+      { key: "CancelRefDoc", label: "Cancel Ref Doc", type: "string" },
+      { key: "CancelRefYear", label: "Cancel Ref Year", type: "string" },
     ],
     scripts: { csrfFetch: true },
     middleware: {

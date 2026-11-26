@@ -65,7 +65,7 @@ export function buildChangedItemPayload(
     const after = draft[c.path];
     if (after === undefined) continue;
     const live = getPath(row, c.path);
-    const t = typeof live === "number" ? "number" : "text";
+    const t = (typeof live === "number" ? "number" : "string") as Parameters<typeof normalizeForCompare>[1];
     if (normalizeForCompare(initial[c.path] ?? "", t) === normalizeForCompare(after, t)) continue;
     body[resolveKey(row, c.path)] = t === "number" && after !== "" ? Number(after) : after;
   }

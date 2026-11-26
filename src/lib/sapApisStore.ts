@@ -400,6 +400,38 @@ const seed: SapApi[] = [
     },
   },
   {
+    name: "Cancel Mat Doc Against DMR",
+    description:
+      "POSTs cancelGoodsReceipt (no body) for one Gate ID and returns the reversal Material Document. Used by Create GRN with action A04 Cancel.",
+    baseUrl: "https://1f674db9-07aa-4869-885b-435d1624cc4c.abap.us10.hana.ondemand.com",
+    endpoint:
+      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd_a2x/sap/zsd_gate_entry/0001/GateHeader('{gate_id}')/com.sap.gateway.srvd_a2x.zsd_gate_entry.v0001.cancelGoodsReceipt",
+    method: "POST",
+    auth: "Basic",
+    status: "Active",
+    tag: "Proxy",
+    type: "action",
+    autoSync: { enabled: false, frequencyMinutes: 5 },
+    rowKey: "gate_id",
+    requestHeaderFields: [],
+    responseHeaderFields: [
+      { key: "GateId", label: "Gate ID", type: "string" },
+      { key: "MaterialDoc", label: "Material Doc", type: "string" },
+      { key: "MaterialDocYear", label: "Material Doc Year", type: "string" },
+      { key: "PostingDate", label: "Posting Date", type: "date" },
+      { key: "CancelRefDoc", label: "Cancel Ref Doc", type: "string" },
+      { key: "CancelRefYear", label: "Cancel Ref Year", type: "string" },
+    ],
+    scripts: { csrfFetch: true },
+    middleware: {
+      url: "",
+      port: "3202",
+      secret: "",
+      connectionMode: "Via Proxy Server",
+      deploymentMode: "Self-Hosted (Client Server)",
+    },
+  },
+  {
     name: "Get PO Details",
     description:
       "Fetches Purchase Order line items for a PO number via the Node middleware. Used by the Enter button on the DMR → New Entry → Purchase Order Details box.",

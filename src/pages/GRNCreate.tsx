@@ -84,7 +84,7 @@ const sel = "h-9 w-full rounded-md border border-input bg-background px-2 text-s
 
 export default function GRNCreate() {
   const [h, setH] = useState({
-    action: "A01 Goods Receipt", ref: "R01 Purchase Order", poNumber: "", poItem: "", plant: "", movementType: "101",
+    action: "", ref: "R01 Purchase Order", poNumber: "", poItem: "", plant: "", movementType: "101",
     docDate: today, postDate: today, slip: "1 Individual Slip", printSlip: false, deliveryNote: "", billOfLading: "",
     slipNo: "", headerText: "", supplier: "", vendor: "", vendorName: "", postalCode: "", city: "",
     purchasingGroup: "", orderedBy: "",
@@ -94,6 +94,10 @@ export default function GRNCreate() {
   const { selectedApi, apis } = useGateApis();
   const postApi = useMemo(() => apis.find((a) => a.status === "Active" && /postgoodsreceipt/i.test(a.endpoint ?? "")) ?? null, [apis]);
   const grnPost = useSapGrnPost(postApi);
+  const cancelApi = useMemo(() => apis.find((a) => a.status === "Active" && /cancelgoodsreceipt/i.test(a.endpoint ?? "")) ?? null, [apis]);
+  const grnCancel = useSapGrnPost(cancelApi);
+  const isCancel = h.action.startsWith("A04");
+  const busy = grnPost.loading || grnCancel.loading;
   const schema = useMemo(() => (selectedApi ? buildSchemaFromApi(selectedApi) : null), [selectedApi]);
   const proxy = useSapProxy<Record<string, unknown>>(selectedApi, schema ?? ({ proxyPath: "", columns: [] } as never));
   const dmrs = useMemo(() => sortNewestFirst(proxy.rows as Record<string, unknown>[]), [proxy.rows]);
@@ -132,15 +136,27 @@ export default function GRNCreate() {
       poItem: str(it, "po_item"), item: str(it, "item_no"), vendor, supplier: vendor,
     })) : [emptyRow()]);
   };
+  const resetScreen = () => { pickGate(""); setH((p) => ({ ...p, action: "", postDate: today })); };
   const onPost = async () => {
-    if (!gateId) return;
+    if (!gateId || !h.action) return;
+    const id = gateId;
+    if (isCancel) {
+      if (!(await confirmAction(`Cancel GRN for Gate ${id}?`, "This reverses the material document in SAP.", "Yes, cancel"))) return;
+      const r = await grnCancel.post(id, {});
+      resetScreen();
+      if (!r.ok) { await alertError("Cancel failed", r.error); return; }
+      const d = r.data ?? {};
+      await alertSuccess("GRN cancelled", `Material Document ${str(d, "cancel_ref_doc")} / ${str(d, "cancel_ref_year")} cancelled by ${str(d, "material_doc")} / ${str(d, "material_doc_year")} for Gate ${id}`);
+      return;
+    }
     const body = buildGrnPostPayload(h.postDate, rows as Record<string, unknown>[]);
-    if (!(await confirmAction(`Post GRN for Gate ${gateId}?`, `Posting date ${body.PostingDate ?? "-"}`))) return;
-    const r = await grnPost.post(gateId, body);
+    if (!(await confirmAction(`Post GRN for Gate ${id}?`, `Posting date ${body.PostingDate ?? "-"}`))) return;
+    const r = await grnPost.post(id, body);
+    resetScreen();
     if (!r.ok) { await alertError("Post failed", r.error); return; }
     const d = r.data ?? {};
     const doc = str(d, "material_doc"); const yr = str(d, "material_doc_year");
-    await alertSuccess("GRN posted", doc ? `Material Document ${doc} / ${yr} posted for Gate ${gateId}` : `Posted for Gate ${gateId}`);
+    await alertSuccess("GRN posted", doc ? `Material Document ${doc} / ${yr} posted for Gate ${id}` : `Posted for Gate ${id}`);
   };
   const set = (k: keyof typeof h, v: string | boolean) => setH((p) => ({ ...p, [k]: v }));
   const setCell = (i: number, k: string, v: string | boolean) => setRows((r) => r.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
@@ -153,7 +169,7 @@ export default function GRNCreate() {
         actions={
           <>
             <Button variant="outline" size="sm" className="border-primary/40 text-primary hover:bg-primary/10" onClick={() => toast.info("Check completed — no errors found")}>Check</Button>
-            <Button size="sm" className="bg-gradient-primary shadow-card hover:opacity-90" disabled={!gateId || grnPost.loading} onClick={onPost}><Save className="h-4 w-4" />{grnPost.loading ? "Posting…" : "Post"}</Button>
+            <Button size="sm" className="bg-gradient-primary shadow-card hover:opacity-90" disabled={!gateId || !h.action || busy} onClick={onPost}><Save className="h-4 w-4" />{busy ? "Working…" : isCancel ? "Cancel GRN" : "Post"}</Button>
           </>
         }
       />
@@ -164,6 +180,7 @@ export default function GRNCreate() {
             <div className="grid grid-cols-2 gap-2 p-3 [&>*]:min-w-0 sm:grid-cols-3 xl:grid-cols-6">
           <div className="space-y-1"><Label className="text-xs text-muted-foreground">Action</Label>
             <select className={sel} value={h.action} onChange={(e) => set("action", e.target.value)}>
+              <option value="">Select Action</option>
               {["A01 Goods Receipt", "A02 Change", "A03 Display", "A04 Cancel"].map((o) => <option key={o}>{o}</option>)}
             </select></div>
           {!gateId && (<>

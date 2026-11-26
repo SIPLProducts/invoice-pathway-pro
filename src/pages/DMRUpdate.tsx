@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EditableItemsTable } from "@/components/EditableItemsTable";
 import { EditHeaderDialog } from "@/components/EditHeaderDialog";
 import { useGateApis } from "@/hooks/useGateApis";
 import { useSapProxy } from "@/hooks/useSapProxy";
@@ -17,7 +17,7 @@ const show = (v: unknown) => (v === null || v === undefined || v === "" ? "—" 
 const norm = (v: unknown) => String(v ?? "").trim().replace(/^0+(?=.)/, "").toLowerCase();
 
 export default function DMRUpdate() {
-  const { selectedApi, updateApi } = useGateApis();
+  const { selectedApi, updateApi, itemUpdateApi } = useGateApis();
   const schema = useMemo(() => (selectedApi ? buildSchemaFromApi(selectedApi) : null), [selectedApi]);
   const proxy = useSapProxy<Row>(selectedApi, schema ?? { proxyPath: "", columns: [] } as never);
   const [gateId, setGateId] = useState("");
@@ -92,15 +92,9 @@ export default function DMRUpdate() {
               {schema.childColumns && items.length > 0 && (
                 <Card>
                   <CardHeader><CardTitle className="text-base">Line items</CardTitle></CardHeader>
-                  <CardContent className="overflow-x-auto">
-                    <Table>
-                      <TableHeader><TableRow>{schema.childColumns.map((c) => <TableHead key={c.path}>{c.header}</TableHead>)}</TableRow></TableHeader>
-                      <TableBody>
-                        {items.map((it, i) => (
-                          <TableRow key={i}>{schema.childColumns!.map((c) => <TableCell key={c.path}>{show(getPath(it, c.path))}</TableCell>)}</TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                  <CardContent>
+                    <EditableItemsTable schema={schema} parentRow={found} items={items} itemUpdateApi={itemUpdateApi ?? undefined} onSaved={() => proxy.refresh()} />
+                    {!itemUpdateApi && <div className="mt-2 text-xs text-muted-foreground">No Update Item API configured — set one in <Link to="/sap/settings" className="font-semibold text-primary hover:underline">SAP Settings</Link> to edit line items.</div>}
                   </CardContent>
                 </Card>
               )}

@@ -23,3 +23,11 @@ export function getPath(obj: unknown, path: string): unknown {
   }
   return cur;
 }
+
+/** Actual property name in `row` for a configured key (exact, then unique normalized match); falls back to the key. */
+export function resolveKey(row: Record<string, unknown> | null | undefined, key: string): string {
+  if (!row || Object.prototype.hasOwnProperty.call(row, key)) return key;
+  const n = key.replace(/_/g, "").toLowerCase();
+  const m = Object.keys(row).filter((k) => k.replace(/_/g, "").toLowerCase() === n);
+  return m.length === 1 ? m[0] : key;
+}

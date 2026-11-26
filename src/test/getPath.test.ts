@@ -55,3 +55,12 @@ describe("SAP field path matching", () => {
     expect(getPath({}, "toString")).toBeUndefined();
   });
 });
+import { resolveKey } from "@/lib/getPath";
+describe("resolveKey", () => {
+  it("maps configured snake_case key to SAP PascalCase key", () => {
+    expect(resolveKey({ VehicleNo: "TS10" }, "vehicle_no")).toBe("VehicleNo");
+  });
+  it("keeps exact key", () => {
+    expect(resolveKey({ vehicle_no: "x", VehicleNo: "y" }, "vehicle_no")).toBe("vehicle_no");
+  });
+});

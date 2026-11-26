@@ -15,6 +15,7 @@ import { useSapItemUpdate } from "@/hooks/useSapItemUpdate";
 import { Pencil, Save, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { getPath, resolveKey } from "@/lib/getPath";
 
 interface Props {
   schema: SapApiSchema;
@@ -65,7 +66,7 @@ export function EditableItemsTable({
   const startEdit = (idx: number, row: Record<string, unknown>) => {
     const initial: Record<string, string> = {};
     cols.forEach((c) => {
-      initial[c.path] = toInputValue(row[c.path]);
+      initial[c.path] = toInputValue(getPath(row, c.path));
     });
     // Make sure we keep parent gate_id available for URL building (display only).
     setDraft(initial);
@@ -79,13 +80,20 @@ export function EditableItemsTable({
 
   const onUpdate = async (idx: number, row: Record<string, unknown>) => {
     if (!itemUpdateApi) return;
-    const body: Record<string, unknown> = { ...draft };
+    const body: Record<string, unknown> = {};
+    cols.forEach((c) => {
+      if (KEY_COLS.has(c.path) || READONLY_COLS.has(c.path)) return;
+      const raw = draft[c.path];
+      if (raw === undefined) return;
+      const live = getPath(row, c.path);
+      body[resolveKey(row, c.path)] = typeof live === "number" && raw !== "" ? Number(raw) : raw;
+    });
     const result = await submit(parentRow, row, body);
     if (!result.ok) {
       toast.error(result.error ?? "Update failed");
       return;
     }
-    toast.success(`Updated item ${row.item_no ?? ""}`);
+    toast.success(`Updated item ${String(getPath(row, "item_no") ?? "")}`);
     onSaved?.((result.data as Record<string, unknown>) ?? { ...row, ...body }, idx);
     cancel();
   };
@@ -117,9 +125,9 @@ export function EditableItemsTable({
             return (
               <TableRow key={idx}>
                 {cols.map((c) => {
-                  const liveVal = child[c.path];
+                  const liveVal = getPath(child, c.path);
                   const t = effectiveType(c, liveVal);
-                  const isKey = KEY_COLS.has(c.path);
+                  const isKey = KEY_COLS.has(c.path) || ["gateid","itemno","poitem","ponumber"].includes(c.path.replace(/_/g, "").toLowerCase());
                   const isReadOnly = READONLY_COLS.has(c.path);
                   if (isEditing && !isKey && !isReadOnly) {
                     return (

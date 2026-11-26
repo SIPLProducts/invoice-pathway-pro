@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useSapUpdate, resolveUrlTemplate } from "@/hooks/useSapUpdate";
 import type { SapApi, FieldDef } from "@/lib/sapApisStore";
 import { toast } from "sonner";
+import { getPath, resolveKey } from "@/lib/getPath";
 import { Loader2, Save, AlertCircle } from "lucide-react";
 
 interface Props {
@@ -29,7 +30,7 @@ function deriveFields(api: SapApi, row: Record<string, unknown>): FieldDef[] {
   const resp = api.responseHeaderFields ?? [];
   if (resp.length) {
     return resp.filter((f) => {
-      const v = row[f.key];
+      const v = getPath(row, f.key);
       return v === null || v === undefined || typeof v !== "object";
     });
   }
@@ -79,14 +80,14 @@ export function EditHeaderDialog({ api, row, onClose, onSaved }: Props) {
 
   const initial = useMemo(() => {
     const o: Record<string, string> = {};
-    fields.forEach((f) => (o[f.key] = toInputValue(row[f.key], effectiveType(f, row[f.key]))));
+    fields.forEach((f) => { const v = getPath(row, f.key); o[f.key] = toInputValue(v, effectiveType(f, v)); });
     return o;
   }, [fields, row]);
 
   const [values, setValues] = useState<Record<string, string>>(initial);
 
   const keyField = api.keyField ?? api.rowKey ?? "gate_id";
-  const previewKey = String(row[keyField] ?? "");
+  const previewKey = String(getPath(row, keyField) ?? "");
   const { url: resolvedPath, missing } = resolveUrlTemplate(api.updateEndpoint ?? "", row);
 
   // Defense-in-depth: if the configured template is an ITEM template (has
@@ -127,7 +128,7 @@ export function EditHeaderDialog({ api, row, onClose, onSaved }: Props) {
     fields.forEach((f) => {
       const raw = values[f.key];
       if (raw === undefined || raw === "") return;
-      body[f.key] = coerce(raw, effectiveType(f, row[f.key]));
+      body[resolveKey(row, f.key)] = coerce(raw, effectiveType(f, getPath(row, f.key)));
     });
 
     const result = await submit(row, body);
@@ -185,7 +186,7 @@ export function EditHeaderDialog({ api, row, onClose, onSaved }: Props) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {fields.map((f) => {
             const isKey = f.key === keyField;
-            const t = effectiveType(f, row[f.key]);
+            const t = effectiveType(f, getPath(row, f.key));
             return (
               <div key={f.key} className="space-y-1.5">
                 <Label className="text-xs">

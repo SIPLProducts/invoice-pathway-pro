@@ -1,4 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useGateApis } from "@/hooks/useGateApis";
+import { useSapProxy } from "@/hooks/useSapProxy";
+import { buildSchemaFromApi, sortNewestFirst } from "@/lib/sapApiSchemas";
+import { getPath } from "@/lib/getPath";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,13 +84,52 @@ export default function GRNCreate() {
   });
   const [rows, setRows] = useState<Row[]>([emptyRow()]);
   const [selected, setSelected] = useState<number | null>(null);
+  const { selectedApi } = useGateApis();
+  const schema = useMemo(() => (selectedApi ? buildSchemaFromApi(selectedApi) : null), [selectedApi]);
+  const proxy = useSapProxy<Record<string, unknown>>(selectedApi, schema ?? ({ proxyPath: "", columns: [] } as never));
+  const dmrs = useMemo(() => sortNewestFirst(proxy.rows as Record<string, unknown>[]), [proxy.rows]);
+  const [gateId, setGateId] = useState("");
+  const str = (r: Record<string, unknown>, ...keys: string[]) => {
+    for (const k of keys) { const v = getPath(r, k); if (v !== undefined && v !== null && v !== "") return String(v); }
+    return "";
+  };
+  const pickGate = (id: string) => {
+    setGateId(id);
+    setSelected(null);
+    if (!id) {
+      setH((p) => ({ ...p, poNumber: "", poItem: "", plant: "", supplier: "", vendor: "", vendorName: "", deliveryNote: "", headerText: "", docDate: today }));
+      setRows([emptyRow()]);
+      return;
+    }
+    const d = dmrs.find((r) => str(r, "gate_id") === id);
+    if (!d) return;
+    const items = ((schema?.childKey ? getPath(d, schema.childKey) : undefined) as Record<string, unknown>[] | undefined) ?? [];
+    const vendor = str(d, "vendor");
+    const plant = str(d, "plant");
+    setH((p) => ({
+      ...p,
+      plant, vendor, supplier: vendor,
+      poNumber: str(d, "po_number", "reference_doc") || (items[0] ? str(items[0], "po_number") : ""),
+      vendorName: str(d, "vendor_name"),
+      deliveryNote: str(d, "invoice_no", "reference_doc"),
+      headerText: str(d, "remarks"),
+      docDate: str(d, "gate_date").slice(0, 10) || today,
+    }));
+    setRows(items.length ? items.map((it) => ({
+      ...emptyRow(),
+      material: str(it, "material"), matText: str(it, "material_desc"), qty: str(it, "quantity"),
+      eun: str(it, "unit"), sloc: str(it, "storage_location"), storageLocation: str(it, "storage_location"),
+      batch: str(it, "batch"), plant: str(it, "plant") || plant, purchaseOrder: str(it, "po_number"),
+      poItem: str(it, "po_item"), item: str(it, "item_no"), vendor, supplier: vendor,
+    })) : [emptyRow()]);
+  };
   const set = (k: keyof typeof h, v: string | boolean) => setH((p) => ({ ...p, [k]: v }));
   const setCell = (i: number, k: string, v: string | boolean) => setRows((r) => r.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
 
   return (
     <>
       <PageHeader
-        title="Create GRN"
+        title="Create GRN — Post Mat Doc Against DMR"
         description="Post goods receipt against a purchase order (MIGO-style)."
         actions={
           <>
@@ -97,24 +140,35 @@ export default function GRNCreate() {
       />
 
       <div className="rounded-xl border bg-card p-4 shadow-card">
-        <div className="flex flex-wrap items-center gap-3">
-          <select className={`${sel} w-48`} value={h.action} onChange={(e) => set("action", e.target.value)}>
-            {["A01 Goods Receipt", "A02 Change", "A03 Display", "A04 Cancel"].map((o) => <option key={o}>{o}</option>)}
-          </select>
-          <select className={`${sel} w-48`} value={h.ref} onChange={(e) => set("ref", e.target.value)}>
-            {["R01 Purchase Order", "R02 Material Document", "R05 Outbound Delivery"].map((o) => <option key={o}>{o}</option>)}
-          </select>
-          <Input className="w-40 font-mono" placeholder="PO Number" value={h.poNumber} onChange={(e) => set("poNumber", e.target.value)} />
-          <Input className="w-20 font-mono" placeholder="Item" value={h.poItem} onChange={(e) => set("poItem", e.target.value)} />
-          <div className="flex items-center gap-2">
-            <Label className="text-xs text-muted-foreground">Plant:</Label>
-            <Input className="w-24" value={h.plant} onChange={(e) => set("plant", e.target.value)} />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-1"><Label className="text-xs text-muted-foreground">Action</Label>
+            <select className={sel} value={h.action} onChange={(e) => set("action", e.target.value)}>
+              {["A01 Goods Receipt", "A02 Change", "A03 Display", "A04 Cancel"].map((o) => <option key={o}>{o}</option>)}
+            </select></div>
+          {!gateId && (<>
+            <div className="space-y-1"><Label className="text-xs text-muted-foreground">Reference</Label>
+              <select className={sel} value={h.ref} onChange={(e) => set("ref", e.target.value)}>
+                {["R01 Purchase Order", "R02 Material Document", "R05 Outbound Delivery"].map((o) => <option key={o}>{o}</option>)}
+              </select></div>
+            <div className="space-y-1"><Label className="text-xs text-muted-foreground">PO Number</Label>
+              <div className="flex gap-2">
+                <Input className="font-mono" placeholder="PO Number" value={h.poNumber} onChange={(e) => set("poNumber", e.target.value)} />
+                <Button variant="outline" size="icon" aria-label="Search PO" onClick={() => toast.info("PO lookup is not connected yet")}><Search className="h-4 w-4" /></Button>
+              </div></div>
+            <div className="space-y-1"><Label className="text-xs text-muted-foreground">Item</Label>
+              <Input className="font-mono" placeholder="Item" value={h.poItem} onChange={(e) => set("poItem", e.target.value)} /></div>
+          </>)}
+          <div className="space-y-1"><Label className="text-xs text-muted-foreground">Plant</Label>
+            <Input value={h.plant} onChange={(e) => set("plant", e.target.value)} /></div>
+          <div className="space-y-1"><Label className="text-xs text-muted-foreground">Gate ID</Label>
+            <select className={`${sel} font-mono`} value={gateId} onChange={(e) => pickGate(e.target.value)} disabled={proxy.loading}>
+              <option value="">{proxy.loading ? "Loading Gate IDs…" : "Select Gate ID"}</option>
+              {dmrs.map((r) => { const id = str(r, "gate_id"); return id ? <option key={id} value={id}>{id}{str(r, "vendor_name") ? ` — ${str(r, "vendor_name")}` : ""}</option> : null; })}
+            </select>
+            {proxy.error && <p className="text-xs text-destructive">Could not load DMRs from SAP</p>}
           </div>
-          <Button variant="outline" size="icon" aria-label="Search PO" onClick={() => toast.info("PO lookup is not connected yet")}><Search className="h-4 w-4" /></Button>
-          <div className="ml-auto flex items-center gap-2">
-            <Label className="text-xs text-muted-foreground">GR goods receipt</Label>
-            <Input className="w-20 font-mono" value={h.movementType} onChange={(e) => set("movementType", e.target.value)} />
-          </div>
+          <div className="space-y-1"><Label className="text-xs text-muted-foreground">GR goods receipt</Label>
+            <Input className="font-mono" value={h.movementType} onChange={(e) => set("movementType", e.target.value)} /></div>
         </div>
 
         <Tabs defaultValue="general" className="mt-5">

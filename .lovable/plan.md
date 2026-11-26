@@ -12,6 +12,7 @@
 +----------------------------------------------------+---------------+
 | Items table + item detail (unchanged content, tighter spacing)     |
 ```
+- Document Header, Items and Item Detail each stay in their own separate card with its own gradient title strip.
 - Right panel holds only the Gate ID dropdown, its summary chip and Clear button.
 - Action, Reference, PO Number, Item, Plant and GR goods receipt move into the left panel as one row of narrow fields (Reference/PO/Item still hide when a Gate ID is picked).
 - Smaller inputs (h-8, text-sm), smaller labels and gaps so the header, tabs and the first item lines fit on one screen at normal laptop size.

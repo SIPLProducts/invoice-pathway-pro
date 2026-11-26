@@ -66,13 +66,16 @@ const emptyRow = (): Row => ({ movementType: "101", direction: "+", stockType: "
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[130px_1fr] items-center gap-3">
+    <div className="grid grid-cols-[110px_1fr] items-center gap-2">
       <Label className="text-right text-xs text-muted-foreground">{label}</Label>
       {children}
     </div>
   );
 }
 
+const cardCls = "overflow-hidden rounded-xl border border-primary/15 bg-card shadow-card";
+const stripCls = "bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground";
+const tabCls = "[&_[data-state=active]]:bg-gradient-primary [&_[data-state=active]]:text-primary-foreground";
 const sel = "h-9 w-full rounded-md border border-input bg-background px-2 text-sm";
 
 export default function GRNCreate() {
@@ -133,27 +136,54 @@ export default function GRNCreate() {
         description="Post goods receipt against a purchase order (MIGO-style)."
         actions={
           <>
-            <Button variant="outline" size="sm" onClick={() => toast.info("Check completed — no errors found")}>Check</Button>
-            <Button size="sm" onClick={() => toast.info("GRN posting to SAP is not connected yet")}><Save className="h-4 w-4" />Post</Button>
+            <Button variant="outline" size="sm" className="border-primary/40 text-primary hover:bg-primary/10" onClick={() => toast.info("Check completed — no errors found")}>Check</Button>
+            <Button size="sm" className="bg-gradient-primary shadow-card hover:opacity-90" onClick={() => toast.info("GRN posting to SAP is not connected yet")}><Save className="h-4 w-4" />Post</Button>
           </>
         }
       />
 
-      <div className="grid gap-5 lg:grid-cols-12">
-        <div className="order-last rounded-xl border bg-card p-4 shadow-card lg:order-first lg:col-span-8">
-          <h3 className="mb-3 font-display text-base font-semibold">Document Header</h3>
+      <div className="grid gap-4 lg:grid-cols-12 [&_input]:h-8 [&_select]:h-8">
+        <div className="space-y-4 lg:col-span-9">
+          <div className={cardCls}>
+            <div className="grid grid-cols-2 gap-2 p-3 md:grid-cols-3 xl:grid-cols-6">
+          <div className="space-y-1"><Label className="text-xs text-muted-foreground">Action</Label>
+            <select className={sel} value={h.action} onChange={(e) => set("action", e.target.value)}>
+              {["A01 Goods Receipt", "A02 Change", "A03 Display", "A04 Cancel"].map((o) => <option key={o}>{o}</option>)}
+            </select></div>
+          {!gateId && (<>
+            <div className="space-y-1"><Label className="text-xs text-muted-foreground">Reference</Label>
+              <select className={sel} value={h.ref} onChange={(e) => set("ref", e.target.value)}>
+                {["R01 Purchase Order", "R02 Material Document", "R05 Outbound Delivery"].map((o) => <option key={o}>{o}</option>)}
+              </select></div>
+            <div className="space-y-1"><Label className="text-xs text-muted-foreground">PO Number</Label>
+              <div className="flex gap-1">
+                <Input className="font-mono" placeholder="PO Number" value={h.poNumber} onChange={(e) => set("poNumber", e.target.value)} />
+                <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" aria-label="Search PO" onClick={() => toast.info("PO lookup is not connected yet")}><Search className="h-4 w-4" /></Button>
+              </div></div>
+            <div className="space-y-1"><Label className="text-xs text-muted-foreground">Item</Label>
+              <Input className="font-mono" placeholder="Item" value={h.poItem} onChange={(e) => set("poItem", e.target.value)} /></div>
+          </>)}
+          <div className="space-y-1"><Label className="text-xs text-muted-foreground">Plant</Label>
+            <Input value={h.plant} onChange={(e) => set("plant", e.target.value)} /></div>
+          <div className="space-y-1"><Label className="text-xs text-muted-foreground">GR goods receipt</Label>
+            <Input className="font-mono" value={h.movementType} onChange={(e) => set("movementType", e.target.value)} /></div>
+            </div>
+          </div>
+          <div className={cardCls}>
+            <div className={stripCls}>Document Header</div>
+            <div className="p-3">
         <Tabs defaultValue="general" >
-          <TabsList>
+          <TabsList className={tabCls}>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="vendor">Vendor</TabsTrigger>
             <TabsTrigger value="partner" aria-label="Partner"><Users className="h-4 w-4" /></TabsTrigger>
           </TabsList>
-          <TabsContent value="general" className="pt-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-3">
+          <TabsContent value="general" className="pt-3">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
                 <Field label="Document Date"><Input type="date" value={h.docDate} onChange={(e) => set("docDate", e.target.value)} /></Field>
                 <Field label="Posting Date"><Input type="date" value={h.postDate} onChange={(e) => set("postDate", e.target.value)} /></Field>
-                <div className="grid grid-cols-[130px_1fr] items-center gap-3">
+                <div className="grid grid-cols-[100px_1fr] items-center gap-3">
                   <div className="flex items-center justify-end gap-2">
                     <Printer className="h-4 w-4 text-muted-foreground" />
                     <Checkbox checked={h.printSlip} onCheckedChange={(v) => set("printSlip", !!v)} aria-label="Print slip" />
@@ -163,18 +193,18 @@ export default function GRNCreate() {
                   </select>
                 </div>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <Field label="Delivery Note"><Input value={h.deliveryNote} onChange={(e) => set("deliveryNote", e.target.value)} /></Field>
                 <Field label="Bill of Lading"><Input value={h.billOfLading} onChange={(e) => set("billOfLading", e.target.value)} /></Field>
                 <Field label="GR/GI Slip No."><Input value={h.slipNo} onChange={(e) => set("slipNo", e.target.value)} /></Field>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <Field label="Supplier"><Input readOnly className="bg-muted" value={h.supplier} /></Field>
                 <Field label="Header Text"><Input value={h.headerText} onChange={(e) => set("headerText", e.target.value)} /></Field>
               </div>
             </div>
           </TabsContent>
-          <TabsContent value="vendor" className="pt-4">
+          <TabsContent value="vendor" className="pt-3">
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Vendor"><Input className="font-mono" value={h.vendor} onChange={(e) => set("vendor", e.target.value)} /></Field>
               <Field label="Name"><Input value={h.vendorName} onChange={(e) => set("vendorName", e.target.value)} /></Field>
@@ -186,56 +216,38 @@ export default function GRNCreate() {
               </Field>
             </div>
           </TabsContent>
-          <TabsContent value="partner" className="pt-4">
+          <TabsContent value="partner" className="pt-3">
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Purchasing Group"><Input value={h.purchasingGroup} onChange={(e) => set("purchasingGroup", e.target.value)} /></Field>
               <Field label="Ordered By"><Input value={h.orderedBy} onChange={(e) => set("orderedBy", e.target.value)} /></Field>
             </div>
           </TabsContent>
         </Tabs>
+            </div>
+          </div>
         </div>
-        <div className="order-first rounded-xl border bg-card p-4 shadow-card lg:order-last lg:col-span-4 lg:sticky lg:top-4 lg:self-start">
-          <h3 className="mb-3 font-display text-base font-semibold">Selection</h3>
-          <div className="space-y-3">
-          <div className="space-y-1.5 rounded-lg border border-primary/40 bg-primary/5 p-3"><Label className="text-xs font-semibold text-primary">Gate ID</Label>
-            <select className={`${sel} font-mono`} value={gateId} onChange={(e) => pickGate(e.target.value)} disabled={proxy.loading}>
+        <div className="order-first lg:order-last lg:col-span-3">
+          <div className="rounded-xl bg-gradient-primary p-4 text-primary-foreground shadow-card lg:sticky lg:top-4">
+            <h3 className="mb-2 font-display text-base font-semibold">Selection</h3>
+            <p className="mb-3 text-xs text-primary-foreground/80">Pick a Gate ID from All DMR to fill this GRN.</p>
+          <div className="space-y-1.5 "><Label className="text-xs font-semibold text-primary-foreground/90">Gate ID</Label>
+            <select className={`${sel} font-mono text-foreground`} value={gateId} onChange={(e) => pickGate(e.target.value)} disabled={proxy.loading}>
               <option value="">{proxy.loading ? "Loading Gate IDs…" : "Select Gate ID"}</option>
               {dmrs.map((r) => { const id = str(r, "gate_id"); return id ? <option key={id} value={id}>{id}</option> : null; })}
             </select>
-            {gateId && (<div className="flex items-center justify-between gap-2 pt-1"><span className="truncate rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{gateId}{h.vendorName ? ` · ${h.vendorName}` : ""}</span><Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => pickGate("")}>Clear</Button></div>)}
-            {proxy.error && <p className="text-xs text-destructive">Could not load DMRs from SAP</p>}
+            {gateId && (<div className="flex items-center justify-between gap-2 pt-1"><span className="truncate rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs text-primary-foreground">{gateId}{h.vendorName ? ` · ${h.vendorName}` : ""}</span><Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground" onClick={() => pickGate("")}>Clear</Button></div>)}
+            {proxy.error && <p className="text-xs text-primary-foreground">Could not load DMRs from SAP</p>}
           </div>
-          <div className="space-y-1"><Label className="text-xs text-muted-foreground">Action</Label>
-            <select className={sel} value={h.action} onChange={(e) => set("action", e.target.value)}>
-              {["A01 Goods Receipt", "A02 Change", "A03 Display", "A04 Cancel"].map((o) => <option key={o}>{o}</option>)}
-            </select></div>
-          {!gateId && (<>
-            <div className="space-y-1"><Label className="text-xs text-muted-foreground">Reference</Label>
-              <select className={sel} value={h.ref} onChange={(e) => set("ref", e.target.value)}>
-                {["R01 Purchase Order", "R02 Material Document", "R05 Outbound Delivery"].map((o) => <option key={o}>{o}</option>)}
-              </select></div>
-            <div className="space-y-1"><Label className="text-xs text-muted-foreground">PO Number</Label>
-              <div className="flex gap-2">
-                <Input className="font-mono" placeholder="PO Number" value={h.poNumber} onChange={(e) => set("poNumber", e.target.value)} />
-                <Button variant="outline" size="icon" aria-label="Search PO" onClick={() => toast.info("PO lookup is not connected yet")}><Search className="h-4 w-4" /></Button>
-              </div></div>
-            <div className="space-y-1"><Label className="text-xs text-muted-foreground">Item</Label>
-              <Input className="font-mono" placeholder="Item" value={h.poItem} onChange={(e) => set("poItem", e.target.value)} /></div>
-          </>)}
-          <div className="space-y-1"><Label className="text-xs text-muted-foreground">Plant</Label>
-            <Input value={h.plant} onChange={(e) => set("plant", e.target.value)} /></div>
-          <div className="space-y-1"><Label className="text-xs text-muted-foreground">GR goods receipt</Label>
-            <Input className="font-mono" value={h.movementType} onChange={(e) => set("movementType", e.target.value)} /></div>
           </div>
         </div>
       </div>
 
-      <div className="mt-5 rounded-xl border bg-card shadow-card">
-        <div className="flex items-center justify-between border-b p-4">
-          <h3 className="font-display text-base font-semibold">Items <span className="text-xs font-normal text-muted-foreground">({rows.length})</span></h3>
+      <div className={`mt-4 ${cardCls}`}>
+        <div className={`${stripCls} flex items-center justify-between py-1.5`}>
+          <h3 className="font-display text-sm font-semibold">Items <span className="text-xs font-normal opacity-80">({rows.length})</span></h3>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setRows((r) => [...r, emptyRow()])}><Plus className="h-4 w-4" />Add Line</Button>
-            <Button variant="outline" size="sm" disabled={selected === null}
+            <Button variant="secondary" size="sm" className="h-7" onClick={() => setRows((r) => [...r, emptyRow()])}><Plus className="h-4 w-4" />Add Line</Button>
+            <Button variant="secondary" size="sm" className="h-7" disabled={selected === null}
               onClick={() => { setRows((r) => r.filter((_, i) => i !== selected)); setSelected(null); }}>
               <Trash2 className="h-4 w-4" />Delete
             </Button>
@@ -283,9 +295,10 @@ export default function GRNCreate() {
         const ro = (k: string, cls = "") => <Input readOnly className={`bg-muted ${cls}`} value={v(k)} />;
         const pair = (a: React.ReactNode, b: React.ReactNode) => <div className="grid grid-cols-[1fr_100px] gap-2">{a}{b}</div>;
         return (
-          <div className="mt-5 rounded-xl border bg-card shadow-card">
-            <Tabs defaultValue="material" className="p-4">
-              <TabsList className="flex-wrap h-auto">
+          <div className={`mt-4 ${cardCls}`}>
+            <div className={stripCls}>Item Detail — Line {di + 1}</div>
+            <Tabs defaultValue="material" className="p-3">
+              <TabsList className={`flex-wrap h-auto ${tabCls}`}>
                 {[["material","Material"],["quantity","Quantity"],["where","Where"],["po","Purchase Order Data"],["partner","Partner"],["acct","Account Assignment"],["custom","Custom Fields"]].map(([k,l]) => <TabsTrigger key={k} value={k}>{l}</TabsTrigger>)}
               </TabsList>
               <TabsContent value="material" className="pt-4">

@@ -17,16 +17,20 @@ export interface ItemUpdateResult {
   sapBody?: unknown;
 }
 
-function sanitizeItemRow(
+export function sanitizeItemRow(
   body: Record<string, unknown>,
   fields: FieldDef[],
   liveRow: Record<string, unknown> = {},
 ): Record<string, unknown> {
-  const typeByKey = new Map(fields.map((f) => [f.key, f.type] as const));
-  const allowed = fields.length > 0 ? new Set(fields.map((f) => f.key)) : null;
+  // Match names ignoring case/underscores: body uses SAP names (VendorName),
+  // configured fields use snake_case (vendor_name).
+  const nk = (x: string) => x.replace(/_/g, "").toLowerCase();
+  const typeByKey = new Map(fields.map((f) => [nk(f.key), f.type] as const));
+  const allowed = fields.length > 0 ? new Set(fields.map((f) => nk(f.key))) : null;
+  const liveByNk = new Map(Object.entries(liveRow).map(([lk, lv]) => [nk(lk), lv] as const));
   const out: Record<string, unknown> = {};
   for (const [k, raw] of Object.entries(body)) {
-    if (allowed && !allowed.has(k)) continue;
+    if (allowed && !allowed.has(nk(k))) continue;
     if (raw === null || raw === undefined) continue;
     if (k.startsWith("@") || k === "SAP__Messages") continue;
     // Skip SAP server-managed audit fields when null/empty
@@ -34,8 +38,8 @@ function sanitizeItemRow(
       if (raw === "" || raw === null) continue;
     }
 
-    const liveVal = liveRow[k];
-    let effectiveType: FieldDef["type"] | undefined = typeByKey.get(k);
+    const liveVal = k in liveRow ? liveRow[k] : liveByNk.get(nk(k));
+    let effectiveType: FieldDef["type"] | undefined = typeByKey.get(nk(k));
     if (typeof liveVal === "number") effectiveType = "number";
     else if (typeof liveVal === "boolean") effectiveType = "boolean";
 
@@ -204,6 +208,9 @@ export function useSapItemUpdate(api: SapApi | null | undefined) {
     try {
       const itemFields = api?.requestItemFields ?? [];
       const payload = sanitizeItemRow(body, itemFields, childRow);
+      if (Object.keys(payload).length === 0) {
+        return { ok: false, error: "Nothing changed — no fields to send." };
+      }
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",

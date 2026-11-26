@@ -381,6 +381,7 @@ async function sapWrite(method, path, body, extraHeaders = {}, extraCookies = ""
     };
 
     _log.logSapPayload({ method, path, body });
+    console.log(`[SAP WRITE] ${method} ${path}\n[SAP WRITE] payload: ${serialized ?? "(none)"}`);
     let res = await doRequest();
     if (res.status === 401 && useOauthCc) {
       cachedToken = null;
@@ -394,6 +395,10 @@ async function sapWrite(method, path, body, extraHeaders = {}, extraCookies = ""
       res = await doRequest();
     }
     _log.logSapResponse({ method, path, status: res.status, data: res.data });
+    {
+      const d = typeof res.data === "string" ? res.data : JSON.stringify(res.data);
+      console.log(`[SAP WRITE] ${res.status} response: ${d ? d.slice(0, 4000) : "(empty)"}`);
+    }
     ensureJson(res, `${method} ${path}`, Boolean(cookies));
     if (res.status >= 400) {
       throw fromAxios({ message: `${method} ${path} failed`, response: res });

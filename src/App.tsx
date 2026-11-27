@@ -15,6 +15,7 @@ import DMRNew from "./pages/DMRNew";
 import OCRCapture from "./pages/OCRCapture";
 import GRN from "./pages/GRN";
 import GRNCreate from "./pages/GRNCreate";
+import SESCreate from "./pages/SESCreate";
 import Tracker from "./pages/Tracker";
 import Approvals from "./pages/Approvals";
 import Documents from "./pages/Documents";
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/dmr/:id" element={<RequirePermission screen="dmr" label="DMR"><DMRDetail /></RequirePermission>} />
               <Route path="/ocr" element={<RequirePermission screen="gate_entries" label="Gate Entries"><OCRCapture /></RequirePermission>} />
               <Route path="/grn/new" element={<RequirePermission screen="grn" label="GRN"><GRNCreate /></RequirePermission>} />
+              <Route path="/ses/new" element={<RequirePermission screen="grn" label="Service Entry Sheet"><SESCreate /></RequirePermission>} />
               <Route path="/grn" element={<RequirePermission screen="grn" label="GRN"><GRN /></RequirePermission>} />
               <Route path="/tracker" element={<RequirePermission screen="sap_tracker" label="SAP Tracker"><Tracker /></RequirePermission>} />
               <Route path="/approvals" element={<RequirePermission screen="approvals" label="Approvals"><Approvals /></RequirePermission>} />

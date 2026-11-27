@@ -19,6 +19,7 @@ import {
   Plug,
   Activity,
   Users,
+  ClipboardList,
 } from "lucide-react";
 import { useState } from "react";
 import logo from "@/assets/rithwik-logo.png";
@@ -36,7 +37,7 @@ import {
 import { initials, useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
-type NavChild = { to: string; label: string; icon: typeof LayoutDashboard };
+type NavChild = { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean; screen?: string };
 type NavItem = {
   to?: string;
   label: string;
@@ -45,21 +46,46 @@ type NavItem = {
   badge?: number;
   screen: string;
   children?: NavChild[];
+  prefixes?: string[];
 };
 
 const nav: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true, screen: "dashboard" },
-  { to: "/ocr", label: "OCR Capture", icon: Camera, screen: "gate_entries" },
-  { to: "/dmr/new", label: "Create DMR", icon: FileText, end: true, screen: "dmr" },
-  { to: "/dmr/update", label: "Update DMR", icon: FileText, end: true, screen: "dmr" },
-  { to: "/dmr/sap-gate-entries", label: "All DMR", icon: Database, end: true, screen: "dmr" },
-  { to: "/grn/new", label: "Create GRN", icon: PackageCheck, end: true, screen: "grn" },
-  { to: "/grn", label: "GRN", icon: PackageCheck, end: true, screen: "grn" },
+  {
+    label: "DMR",
+    icon: FileText,
+    screen: "dmr",
+    prefixes: ["/ocr", "/dmr"],
+    children: [
+      { to: "/ocr", label: "OCR Capture", icon: Camera, screen: "gate_entries" },
+      { to: "/dmr/new", label: "Create DMR", icon: FileText, end: true, screen: "dmr" },
+      { to: "/dmr/update", label: "Update DMR", icon: FileText, end: true, screen: "dmr" },
+      { to: "/dmr/sap-gate-entries", label: "All DMR", icon: Database, end: true, screen: "dmr" },
+    ],
+  },
+  {
+    label: "GRN",
+    icon: PackageCheck,
+    screen: "grn",
+    prefixes: ["/grn"],
+    children: [
+      { to: "/grn/new", label: "Create GRN", icon: PackageCheck, end: true, screen: "grn" },
+      { to: "/grn", label: "GRN", icon: PackageCheck, end: true, screen: "grn" },
+    ],
+  },
+  {
+    label: "Service Entry Sheet",
+    icon: ClipboardList,
+    screen: "grn",
+    prefixes: ["/ses"],
+    children: [{ to: "/ses/new", label: "Create SES", icon: ClipboardList, end: true, screen: "grn" }],
+  },
   { to: "/tracker", label: "SAP Tracker", icon: Database, screen: "sap_tracker" },
   {
     label: "SAP Module",
     icon: Plug,
     screen: "sap_module",
+    prefixes: ["/sap"],
     children: [
       { to: "/sap/monitor", label: "Sync Monitor", icon: Activity },
       { to: "/sap/settings", label: "API Settings", icon: Settings },
@@ -76,11 +102,21 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { profile, roleNames, can, signOut } = useAuth();
-  const [sapOpen, setSapOpen] = useState(location.pathname.startsWith("/sap"));
-  const visibleNav = nav.filter(
-    (n) => can(n.screen) || (n.screen === "user_management" && can("role_management")),
+  const inGroup = (n: NavItem) => (n.prefixes ?? []).some((p) => location.pathname.startsWith(p));
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(nav.filter((n) => n.children).map((n) => [n.label, inGroup(n)])),
   );
-  const current = visibleNav.find((n) =>
+  const visibleNav = nav
+    .map((n) =>
+      n.children ? { ...n, children: n.children.filter((c) => (c.screen ? can(c.screen) : can(n.screen))) } : n,
+    )
+    .filter((n) =>
+      n.children
+        ? n.children.length > 0
+        : can(n.screen) || (n.screen === "user_management" && can("role_management")),
+    );
+  const flatNav = visibleNav.flatMap((n) => (n.children ? n.children : [n]));
+  const current = flatNav.find((n) =>
     n.to ? (n.end ? location.pathname === n.to : location.pathname.startsWith(n.to)) : false,
   );
 
@@ -130,11 +166,12 @@ export function AppShell() {
           </div>
           {visibleNav.map((item) => {
             if (item.children) {
-              const groupActive = location.pathname.startsWith("/sap");
+              const groupActive = inGroup(item);
+              const isOpen = openGroups[item.label] || groupActive;
               return (
                 <div key={item.label}>
                   <button
-                    onClick={() => setSapOpen((s) => !s)}
+                    onClick={() => setOpenGroups((g) => ({ ...g, [item.label]: !isOpen }))}
                     className={cn(
                       "group flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                       groupActive
@@ -145,15 +182,16 @@ export function AppShell() {
                     <item.icon className="h-4 w-4 shrink-0" />
                     <span className="flex-1 text-left">{item.label}</span>
                     <ChevronRight
-                      className={cn("h-3.5 w-3.5 transition-transform", sapOpen && "rotate-90")}
+                      className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-90")}
                     />
                   </button>
-                  {sapOpen && (
+                  {isOpen && (
                     <div className="ml-3 mt-0.5 space-y-0.5 border-l border-sidebar-border pl-2">
                       {item.children.map((c) => (
                         <NavLink
                           key={c.to}
                           to={c.to}
+                          end={c.end}
                           onClick={() => setOpen(false)}
                           className={({ isActive }) =>
                             cn(

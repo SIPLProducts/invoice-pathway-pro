@@ -28,7 +28,6 @@ export default function SapGateEntries() {
   const [pdfBusy, setPdfBusy] = useState(false);
   const onDataChange = useCallback((d: typeof data) => setData(d), []);
   const { selectedApi, updateApi, updateNeedsConfig, itemUpdateApi, itemUpdateNeedsConfig } = useGateApis();
-  const [pdfRow, setPdfRow] = useState<Record<string, unknown> | null>(null);
 
   // Build the table schema once per selected API. Rebuilding it on every render
   // gave SapLiveTable new column arrays each time and caused an endless render loop.
@@ -72,24 +71,8 @@ export default function SapGateEntries() {
                 itemUpdateApi={itemUpdateApi ?? undefined}
                 onItemSaved={() => setRefreshKey((k) => k + 1)}
                 onDataChange={onDataChange}
-                onRowClick={(row) => {
-                  if (!pdfBusy) setPdfRow(row);
-                }}
+                selectable
               />
-              <AlertDialog open={!!pdfRow} onOpenChange={(o) => !o && setPdfRow(null)}>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Download PDF?</AlertDialogTitle>
-                    <AlertDialogDescription>Do you want to download the PDF for this DMR?</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => { const r = pdfRow; setPdfRow(null); if (r) void downloadPdf(r); }}>
-                      Yes, download
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
               {updateNeedsConfig && (
                 <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-xs text-foreground">
                   <div className="font-semibold">

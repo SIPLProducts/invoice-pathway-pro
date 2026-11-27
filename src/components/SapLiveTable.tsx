@@ -21,7 +21,9 @@ import { useSapProxy } from "@/hooks/useSapProxy";
 import { mergeColumnsWithData, sortNewestFirst, type ColumnDef, type SapApiSchema } from "@/lib/sapApiSchemas";
 import type { SapApi } from "@/lib/sapApisStore";
 import { getPath } from "@/lib/getPath";
-import { RefreshCw, AlertCircle, Wifi, WifiOff, Package, KeyRound, Pencil } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { filterRowsByQuery } from "@/lib/rowSearch";
+import { RefreshCw, Search, X, AlertCircle, Wifi, WifiOff, Package, KeyRound, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EditableItemsTable } from "@/components/EditableItemsTable";
 
@@ -103,7 +105,11 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
   const viewSchema = useMemo(() => ({ ...schema, columns, childColumns }), [schema, columns, childColumns]);
   const hasChildren = Boolean(schema.childKey && childColumns?.length);
 
-  const allRows = rows as Record<string, unknown>[];
+  const [query, setQuery] = useState("");
+  const allRows = useMemo(
+    () => filterRowsByQuery(rows as Record<string, unknown>[], query, schema.childKey),
+    [rows, query, schema.childKey],
+  );
   const keyOf = (row: Record<string, unknown>, idx: number) => String(getPath(row, schema.rowKey) ?? idx);
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
@@ -143,12 +149,27 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
     <div className="rounded-xl border bg-card shadow-card">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold">{schema.label}</h3>
           <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-            {total} record{total === 1 ? "" : "s"}
+            {query.trim() ? `${total} of ${rows.length}` : total} record{total === 1 ? "" : "s"}
             {selectedKey && ` · 1 selected`}
           </span>
+          <div className="relative w-56">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+              placeholder="Search Gate ID, PO, vendor, vehicle…"
+              className="h-8 pl-7 pr-7 text-xs"
+              aria-label="Search DMR"
+            />
+            {query && (
+              <button type="button" onClick={() => setQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear search">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
           {proxyConfigured ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
               <Wifi className="h-3 w-3" /> Live
@@ -330,7 +351,7 @@ export function SapLiveTable({ api, schema, onEdit, itemUpdateApi, onItemSaved, 
                 const editKey = keyFieldName ? row[keyFieldName] : undefined;
                 const canEdit = editKey !== undefined && editKey !== null && editKey !== "";
                 return (
-                  <TableRow key={key} className={cn("hover:bg-muted/30", onRowClick && "cursor-pointer")} onClick={() => { setSelectedKey(key); onRowClick?.(row); }} title={onRowClick ? "Click to download PDF" : undefined} data-state={selectedKey === key ? "selected" : undefined}>
+                  <TableRow key={key} className={cn("hover:bg-muted/30", (selectable || onRowClick) && "cursor-pointer")} onClick={() => { setSelectedKey(key); onRowClick?.(row); }} title={selectable ? "Click to select" : undefined} data-state={selectedKey === key ? "selected" : undefined}>
                     {selectable && (
                       <TableCell className="w-10">
                         <input

@@ -115,7 +115,7 @@ export function AppShell() {
         ? n.children.length > 0
         : can(n.screen) || (n.screen === "user_management" && can("role_management")),
     );
-  const flatNav: { to?: string; end?: boolean; label: string }[] = visibleNav.flatMap((n) =>
+  const flatNav: { to?: string; end?: boolean; label: string }[] = visibleNav.flatMap<{ to?: string; end?: boolean; label: string }>((n) =>
     n.children ? n.children : [n],
   );
   const current = flatNav.find((n) =>

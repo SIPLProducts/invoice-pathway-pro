@@ -366,10 +366,10 @@ const seed: SapApi[] = [
   {
     name: "Post Mat Doc Against DMR",
     description:
-      "POSTs postGoodsReceipt for one Gate ID and returns the Material Document. Used by the Post button on Create GRN.",
+      "POSTs postGoodsReceiptByPo with PO number and item and returns the Material Document. Used by the Post button on Create GRN.",
     baseUrl: "https://1f674db9-07aa-4869-885b-435d1624cc4c.abap.us10.hana.ondemand.com",
     endpoint:
-      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd_a2x/sap/zsd_gate_entry/0001/GateHeader('{gate_id}')/com.sap.gateway.srvd_a2x.zsd_gate_entry.v0001.postGoodsReceipt",
+      "/sap/opu/odata4/sap/zsb_gate_entry_o4/srvd_a2x/sap/zsd_gate_entry/0001/GateHeader/com.sap.gateway.srvd_a2x.zsd_gate_entry.v0001.postGoodsReceiptByPo",
     method: "POST",
     auth: "Basic",
     status: "Active",
@@ -378,6 +378,8 @@ const seed: SapApi[] = [
     autoSync: { enabled: false, frequencyMinutes: 5 },
     rowKey: "gate_id",
     requestHeaderFields: [
+      { key: "PoNumber", label: "PO Number", type: "string" },
+      { key: "PoItem", label: "PO Item", type: "string" },
       { key: "PostingDate", label: "Posting Date", type: "date" },
       { key: "StorageLocations", label: "Storage Locations", type: "string" },
       { key: "Serials", label: "Serials", type: "string" },
@@ -389,6 +391,7 @@ const seed: SapApi[] = [
       { key: "PostingDate", label: "Posting Date", type: "date" },
       { key: "CancelRefDoc", label: "Cancel Ref Doc", type: "string" },
       { key: "CancelRefYear", label: "Cancel Ref Year", type: "string" },
+      { key: "ServiceEntrySheet", label: "Service Entry Sheet", type: "string" },
     ],
     scripts: { csrfFetch: true },
     middleware: {
@@ -718,6 +721,18 @@ async function bootstrapCloud(): Promise<void> {
       }
     } catch (e) {
       console.warn("[sapApisStore] Endpoint refresh failed (non-fatal).", e);
+    }
+
+    // Move "Post Mat Doc Against DMR" from postGoodsReceipt (Gate ID in URL) to postGoodsReceiptByPo.
+    try {
+      const s = seed.find((x) => x.name === "Post Mat Doc Against DMR");
+      const old = cloud.filter((a) => a.name === s?.name && /\/postGoodsReceipt$/i.test((a.endpoint ?? "").replace(/.*\./, "/")));
+      if (s && old.length > 0) {
+        await bulkUpsert(old.map((a) => ({ ...a, endpoint: s.endpoint, description: s.description, requestHeaderFields: s.requestHeaderFields, responseHeaderFields: s.responseHeaderFields })));
+        cloud = await fetchAllFromCloud();
+      }
+    } catch (e) {
+      console.warn("[sapApisStore] GRN post endpoint update failed (non-fatal).", e);
     }
 
     // Retire the old "Update Header Data" API; "Update DMR Based on Gate ID" replaces it.

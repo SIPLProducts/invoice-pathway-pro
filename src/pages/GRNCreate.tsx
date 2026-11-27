@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronLeft, ChevronRight, Plus, Printer, RotateCcw, Save, Search, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useSapGrnPost } from "@/hooks/useSapGrnPost";
-import { buildGrnPostPayload, missingSerialRows } from "@/lib/grnPostPayload";
+import { buildGrnPostPayload, missingPoFields, missingSerialRows } from "@/lib/grnPostPayload";
 import { alertError, alertSuccess, confirmAction } from "@/lib/alerts";
 
 type Row = Record<string, string | boolean>;
@@ -205,7 +205,9 @@ export default function GRNCreate() {
       await alertError("Serial No. required", `Enter Serial No. for item ${missing.map((i) => String(rows[i].item ?? i + 1)).join(", ")} and post again.`);
       return;
     }
-    const body = buildGrnPostPayload(h.postDate, rows as Record<string, unknown>[]);
+    const body = buildGrnPostPayload(h.postDate, rows as Record<string, unknown>[], { poNumber: h.poNumber, poItem: h.poItem });
+    const missingPo = missingPoFields(body);
+    if (missingPo.length) { await alertError(`${missingPo.join(" and ")} required`, "Enter it in the Items table (Purchase Order / PO Item) and post again."); return; }
     if (!body.PostingDate) { await alertError("Posting Date is required"); return; }
     if (!body.StorageLocations) { await alertError("Storage Location is required", "Enter SLoc on a line item."); return; }
     if (!(await confirmAction(`Post GRN for Gate ${id}?`, `Posting date ${body.PostingDate ?? "-"}`))) return;
@@ -214,7 +216,7 @@ export default function GRNCreate() {
     resetScreen();
     const d = r.data ?? {};
     const doc = str(d, "material_doc"); const yr = str(d, "material_doc_year");
-    await alertSuccess("GRN posted", doc ? `Material Document ${doc} / ${yr} posted for Gate ${id}` : `Posted for Gate ${id}`);
+    await alertSuccess("GRN posted", doc ? `Material Document ${doc} / ${yr} posted for Gate ${id}${str(d, "service_entry_sheet") ? ` · Service Entry Sheet ${str(d, "service_entry_sheet")}` : ""}` : `Posted for Gate ${id}`);
   };
   const set = (k: keyof typeof h, v: string | boolean) => setH((p) => ({ ...p, [k]: v }));
   const setCell = (i: number, k: string, v: string | boolean) => { if (k === "serial") setMissingSerials((m) => { if (!m.has(i)) return m; const n = new Set(m); n.delete(i); return n; }); setRowsCell(i, k, v); };

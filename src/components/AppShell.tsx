@@ -115,7 +115,9 @@ export function AppShell() {
         ? n.children.length > 0
         : can(n.screen) || (n.screen === "user_management" && can("role_management")),
     );
-  const flatNav = visibleNav.flatMap((n) => (n.children ? n.children : [n]));
+  const flatNav: { to?: string; end?: boolean; label: string }[] = visibleNav.flatMap((n) =>
+    n.children ? n.children : [n],
+  );
   const current = flatNav.find((n) =>
     n.to ? (n.end ? location.pathname === n.to : location.pathname.startsWith(n.to)) : false,
   );
